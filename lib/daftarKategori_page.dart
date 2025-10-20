@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'tambahKategori_page.dart';
 
 class DaftarKategoriPage extends StatefulWidget {
   const DaftarKategoriPage({super.key});
@@ -128,6 +129,17 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
         .then((_) => _fetchCategories());
   }
 
+  void _navigateToEditCategory(Map<String, dynamic> category) {
+    Navigator.of(context, rootNavigator: true)
+        .pushNamed(
+      '/tambah-kategori',
+      arguments: category,
+    )
+        .then((_) {
+      _fetchCategories();
+    });
+  }
+
   Future<void> _handleDelete(String categoryId, String categoryName) async {
     try {
       final token = await _getAuthToken();
@@ -171,6 +183,7 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          backgroundColor: Colors.white,
           shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           title: const Text('Konfirmasi Hapus'),
@@ -388,7 +401,9 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
                       borderRadius: BorderRadius.circular(8.0)),
                   icon: const Icon(Icons.more_horiz),
                   onSelected: (String value) {
-                    if (value == 'hapus') {
+                    if (value == 'ubah') {
+                      _navigateToEditCategory(category);
+                    } else if (value == 'hapus') {
                       _showDeleteConfirmationDialog(
                           context, category['name'], category['id']);
                     }

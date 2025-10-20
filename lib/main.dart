@@ -2,7 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+
+// You need to import all your pages here
 import 'package:proyekpos2/tambahKupon_page.dart';
+import 'package:proyekpos2/tambahPelanggan_page.dart';
 import 'daftarProduk_page.dart';
 import '/tambahProduk_page.dart';
 import 'business_page.dart';
@@ -65,17 +68,49 @@ class MyApp extends StatelessWidget {
         ),
       ),
       home: const AuthWrapper(),
-      routes: {
-        '/login': (context) => const LoginPage(),
-        '/register': (context) => const RegisterPage(),
-        '/business': (context) => const BusinessPage(),
-        '/dashboard': (context) => const DashboardPage(),
-        '/daftar-produk' : (context) => const DaftarProdukPage(),
-        '/tambah-produk': (context) => const TambahProdukPage(),
-        '/daftar-kategori' : (context) => const DaftarKategoriPage(),
-        '/tambah-kategori' : (context) => const TambahKategoriPage(),
-        '/tambah-kupon' : (context) => const TambahKuponPage()
-     },
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
+          case '/login':
+            return MaterialPageRoute(builder: (_) => const LoginPage());
+          case '/register':
+            return MaterialPageRoute(builder: (_) => const RegisterPage());
+          case '/business':
+            return MaterialPageRoute(builder: (_) => const BusinessPage());
+          case '/dashboard':
+            return MaterialPageRoute(builder: (_) => const DashboardPage());
+          case '/daftar-produk':
+            return MaterialPageRoute(builder: (_) => const DaftarProdukPage());
+          case '/tambah-produk':
+            final Map<String, dynamic>? product =
+            settings.arguments as Map<String, dynamic>?;
+            return MaterialPageRoute(
+              builder: (_) => TambahProdukPage(product: product),
+            );
+          case '/daftar-kategori':
+            return MaterialPageRoute(builder: (_) => const DaftarKategoriPage());
+
+          case '/tambah-kategori':
+            final Map<String, dynamic>? kategori =
+            settings.arguments as Map<String, dynamic>?;
+            return MaterialPageRoute(
+              builder: (_) => TambahKategoriPage(kategori: kategori),
+            );
+          case '/tambah-kupon':
+            return MaterialPageRoute(builder: (_) => const TambahKuponPage());
+          case '/tambah-pelanggan':
+            final Map<String, dynamic>? pelanggan =
+            settings.arguments as Map<String, dynamic>?;
+            return MaterialPageRoute(
+              builder: (_) => TambahPelangganPage(pelanggan: pelanggan),
+            );
+          default:
+            return MaterialPageRoute(
+              builder: (_) => const Scaffold(
+                body: Center(child: Text('Page not found')),
+              ),
+            );
+        }
+      },
     );
   }
 }
@@ -110,6 +145,7 @@ class AuthWrapper extends StatelessWidget {
               }
 
               if (userDocSnapshot.hasError || !userDocSnapshot.data!.exists) {
+                FirebaseAuth.instance.signOut();
                 return const LoginPage();
               }
 

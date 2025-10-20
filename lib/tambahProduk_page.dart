@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:proyekpos2/service/api_service.dart';
 
 class TambahProdukPage extends StatefulWidget {
-  const TambahProdukPage({super.key});
+  final Map<String, dynamic>? product; // To accept product data for editing
+
+  const TambahProdukPage({super.key, this.product});
 
   @override
   State<TambahProdukPage> createState() => _TambahProdukPageState();
@@ -12,23 +12,84 @@ class TambahProdukPage extends StatefulWidget {
 
 class _TambahProdukPageState extends State<TambahProdukPage> {
   final _formKey = GlobalKey<FormState>();
+  final _apiService = ApiService();
   bool _isLoading = false;
+  bool _isFetchingData = true; // For initial data load
+
   final _namaProdukController = TextEditingController();
   final _deskripsiController = TextEditingController();
   final _skuController = TextEditingController();
   final _hargaJualController = TextEditingController();
   final _hargaBeliController = TextEditingController();
 
-  List<String> _selectedOutlets = [];
-  String? _selectedKategori;
+  // Dynamic data state
+  List<Map<String, dynamic>> _outletOptions = [];
+  List<Map<String, dynamic>> _kategoriOptions = [];
+  List<Map<String, dynamic>> _selectedOutlets = [];
+  String? _selectedKategoriId;
 
-  final List<String> _outletOptions = ['Outlet Pusat', 'Outlet Cabang A', 'Outlet Gudang'];
-  final List<String> _kategoriOptions = ['Minuman Kopi', 'Makanan Ringan', 'Teh & Lainnya'];
-
-  // State for custom overlay dropdown
   OverlayEntry? _overlayEntry;
   final LayerLink _layerLink = LayerLink();
   bool _isOutletOverlayOpen = false;
+
+  bool get _isEditMode => widget.product != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    setState(() => _isFetchingData = true);
+    try {
+      // Fetch both outlets and categories
+      final outlets = await _apiService.getOutlets();
+      // Get categories for the first outlet by default
+      final categories = outlets.isNotEmpty
+          ? await _apiService.getCategories(outletId: outlets.first['id'])
+          : <Map<String, dynamic>>[];
+
+      if (mounted) {
+        setState(() {
+          _outletOptions = outlets;
+          _kategoriOptions = categories;
+          // If in edit mode, populate fields
+          if (_isEditMode) {
+            _populateFieldsForEdit();
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Failed to load data: $e'),
+              backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isFetchingData = false);
+      }
+    }
+  }
+
+  void _populateFieldsForEdit() {
+    final product = widget.product!;
+    _namaProdukController.text = product['name'] ?? '';
+    _deskripsiController.text = product['description'] ?? '';
+    _skuController.text = product['sku'] ?? '';
+    _hargaJualController.text = product['sellingPrice']?.toString() ?? '';
+    _hargaBeliController.text = product['costPrice']?.toString() ?? '0';
+    _selectedKategoriId = product['categoryId'];
+
+    // Match selected outlets
+    final List<String> outletIds =
+    List<String>.from(product['outletIds'] ?? []);
+    _selectedOutlets =
+        _outletOptions.where((opt) => outletIds.contains(opt['id'])).toList();
+  }
 
   @override
   void dispose() {
@@ -41,7 +102,77 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
     super.dispose();
   }
 
-  // --- MODIFIED: Methods now accept a BuildContext ---
+  Future<void> _saveProduct() async {
+    final isFormValid = _formKey.currentState!.validate();
+    if (_selectedOutlets.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Outlet harus dipilih'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    if (_selectedKategoriId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Kategori harus dipilih'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    if (!isFormValid) return;
+
+    setState(() => _isLoading = true);
+    try {
+      final sellingPrice = double.tryParse(_hargaJualController.text) ?? 0.0;
+      final costPrice = double.tryParse(_hargaBeliController.text);
+
+      if (_isEditMode) {
+        // Update logic
+        await _apiService.updateProduct(
+          id: widget.product!['id'],
+          name: _namaProdukController.text,
+          description: _deskripsiController.text,
+          sku: _skuController.text,
+          sellingPrice: sellingPrice,
+          costPrice: costPrice,
+          categoryId: _selectedKategoriId!,
+          outlets: _selectedOutlets,
+        );
+      } else {
+        // Add logic
+        await _apiService.addProduct(
+          name: _namaProdukController.text,
+          description: _deskripsiController.text,
+          sku: _skuController.text,
+          sellingPrice: sellingPrice,
+          costPrice: costPrice,
+          categoryId: _selectedKategoriId!,
+          outlets: _selectedOutlets,
+        );
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Product saved successfully!'),
+              backgroundColor: Colors.green),
+        );
+        Navigator.of(context).pop(true); // Pop with success
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Failed to save product: $e'),
+              backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   void _toggleOutletOverlay(BuildContext targetContext) {
     if (_isOutletOverlayOpen) {
       _removeOutletOverlay();
@@ -57,13 +188,14 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
   void _removeOutletOverlay() {
     _overlayEntry?.remove();
     _overlayEntry = null;
-    setState(() {
-      _isOutletOverlayOpen = false;
-    });
+    if (mounted) {
+      setState(() {
+        _isOutletOverlayOpen = false;
+      });
+    }
   }
 
   OverlayEntry _createOutletOverlayEntry(BuildContext targetContext) {
-    // --- FIXED: Get RenderBox from the correct context ---
     final RenderBox renderBox = targetContext.findRenderObject() as RenderBox;
     final size = renderBox.size;
 
@@ -73,7 +205,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
         child: CompositedTransformFollower(
           link: _layerLink,
           showWhenUnlinked: false,
-          offset: Offset(0, size.height + 4), // Position below the field
+          offset: Offset(0, size.height + 4),
           child: Material(
             elevation: 4.0,
             color: Colors.white,
@@ -83,38 +215,41 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
             ),
             child: StatefulBuilder(
               builder: (context, setDialogState) {
-                final isAllSelected = _selectedOutlets.length == _outletOptions.length;
+                final isAllSelected =
+                    _selectedOutlets.length == _outletOptions.length;
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CheckboxListTile(
-                      title: const Text('Pilih Semua'),
-                      value: isAllSelected,
-                      onChanged: (bool? value) {
-                        setDialogState(() {
-                          if (value == true) {
-                            _selectedOutlets = List.from(_outletOptions);
-                          } else {
-                            _selectedOutlets.clear();
-                          }
-                          setState(() {});
-                        });
-                      },
-                      controlAffinity: ListTileControlAffinity.leading,
-                      activeColor: const Color(0xFF00A3A3),
-                    ),
-                    ..._outletOptions.map((outlet) {
-                      return CheckboxListTile(
-                        title: Text(outlet),
-                        value: _selectedOutlets.contains(outlet),
+                    if (_outletOptions.length > 1)
+                      CheckboxListTile(
+                        title: const Text('Pilih Semua'),
+                        value: isAllSelected,
                         onChanged: (bool? value) {
                           setDialogState(() {
                             if (value == true) {
-                              if (!_selectedOutlets.contains(outlet)) {
-                                _selectedOutlets.add(outlet);
-                              }
+                              _selectedOutlets = List.from(_outletOptions);
                             } else {
-                              _selectedOutlets.remove(outlet);
+                              _selectedOutlets.clear();
+                            }
+                            setState(() {});
+                          });
+                        },
+                        controlAffinity: ListTileControlAffinity.leading,
+                        activeColor: const Color(0xFF00A3A3),
+                      ),
+                    ..._outletOptions.map((outlet) {
+                      final isSelected = _selectedOutlets
+                          .any((item) => item['id'] == outlet['id']);
+                      return CheckboxListTile(
+                        title: Text(outlet['name']),
+                        value: isSelected,
+                        onChanged: (bool? value) {
+                          setDialogState(() {
+                            if (value == true) {
+                              _selectedOutlets.add(outlet);
+                            } else {
+                              _selectedOutlets.removeWhere(
+                                      (item) => item['id'] == outlet['id']);
                             }
                             setState(() {});
                           });
@@ -147,15 +282,17 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
             icon: const Icon(Icons.close, color: Colors.black87),
             onPressed: () => Navigator.of(context).pop(),
           ),
-          title: const Text(
-            'Tambahkan Produk',
-            style: TextStyle(
+          title: Text(
+            _isEditMode ? 'Edit Produk' : 'Tambahkan Produk',
+            style: const TextStyle(
               color: Color(0xFF333333),
               fontWeight: FontWeight.bold,
             ),
           ),
         ),
-        body: Form(
+        body: _isFetchingData
+            ? const Center(child: CircularProgressIndicator())
+            : Form(
           key: _formKey,
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24.0),
@@ -181,20 +318,21 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                           _buildTextField(
                             controller: _deskripsiController,
                             label: 'Deskripsi Produk',
-                            hint: 'Contoh: Perpaduan kopi, susu, dan gula aren',
+                            hint:
+                            'Contoh: Perpaduan kopi, susu, dan gula aren',
                             maxLines: 3,
                           ),
                           const SizedBox(height: 16),
                           _buildImagePicker(),
                           const SizedBox(height: 16),
-                          _buildDropdownField(
+                          _buildCategoryDropdownField(
                             label: 'Kategori Produk',
-                            value: _selectedKategori,
+                            value: _selectedKategoriId,
                             items: _kategoriOptions,
                             hint: 'Pilih kategori',
                             onChanged: (value) {
                               setState(() {
-                                _selectedKategori = value;
+                                _selectedKategoriId = value;
                               });
                             },
                             isRequired: true,
@@ -220,7 +358,6 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                                   controller: _hargaBeliController,
                                   label: 'Harga Beli',
                                   hint: '0',
-                                  isRequired: true,
                                   keyboardType: TextInputType.number,
                                   prefixText: 'Rp ',
                                 ),
@@ -253,29 +390,22 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                           ),
                         ),
                         ElevatedButton(
-                          onPressed: () {
-                            final isFormValid = _formKey.currentState!.validate();
-                            if (_selectedOutlets.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Outlet harus dipilih'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                              return;
-                            }
-                            if (isFormValid) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Menyimpan produk...')),
-                              );
-                            }
-                          },
+                          onPressed: _isLoading ? null : _saveProduct,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF00A3A3),
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 32, vertical: 16),
+                            disabledBackgroundColor: Colors.grey,
                           ),
-                          child: const Text('Simpan'),
+                          child: _isLoading
+                              ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2))
+                              : const Text('Simpan'),
                         ),
                       ],
                     ),
@@ -343,7 +473,8 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
             prefixText: prefixText,
             filled: true,
             fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey[300]!),
@@ -357,6 +488,12 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
             if (isRequired && (value == null || value.isEmpty)) {
               return '$label tidak boleh kosong';
             }
+            if (keyboardType == TextInputType.number &&
+                value != null &&
+                value.isNotEmpty &&
+                double.tryParse(value) == null) {
+              return 'Masukkan angka yang valid';
+            }
             return null;
           },
         ),
@@ -364,10 +501,10 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
     );
   }
 
-  Widget _buildDropdownField({
+  Widget _buildCategoryDropdownField({
     required String label,
     required String? value,
-    required List<String> items,
+    required List<Map<String, dynamic>> items,
     required String hint,
     required ValueChanged<String?> onChanged,
     bool isRequired = false,
@@ -389,7 +526,8 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
           decoration: InputDecoration(
             filled: true,
             fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey[300]!),
@@ -399,10 +537,10 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
               borderSide: BorderSide(color: Colors.grey[300]!),
             ),
           ),
-          items: items.map((String item) {
+          items: items.map((Map<String, dynamic> item) {
             return DropdownMenuItem<String>(
-              value: item,
-              child: Text(item),
+              value: item['id'],
+              child: Text(item['name']),
             );
           }).toList(),
           onChanged: onChanged,
@@ -428,7 +566,6 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
           ],
         ),
         const SizedBox(height: 8),
-        // --- MODIFIED: Wrapped in a Builder to get the correct context ---
         Builder(
           builder: (context) {
             return CompositedTransformTarget(
@@ -436,28 +573,37 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
               child: GestureDetector(
                 onTap: () => _toggleOutletOverlay(context),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                   width: double.infinity,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: _isOutletOverlayOpen ? const Color(0xFF00A3A3) : Colors.grey[300]!),
+                    border: Border.all(
+                        color: _isOutletOverlayOpen
+                            ? const Color(0xFF00A3A3)
+                            : Colors.grey[300]!),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       _selectedOutlets.isEmpty
-                          ? Text('Pilih', style: TextStyle(color: Colors.grey[600], fontSize: 16))
+                          ? Text('Pilih',
+                          style: TextStyle(
+                              color: Colors.grey[600], fontSize: 16))
                           : Expanded(
                         child: Wrap(
                           spacing: 6.0,
                           runSpacing: 6.0,
                           children: _selectedOutlets
                               .map((outlet) => Chip(
-                            label: Text(outlet),
+                            label: Text(outlet['name']),
                             onDeleted: () {
                               setState(() {
-                                _selectedOutlets.remove(outlet);
+                                _selectedOutlets.removeWhere(
+                                        (item) =>
+                                    item['id'] ==
+                                        outlet['id']);
                               });
                             },
                             deleteIconColor: Colors.grey[700],
@@ -467,7 +613,9 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                         ),
                       ),
                       Icon(
-                        _isOutletOverlayOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+                        _isOutletOverlayOpen
+                            ? Icons.arrow_drop_up
+                            : Icons.arrow_drop_down,
                         color: Colors.grey[700],
                       ),
                     ],
@@ -490,7 +638,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
         InkWell(
           onTap: () {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Buka galeri...')),
+              const SnackBar(content: Text('Buka galeri... (fitur belum ada)')),
             );
           },
           child: Container(
@@ -504,9 +652,11 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.cloud_upload_outlined, size: 40, color: Colors.grey[600]),
+                Icon(Icons.cloud_upload_outlined,
+                    size: 40, color: Colors.grey[600]),
                 const SizedBox(height: 8),
-                Text('Pilih atau letakkan berkas di sini', style: TextStyle(color: Colors.grey[700])),
+                Text('Pilih atau letakkan berkas di sini',
+                    style: TextStyle(color: Colors.grey[700])),
               ],
             ),
           ),
@@ -515,4 +665,3 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
     );
   }
 }
-

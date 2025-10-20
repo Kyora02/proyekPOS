@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:proyekpos2/service/api_service.dart';
+import 'package:proyekpos2/service/api_service.dart'; // Assuming this is your service
 
 class TambahKategoriPage extends StatefulWidget {
-  const TambahKategoriPage({super.key});
+  // 1. Add this field to accept an optional category for editing
+  final Map<String, dynamic>? kategori;
+
+  // 2. Update the constructor
+  const TambahKategoriPage({
+    super.key,
+    this.kategori, // Make it an optional parameter
+  });
 
   @override
   State<TambahKategoriPage> createState() => _TambahKategoriPageState();
@@ -22,10 +29,31 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
   bool _isOutletOverlayOpen = false;
   bool _isSaving = false;
 
+  // 3. Add a getter to easily check if we are in "Edit Mode"
+  bool get _isEditMode => widget.kategori != null;
+
   @override
   void initState() {
     super.initState();
-    _fetchOutlets();
+    // 4. Modify initState to fetch outlets and *then* populate fields if editing
+    _fetchOutlets().then((_) {
+      if (_isEditMode && mounted) {
+        // If we are editing, populate the form
+        final kategori = widget.kategori!;
+        _namaKategoriController.text = kategori['name'] ?? '';
+        _urutanController.text = kategori['order']?.toString() ?? '';
+
+        // Match the saved outletIds with the full outlet objects
+        final List<String> outletIds =
+        List<String>.from(kategori['outletIds'] ?? []);
+
+        setState(() {
+          _selectedOutlets = _outletOptions.where((option) {
+            return outletIds.contains(option['id']);
+          }).toList();
+        });
+      }
+    });
   }
 
   Future<void> _fetchOutlets() async {
@@ -99,38 +127,45 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
             ),
             child: StatefulBuilder(
               builder: (context, setDialogState) {
-                final isAllSelected = _selectedOutlets.length == _outletOptions.length;
+                final isAllSelected =
+                    _selectedOutlets.length == _outletOptions.length;
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CheckboxListTile(
-                      title: const Text('Pilih Semua'),
-                      value: isAllSelected,
-                      onChanged: (bool? value) {
-                        setDialogState(() {
-                          if (value == true) {
-                            _selectedOutlets = List.from(_outletOptions);
-                          } else {
-                            _selectedOutlets.clear();
-                          }
-                          setState(() {});
-                        });
-                      },
-                      controlAffinity: ListTileControlAffinity.leading,
-                      activeColor: const Color(0xFF00A3A3),
-                    ),
-                    ..._outletOptions.map((outlet) {
-                      return CheckboxListTile(
-                        title: Text(outlet['name']),
-                        value: _selectedOutlets.contains(outlet),
+                    // This is your fix from before
+                    if (_outletOptions.length > 1)
+                      CheckboxListTile(
+                        title: const Text('Pilih Semua'),
+                        value: isAllSelected,
                         onChanged: (bool? value) {
                           setDialogState(() {
                             if (value == true) {
-                              if (!_selectedOutlets.contains(outlet)) {
-                                _selectedOutlets.add(outlet);
-                              }
+                              _selectedOutlets = List.from(_outletOptions);
                             } else {
-                              _selectedOutlets.remove(outlet);
+                              _selectedOutlets.clear();
+                            }
+                            setState(() {});
+                          });
+                        },
+                        controlAffinity: ListTileControlAffinity.leading,
+                        activeColor: const Color(0xFF00A3A3),
+                      ),
+                    ..._outletOptions.map((outlet) {
+                      // Check if the current outlet is in the selected list
+                      final isSelected = _selectedOutlets.any(
+                            (selected) => selected['id'] == outlet['id'],
+                      );
+                      return CheckboxListTile(
+                        title: Text(outlet['name']),
+                        value: isSelected,
+                        onChanged: (bool? value) {
+                          setDialogState(() {
+                            if (value == true) {
+                              _selectedOutlets.add(outlet);
+                            } else {
+                              _selectedOutlets.removeWhere(
+                                    (selected) => selected['id'] == outlet['id'],
+                              );
                             }
                             setState(() {});
                           });
@@ -153,7 +188,8 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
     final isFormValid = _formKey.currentState!.validate();
     if (_selectedOutlets.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Outlet harus dipilih'), backgroundColor: Colors.red),
+        const SnackBar(
+            content: Text('Outlet harus dipilih'), backgroundColor: Colors.red),
       );
       return;
     }
@@ -166,24 +202,36 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
       try {
         final apiService = ApiService();
         final order = int.tryParse(_urutanController.text) ?? 0;
-
-        await apiService.addCategory(
-          name: _namaKategoriController.text,
-          order: order,
-          outlets: _selectedOutlets,
-          productQty: 0,
-        );
+        if (_isEditMode) {
+          await apiService.updateCategory(
+            id: widget.kategori!['id'],
+            name: _namaKategoriController.text,
+            order: order,
+            outlets: _selectedOutlets,
+          );
+        } else {
+          await apiService.addCategory(
+            name: _namaKategoriController.text,
+            order: order,
+            outlets: _selectedOutlets,
+            productQty: 0,
+          );
+        }
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Kategori berhasil disimpan!'), backgroundColor: Colors.green),
+            const SnackBar(
+                content: Text('Kategori berhasil disimpan!'),
+                backgroundColor: Colors.green),
           );
-          Navigator.of(context).pop();
+          Navigator.of(context).pop(true);
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Gagal menyimpan: ${e.toString()}'), backgroundColor: Colors.red),
+            SnackBar(
+                content: Text('Gagal menyimpan: ${e.toString()}'),
+                backgroundColor: Colors.red),
           );
         }
       } finally {
@@ -210,9 +258,10 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
             icon: const Icon(Icons.close, color: Colors.black87),
             onPressed: () => Navigator.of(context).pop(),
           ),
-          title: const Text(
-            'Tambahkan Kategori',
-            style: TextStyle(
+          // 6. Make the AppBar title dynamic
+          title: Text(
+            _isEditMode ? 'Edit Kategori' : 'Tambahkan Kategori',
+            style: const TextStyle(
               color: Color(0xFF333333),
               fontWeight: FontWeight.bold,
             ),
@@ -267,11 +316,16 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF00A3A3),
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 32, vertical: 16),
                             disabledBackgroundColor: Colors.grey,
                           ),
                           child: _isSaving
-                              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2))
                               : const Text('Simpan'),
                         ),
                       ],
@@ -324,7 +378,8 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
         Row(
           children: [
             Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-            if (isRequired) const Text(' *', style: TextStyle(color: Colors.red)),
+            if (isRequired)
+              const Text(' *', style: TextStyle(color: Colors.red)),
           ],
         ),
         const SizedBox(height: 8),
@@ -335,7 +390,8 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
             hintText: hint,
             filled: true,
             fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey[300]!),
@@ -378,12 +434,16 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
                   }
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                   width: double.infinity,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: _isOutletOverlayOpen ? const Color(0xFF00A3A3) : Colors.grey[300]!),
+                    border: Border.all(
+                        color: _isOutletOverlayOpen
+                            ? const Color(0xFF00A3A3)
+                            : Colors.grey[300]!),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -396,7 +456,9 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
                             ? 'Tidak ada outlet'
                             : 'Pilih',
                         style: TextStyle(
-                          color: _outletError != null ? Colors.red : Colors.grey[600],
+                          color: _outletError != null
+                              ? Colors.red
+                              : Colors.grey[600],
                           fontSize: 16,
                         ),
                       )
@@ -409,7 +471,9 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
                             label: Text(outlet['name']),
                             onDeleted: () {
                               setState(() {
-                                _selectedOutlets.remove(outlet);
+                                _selectedOutlets.removeWhere(
+                                      (o) => o['id'] == outlet['id'],
+                                );
                               });
                             },
                             deleteIconColor: Colors.grey[700],
@@ -419,7 +483,9 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
                         ),
                       ),
                       Icon(
-                        _isOutletOverlayOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+                        _isOutletOverlayOpen
+                            ? Icons.arrow_drop_up
+                            : Icons.arrow_drop_down,
                         color: Colors.grey[700],
                       ),
                     ],
