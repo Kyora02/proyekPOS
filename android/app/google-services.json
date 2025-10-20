@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "86277516510",
+    "project_id": "databasepos-99d12",
+    "storage_bucket": "databasepos-99d12.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:86277516510:android:23aebaf1de0fe4bb89a64f",
+        "android_client_info": {
+          "package_name": "com.example.proyekpos2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA2xl-dqgVi_fskINBw2RZhXSJRAkYUXUM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
