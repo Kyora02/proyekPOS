@@ -1,11 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const { db } = require('../firebaseConfig');
+const authenticate = require('../middleware/authenticate');
 
-// Get all products
-router.get('/', async (req, res) => {
+// Get all products for a specific outlet
+router.get('/', authenticate, async (req, res) => {
     try {
-        const snapshot = await db.collection('products').get();
+        const { outletId } = req.query;
+        if (!outletId) {
+            return res.status(400).json({ message: 'outletId is required' });
+        }
+
+        const snapshot = await db.collection('products').where('outletId', '==', outletId).get();
         const products = [];
         snapshot.forEach(doc => {
             products.push({ id: doc.id, ...doc.data() });
@@ -17,7 +23,7 @@ router.get('/', async (req, res) => {
 });
 
 // Create a new product
-router.post('/', async (req, res) => {
+router.post('/', authenticate, async (req, res) => {
     try {
         const newProduct = req.body;
         const docRef = await db.collection('products').add(newProduct);
@@ -28,7 +34,7 @@ router.post('/', async (req, res) => {
 });
 
 // Get a product by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         const doc = await db.collection('products').doc(id).get();
@@ -42,7 +48,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Update a product by ID
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         const updatedProduct = req.body;
@@ -54,7 +60,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete a product by ID
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         await db.collection('products').doc(id).delete();

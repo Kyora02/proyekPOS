@@ -11,7 +11,7 @@ class DaftarKategoriPage extends StatefulWidget {
 }
 
 class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
-  final String _baseUrl = 'http://10.0.2.2:3000';
+  final String _baseUrl = 'http://10.0.2.2:3000/api';
 
   List<Map<String, dynamic>> _allCategories = [];
   bool _isLoading = true;
@@ -43,8 +43,26 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
     });
 
     try {
+      final token = await _getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final outletId = await _fetchFirstOutletId(token);
+
+      if (outletId == null) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _allCategories = [];
+          });
+        }
+        return;
+      }
+
       final response = await http.get(
-        Uri.parse('$_baseUrl/categories'),
+        Uri.parse('$_baseUrl/categories?outletId=$outletId'),
+        headers: {'Authorization': 'Bearer $token'},
       );
 
       if (!mounted) return;
@@ -65,6 +83,28 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<String?> _fetchFirstOutletId(String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/outlets'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> outlets = jsonDecode(response.body);
+        if (outlets.isNotEmpty) {
+          return outlets[0]['id'];
+        }
+        return null;
+      } else {
+        throw Exception('Failed to fetch outlets');
+      }
+    } catch (e) {
+      debugPrint("Error fetching outlet ID: $e");
+      return null;
     }
   }
 
@@ -97,7 +137,7 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
       }
 
       final response = await http.delete(
-        Uri.parse('$_baseUrl/api/categories/$categoryId'),
+        Uri.parse('$_baseUrl/categories/$categoryId'),
         headers: {'Authorization': 'Bearer $token'},
       );
 

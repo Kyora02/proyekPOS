@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class DaftarPelangganPage extends StatefulWidget {
   const DaftarPelangganPage({super.key});
@@ -10,7 +11,7 @@ class DaftarPelangganPage extends StatefulWidget {
 }
 
 class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
-  final String _baseUrl = 'http://10.0.2.2:3000';
+  final String _baseUrl = 'http://10.0.2.2:3000/api';
 
   List<Map<String, dynamic>> _allCustomers = [];
   bool _isLoading = true;
@@ -26,6 +27,14 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
     _fetchCustomers();
   }
 
+  Future<String?> _getAuthToken() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return null;
+    }
+    return await user.getIdToken();
+  }
+
   Future<void> _fetchCustomers() async {
     if (!mounted) return;
     setState(() {
@@ -34,8 +43,14 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
     });
 
     try {
+      final token = await _getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
       final response = await http.get(
         Uri.parse('$_baseUrl/customers'),
+        headers: {'Authorization': 'Bearer $token'},
       );
 
       if (!mounted) return;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class DaftarProdukPage extends StatefulWidget {
   const DaftarProdukPage({super.key});
@@ -11,7 +12,7 @@ class DaftarProdukPage extends StatefulWidget {
 }
 
 class _DaftarProdukPageState extends State<DaftarProdukPage> {
-  final String _baseUrl = 'http://10.0.2.2:3000';
+  final String _baseUrl = 'http://10.0.2.2:3000/api';
 
   List<Map<String, dynamic>> _allProducts = [];
   bool _isLoading = true;
@@ -34,6 +35,14 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
     _fetchProducts();
   }
 
+  Future<String?> _getAuthToken() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return null;
+    }
+    return await user.getIdToken();
+  }
+
   Future<void> _fetchProducts() async {
     if (!mounted) return;
     setState(() {
@@ -42,8 +51,26 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
     });
 
     try {
+      final token = await _getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final outletId = await _fetchFirstOutletId(token);
+
+      if (outletId == null) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _allProducts = [];
+          });
+        }
+        return;
+      }
+
       final response = await http.get(
-        Uri.parse('$_baseUrl/products'),
+        Uri.parse('$_baseUrl/products?outletId=$outletId'),
+        headers: {'Authorization': 'Bearer $token'},
       );
 
       if (!mounted) return;
@@ -64,6 +91,28 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<String?> _fetchFirstOutletId(String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/outlets'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> outlets = jsonDecode(response.body);
+        if (outlets.isNotEmpty) {
+          return outlets[0]['id'];
+        }
+        return null;
+      } else {
+        throw Exception('Failed to fetch outlets');
+      }
+    } catch (e) {
+      debugPrint("Error fetching outlet ID: $e");
+      return null;
     }
   }
 

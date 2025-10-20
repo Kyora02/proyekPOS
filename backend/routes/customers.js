@@ -1,11 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const { db } = require('../firebaseConfig');
+const authenticate = require('../middleware/authenticate');
 
-// Get all customers
-router.get('/', async (req, res) => {
+// Get all customers for the authenticated user
+router.get('/', authenticate, async (req, res) => {
     try {
-        const snapshot = await db.collection('customers').get();
+        const userId = req.user.uid;
+        const snapshot = await db.collection('customers').where('userId', '==', userId).get();
         const customers = [];
         snapshot.forEach(doc => {
             customers.push({ id: doc.id, ...doc.data() });
@@ -17,7 +19,7 @@ router.get('/', async (req, res) => {
 });
 
 // Create a new customer
-router.post('/', async (req, res) => {
+router.post('/', authenticate, async (req, res) => {
     try {
         const newCustomer = req.body;
         const docRef = await db.collection('customers').add(newCustomer);
@@ -28,7 +30,7 @@ router.post('/', async (req, res) => {
 });
 
 // Get a customer by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         const doc = await db.collection('customers').doc(id).get();
@@ -42,7 +44,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Update a customer by ID
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         const updatedCustomer = req.body;
@@ -54,7 +56,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete a customer by ID
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         await db.collection('customers').doc(id).delete();
