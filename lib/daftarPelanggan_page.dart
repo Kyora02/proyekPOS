@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class DaftarPelangganPage extends StatefulWidget {
   const DaftarPelangganPage({super.key});
@@ -8,32 +10,60 @@ class DaftarPelangganPage extends StatefulWidget {
 }
 
 class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
-  // Dummy data
-  final List<Map<String, dynamic>> _dummyCustomers = [
-    {
-      "nama": "Ahmad Subarjo",
-      "alamat": "Jl. Pahlawan No. 10, Surabaya, Jawa Timur",
-      "notelp": "081234567890",
-      "jenisKelamin": "Laki-laki",
-    },
-    {
-      "nama": "Siti Aminah",
-      "alamat": "Jl. Tunjungan No. 55, Surabaya, Jawa Timur",
-      "notelp": "089876543210",
-      "jenisKelamin": "Perempuan",
-    },
-    // Add more customers here for testing
-  ];
+  final String _baseUrl = 'http://10.0.2.2:3000';
+
+  List<Map<String, dynamic>> _allCustomers = [];
+  bool _isLoading = true;
+  String? _error;
 
   String _searchQuery = '';
   int _currentPage = 1;
   final int _itemsPerPage = 10;
 
+  @override
+  void initState() {
+    super.initState();
+    _fetchCustomers();
+  }
+
+  Future<void> _fetchCustomers() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/customers'),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _allCustomers = List<Map<String, dynamic>>.from(data);
+          _isLoading = false;
+        });
+      } else {
+        throw Exception('Failed to load customers: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   List<Map<String, dynamic>> get _filteredCustomers {
-    List<Map<String, dynamic>> customers = _dummyCustomers;
+    List<Map<String, dynamic>> customers = _allCustomers;
     if (_searchQuery.isNotEmpty) {
       customers = customers.where((customer) {
-        final name = (customer['nama'] as String? ?? '').toLowerCase();
+        final name = (customer['name'] as String? ?? '').toLowerCase();
         final query = _searchQuery.toLowerCase();
         return name.contains(query);
       }).toList();
@@ -87,7 +117,8 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
           final totalPages = (totalItems / _itemsPerPage).ceil();
           final startIndex = (_currentPage - 1) * _itemsPerPage;
           final endIndex = (startIndex + _itemsPerPage).clamp(0, totalItems);
-          final customersOnCurrentPage = _filteredCustomers.sublist(startIndex, endIndex);
+          final customersOnCurrentPage =
+              _filteredCustomers.sublist(startIndex, endIndex);
 
           return SingleChildScrollView(
             padding: EdgeInsets.all(isMobile ? 16.0 : 32.0),
@@ -98,11 +129,28 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
                 const SizedBox(height: 24),
                 _buildFilterActions(),
                 const SizedBox(height: 24),
-                isMobile
-                    ? _buildMobileCustomerList(customersOnCurrentPage)
-                    : _buildDesktopCustomerTable(customersOnCurrentPage),
+                if (_isLoading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(48.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else if (_error != null)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(48.0),
+                      child: Text('Gagal memuat data: $_error',
+                          style: const TextStyle(color: Colors.red)),
+                    ),
+                  )
+                else
+                  isMobile
+                      ? _buildMobileCustomerList(customersOnCurrentPage)
+                      : _buildDesktopCustomerTable(customersOnCurrentPage),
                 const SizedBox(height: 24),
-                _buildPagination(totalItems, totalPages),
+                if (!_isLoading && _error == null)
+                  _buildPagination(totalItems, totalPages),
               ],
             ),
           );
@@ -223,15 +271,15 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: Text(customer['nama'] ?? 'N/A', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  child: Text(customer['name'] ?? 'N/A', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
                 _buildPopupMenuButton(customer),
               ],
             ),
             const Divider(height: 24),
-            _buildInfoRow(Icons.location_on_outlined, customer['alamat'] ?? 'N/A'),
-            _buildInfoRow(Icons.phone_outlined, customer['notelp'] ?? 'N/A'),
-            _buildInfoRow(Icons.person_outline, customer['jenisKelamin'] ?? 'N/A'),
+            _buildInfoRow(Icons.location_on_outlined, customer['address'] ?? 'N/A'),
+            _buildInfoRow(Icons.phone_outlined, customer['phone'] ?? 'N/A'),
+            _buildInfoRow(Icons.person_outline, customer['gender'] ?? 'N/A'),
           ],
         ),
       ),
@@ -276,10 +324,10 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
         child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
           Checkbox(value: false, onChanged: (val) {}),
           const SizedBox(width: 8),
-          Expanded(flex: 3, child: Text(customer['nama'] ?? 'N/A', style: cellStyle)),
-          Expanded(flex: 4, child: Text(customer['alamat'] ?? 'N/A', style: cellStyle)),
-          Expanded(flex: 2, child: Text(customer['notelp'] ?? 'N/A', style: cellStyle)),
-          Expanded(flex: 2, child: Text(customer['jenisKelamin'] ?? 'N/A', style: cellStyle)),
+          Expanded(flex: 3, child: Text(customer['name'] ?? 'N/A', style: cellStyle)),
+          Expanded(flex: 4, child: Text(customer['address'] ?? 'N/A', style: cellStyle)),
+          Expanded(flex: 2, child: Text(customer['phone'] ?? 'N/A', style: cellStyle)),
+          Expanded(flex: 2, child: Text(customer['gender'] ?? 'N/A', style: cellStyle)),
           _buildPopupMenuButton(customer),
         ]),
       ),

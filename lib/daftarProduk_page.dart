@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class DaftarProdukPage extends StatefulWidget {
   const DaftarProdukPage({super.key});
@@ -11,24 +11,11 @@ class DaftarProdukPage extends StatefulWidget {
 }
 
 class _DaftarProdukPageState extends State<DaftarProdukPage> {
-  final List<Map<String, dynamic>> _dummyProducts = [
-    {
-      "productName": "Kopi Susu Gula Aren",
-      "sku": "KS-001",
-      "sellingPrice": 22000,
-      "costPrice": 10000,
-      "stock": 50,
-      "category": "Minuman Kopi",
-    },
-    {
-      "productName": "Americano",
-      "sku": "AM-001",
-      "sellingPrice": 18000,
-      "costPrice": 7000,
-      "stock": 35,
-      "category": "Minuman Kopi",
-    },
-  ];
+  final String _baseUrl = 'http://10.0.2.2:3000';
+
+  List<Map<String, dynamic>> _allProducts = [];
+  bool _isLoading = true;
+  String? _error;
 
   String _searchQuery = '';
   String? _selectedCategory;
@@ -41,12 +28,51 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
     'Makanan',
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _fetchProducts();
+  }
+
+  Future<void> _fetchProducts() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/products'),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _allProducts = List<Map<String, dynamic>>.from(data);
+          _isLoading = false;
+        });
+      } else {
+        throw Exception('Failed to load products: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   List<Map<String, dynamic>> get _filteredProducts {
-    List<Map<String, dynamic>> products = _dummyProducts;
+    List<Map<String, dynamic>> products = _allProducts;
 
     if (_searchQuery.isNotEmpty) {
       products = products.where((product) {
-        final name = product['productName']?.toLowerCase() ?? '';
+        final name = product['name']?.toLowerCase() ?? '';
         final sku = product['sku']?.toLowerCase() ?? '';
         final query = _searchQuery.toLowerCase();
         return name.contains(query) || sku.contains(query);
@@ -122,7 +148,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
     final int startIndex = (_currentPage - 1) * _itemsPerPage;
     final int endIndex = (startIndex + _itemsPerPage).clamp(0, totalItems);
     final List<Map<String, dynamic>> productsOnCurrentPage =
-    _filteredProducts.sublist(startIndex, endIndex);
+        _filteredProducts.sublist(startIndex, endIndex);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(32.0),
@@ -136,9 +162,26 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
               const SizedBox(height: 24),
               _buildFilterAndActionButton(),
               const SizedBox(height: 24),
-              _buildProductTable(productsOnCurrentPage),
+              if (_isLoading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(48.0),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else if (_error != null)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(48.0),
+                    child: Text('Gagal memuat data: $_error',
+                        style: const TextStyle(color: Colors.red)),
+                  ),
+                )
+              else
+                _buildProductTable(productsOnCurrentPage),
               const SizedBox(height: 24),
-              _buildPagination(totalItems, totalPages),
+              if (!_isLoading && _error == null)
+                _buildPagination(totalItems, totalPages),
             ],
           ),
         ),
@@ -346,7 +389,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
               const SizedBox(width: 8),
               Expanded(
                 flex: 3,
-                child: Text(product['productName'] ?? 'N/A',
+                child: Text(product['name'] ?? 'N/A',
                     style: _tableBodyStyle()),
               ),
               Expanded(
