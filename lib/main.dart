@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
-// You need to import all your pages here
 import 'package:proyekpos2/tambahKupon_page.dart';
 import 'package:proyekpos2/tambahPelanggan_page.dart';
 import 'daftarProduk_page.dart';
@@ -15,7 +14,6 @@ import 'login_page.dart';
 import 'register_page.dart';
 import 'daftarKategori_page.dart';
 import 'tambahKategori_page.dart';
-import 'daftarKupo_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

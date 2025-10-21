@@ -13,7 +13,6 @@ class _DaftarTambahKuponPageState extends State<DaftarTambahKuponPage> {
   int _currentPage = 1;
   final int _itemsPerPage = 10;
 
-  // Dummy data
   final List<Map<String, dynamic>> _allCoupons = [
     { "kode": "GILA10K", "nama": "Diskon Gila", "besaranTipe": "rupiah", "besaranNilai": 10000, "durasi": "N/A", "outlet": "Kashierku Pusat", "status": "Baru" },
     { "kode": "GAJIAN25", "nama": "Promo Gajian", "besaranTipe": "persen", "besaranNilai": 25, "durasi": "N/A", "outlet": "Semua Outlet", "status": "Digunakan" },
@@ -21,7 +20,6 @@ class _DaftarTambahKuponPageState extends State<DaftarTambahKuponPage> {
     { "kode": "LAMA01", "nama": "Kupon Hangus", "besaranTipe": "rupiah", "besaranNilai": 5000, "durasi": "N/A", "outlet": "Kashierku Cabang B", "status": "Kedaluwarsa" },
   ];
 
-  // --- FILTERING LOGIC ---
   List<Map<String, dynamic>> get _filteredCoupons {
     List<Map<String, dynamic>> coupons = _allCoupons;
     if (_searchQuery.isNotEmpty) {
@@ -140,7 +138,6 @@ class _DaftarTambahKuponPageState extends State<DaftarTambahKuponPage> {
             onChanged: (value) => setState(() => _searchQuery = value),
           ),
         ),
-        // --- CHANGED: This container now has a white background ---
         Container(
           height: 48,
           padding: const EdgeInsets.symmetric(horizontal: 12),

@@ -37,7 +37,7 @@ class DashboardHost extends StatefulWidget {
 }
 
 class _DashboardHostState extends State<DashboardHost> {
-  Widget _currentPage = const DashboardContent(); // The current page content
+  Widget _currentPage = const DashboardContent();
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
 

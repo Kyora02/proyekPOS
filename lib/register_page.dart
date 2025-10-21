@@ -60,10 +60,10 @@ class _RegisterPageState extends State<RegisterPage> {
           'phone': _phoneController.text.trim(),
           'role': 1,
           'createdAt': Timestamp.now(),
+          'hasBusinessInfo': false,
         });
         await user.updateDisplayName(_nameController.text.trim());
         await user.reload();
-        await FirebaseAuth.instance.signOut();
       }
 
       if (mounted) {
@@ -73,9 +73,10 @@ class _RegisterPageState extends State<RegisterPage> {
         _passwordController.clear();
         _phoneController.clear();
 
-        await Future.delayed(const Duration(milliseconds: 500));
-        // if(mounted) Navigator.pop(context);
+        await Future.delayed(const Duration(seconds: 2));
       }
+      await FirebaseAuth.instance.signOut();
+
     } on FirebaseAuthException catch (e) {
       String message;
       if (e.code == 'weak-password') {
