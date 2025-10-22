@@ -194,7 +194,6 @@ class _DaftarOutletPageState extends State<DaftarOutletPage> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       child: Row(children: [
-        Checkbox(value: false, onChanged: (val) {}),
         const SizedBox(width: 8),
         Expanded(flex: 3, child: Text('NAMA', style: headerStyle)),
         Expanded(flex: 4, child: Text('ALAMAT', style: headerStyle)),
@@ -212,7 +211,6 @@ class _DaftarOutletPageState extends State<DaftarOutletPage> {
       decoration: const BoxDecoration(
           border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE)))),
       child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-        Checkbox(value: false, onChanged: (val) {}),
         const SizedBox(width: 8),
         Expanded(flex: 3, child: Text(outlet['nama'] ?? 'N/A', style: cellStyle)),
         Expanded(

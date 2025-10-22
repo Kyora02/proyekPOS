@@ -351,7 +351,6 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             child: Row(
               children: [
-                Checkbox(value: false, onChanged: (val) {}),
                 const SizedBox(width: 8),
                 Expanded(
                     flex: 3,
@@ -404,7 +403,6 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Checkbox(value: false, onChanged: (val) {}),
               const SizedBox(width: 8),
               Expanded(
                 flex: 3,

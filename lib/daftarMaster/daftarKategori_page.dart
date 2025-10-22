@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'tambahKategori_page.dart';
 
 class DaftarKategoriPage extends StatefulWidget {
   const DaftarKategoriPage({super.key});
@@ -345,7 +344,6 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             child: Row(children: [
-              Checkbox(value: false, onChanged: (val) {}),
               const SizedBox(width: 8),
               Expanded(
                   flex: 4,
@@ -380,7 +378,6 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Checkbox(value: false, onChanged: (val) {}),
               const SizedBox(width: 8),
               Expanded(
                   flex: 4,

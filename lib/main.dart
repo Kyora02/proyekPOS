@@ -2,17 +2,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:proyekpos2/tambahKaryawan_page.dart';
 
 import 'package:proyekpos2/tambahKupon_page.dart';
 import 'package:proyekpos2/tambahPelanggan_page.dart';
-import 'daftarProduk_page.dart';
+import 'daftarMaster/daftarProduk_page.dart';
 import '/tambahProduk_page.dart';
 import 'business_page.dart';
 import 'dashboard_page.dart';
 import 'firebase_options.dart';
 import 'login_page.dart';
 import 'register_page.dart';
-import 'daftarKategori_page.dart';
+import 'daftarMaster/daftarKategori_page.dart';
 import 'tambahKategori_page.dart';
 
 void main() async {
@@ -101,6 +102,8 @@ class MyApp extends StatelessWidget {
             return MaterialPageRoute(
               builder: (_) => TambahPelangganPage(pelanggan: pelanggan),
             );
+          case '/tambah-karyawan':
+            return MaterialPageRoute(builder: (_) => TambahKaryawanPage());
           default:
             return MaterialPageRoute(
               builder: (_) => const Scaffold(

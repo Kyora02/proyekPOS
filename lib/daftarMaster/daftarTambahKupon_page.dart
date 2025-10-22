@@ -184,7 +184,6 @@ class _DaftarTambahKuponPageState extends State<DaftarTambahKuponPage> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       child: Row(children: [
-        Checkbox(value: false, onChanged: (val) {}), const SizedBox(width: 8),
         Expanded(flex: 3, child: Text('KODE KUPON', style: headerStyle)),
         Expanded(flex: 3, child: Text('NAMA KUPON', style: headerStyle)),
         Expanded(flex: 2, child: Text('BESARAN', style: headerStyle)),
@@ -202,7 +201,6 @@ class _DaftarTambahKuponPageState extends State<DaftarTambahKuponPage> {
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE)))),
       child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-        Checkbox(value: false, onChanged: (val) {}), const SizedBox(width: 8),
         Expanded(flex: 3, child: Text(coupon['kode'] ?? 'N/A', style: cellStyle)),
         Expanded(flex: 3, child: Text(coupon['nama'] ?? 'N/A', style: cellStyle)),
         Expanded(flex: 2, child: Text(_formatBesaran(coupon), style: cellStyle)),

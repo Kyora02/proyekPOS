@@ -2,14 +2,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:proyekpos2/daftarMaster/daftarKaryawan_page.dart';
 import 'template/dashboard_layout.dart';
 import 'profile_page.dart';
-import 'daftarProduk_page.dart';
-import 'daftarKategori_page.dart';
-import 'daftarPelanggan_page.dart';
-import 'daftarKupo_page.dart';
-import 'daftarTambahKupon_page.dart';
-import 'daftarOutlet_page.dart';
+import 'daftarMaster/daftarProduk_page.dart';
+import 'daftarMaster/daftarKategori_page.dart';
+import 'daftarMaster/daftarPelanggan_page.dart';
+import 'daftarMaster/daftarKupon_page.dart';
+import 'daftarMaster/daftarTambahKupon_page.dart';
+import 'daftarMaster/daftarOutlet_page.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -100,6 +101,8 @@ class _DashboardHostState extends State<DashboardHost> {
         case 'Daftar Outlet':
           _currentPage = const DaftarOutletPage();
           break;
+        case 'Daftar Karyawan' :
+          _currentPage = const DaftarKaryawanPage();
         default:
           _currentPage = const DashboardContent();
       }

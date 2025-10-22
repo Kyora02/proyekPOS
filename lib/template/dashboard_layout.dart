@@ -558,7 +558,17 @@ class _SideNavBarState extends State<SideNavBar> {
     NavItem(
         title: 'Outlet',
         icon: Icons.storefront_rounded,
-        children: [NavItem(title: 'Daftar Outlet', icon: Icons.store)]),
+        children: [
+          NavItem(title: 'Daftar Outlet', icon: Icons.store)
+        ]),
+    NavItem(
+        title: 'Karyawan', 
+        icon: Icons.person_outline,
+        children: [
+          NavItem(title: 'Daftar Karyawan', icon: Icons.person_outline),
+          NavItem(title: 'Daftar Absensi', icon: Icons.how_to_reg),
+          NavItem(title: 'Manajemen Gaji', icon: Icons.monetization_on)
+        ])
   ];
 
   void _showOutletMenu(BuildContext context) {

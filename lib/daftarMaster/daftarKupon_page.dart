@@ -354,7 +354,6 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       child: Row(
         children: [
-          Checkbox(value: false, onChanged: (val) {}), const SizedBox(width: 8),
           Expanded(flex: 2, child: Text('KODE KUPON', style: _tableHeaderStyle())),
           Expanded(flex: 3, child: Text('NAMA KUPON', style: _tableHeaderStyle())),
           Expanded(flex: 2, child: Text('BESARAN', style: _tableHeaderStyle())),
@@ -375,7 +374,6 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Checkbox(value: false, onChanged: (val) {}), const SizedBox(width: 8),
               Expanded(flex: 2, child: Text(coupon['kode'] ?? 'N/A', style: _tableBodyStyle())),
               Expanded(flex: 3, child: Text(coupon['nama'] ?? 'N/A', style: _tableBodyStyle())),
               Expanded(flex: 2, child: Text(_formatBesaran(coupon), style: _tableBodyStyle())),
