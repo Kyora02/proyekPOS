@@ -115,6 +115,13 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
     return coupons;
   }
 
+  void _navigateToAddKupon() {
+    Navigator.of(context, rootNavigator: true)
+        .pushNamed('/tambah-kupon')
+        .then((success) {
+    });
+  }
+
   Future<void> _showDeleteConfirmationDialog(BuildContext context, String couponName) {
     return showDialog<void>(
         context: context,
@@ -165,7 +172,9 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildHeader(),
+                    // --- THIS IS THE CHANGE ---
+                    _buildHeader(isMobile),
+                    // --- END OF CHANGE ---
                     const SizedBox(height: 24),
                     _buildFilterActions(),
                     const SizedBox(height: 24),
@@ -182,15 +191,43 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
     );
   }
 
-  Widget _buildHeader() {
-    return const Text(
+  Widget _buildHeader(bool isMobile) {
+    final title = const Text(
       'Daftar Kupon',
       style: TextStyle(
-        fontSize: 24,
-        fontWeight: FontWeight.bold,
-        color: Color(0xFF333333),
+          fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+    );
+
+    final button = ElevatedButton.icon(
+      onPressed: _navigateToAddKupon,
+      icon: const Icon(Icons.add_rounded, size: 20),
+      label: const Text('Tambah Kupon', style: TextStyle(fontSize: 15)),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF279E9E),
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          title,
+          const SizedBox(height: 16),
+          SizedBox(width: double.infinity, child: button),
+        ],
+      );
+    } else {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          title,
+          button,
+        ],
+      );
+    }
   }
 
   Widget _buildFilterActions() {
@@ -241,9 +278,7 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
           value: value,
           isExpanded: true,
           icon: const Icon(Icons.keyboard_arrow_down, color: Colors.black54),
-          // --- THIS IS THE CHANGE ---
           dropdownColor: Colors.white,
-          // --- END OF CHANGE ---
           onChanged: onChanged,
           items: items.map<DropdownMenuItem<String>>((String value) => DropdownMenuItem<String>(
             value: value, child: Text(value, style: const TextStyle(fontSize: 14)),

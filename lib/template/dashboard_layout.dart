@@ -56,6 +56,7 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                         userData: widget.userData,
                         isLoading: widget.isLoading,
                         onProfileSettingsTap: () => widget.onNavigate('Profile'),
+                        onBusinessSettingsTap: () => widget.onNavigate('Pengaturan Bisnis'),
                       ),
                       Expanded(
                         child: widget.child,
@@ -73,6 +74,7 @@ class _DashboardLayoutState extends State<DashboardLayout> {
               userData: widget.userData,
               isLoading: widget.isLoading,
               onProfileSettingsTap: () => widget.onNavigate('Profile'),
+              onBusinessSettingsTap: () => widget.onNavigate('Pengaturan Bisnis'),
             ),
             drawer: SideNavBar(
               isCollapsed: false,
@@ -95,6 +97,7 @@ class TopAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool isLoading;
   final VoidCallback onProfileSettingsTap;
   final GlobalKey _profileMenuKey = GlobalKey();
+  final VoidCallback onBusinessSettingsTap;
 
   TopAppBar({
     super.key,
@@ -103,6 +106,7 @@ class TopAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.userData,
     required this.isLoading,
     required this.onProfileSettingsTap,
+    required this.onBusinessSettingsTap,
   });
 
   void _showProfileMenu(BuildContext context) {
@@ -131,6 +135,7 @@ class TopAppBar extends StatelessWidget implements PreferredSizeWidget {
                     userData: userData,
                     isLoading: isLoading,
                     onProfileSettingsTap: onProfileSettingsTap,
+                    onBusinessSettingsTap: onBusinessSettingsTap,
                   ),
                 ),
               ),
@@ -269,12 +274,14 @@ class ProfileMenuDialog extends StatelessWidget {
   final Map<String, dynamic>? userData;
   final bool isLoading;
   final VoidCallback onProfileSettingsTap;
+  final VoidCallback onBusinessSettingsTap;
 
   const ProfileMenuDialog({
     super.key,
     required this.userData,
     required this.isLoading,
     required this.onProfileSettingsTap,
+    required this.onBusinessSettingsTap,
   });
 
   @override
@@ -339,7 +346,10 @@ class ProfileMenuDialog extends StatelessWidget {
           ),
           _ProfileMenuItem(
             text: 'Pengaturan Bisnis',
-            onTap: () {},
+            onTap: () {
+              Navigator.of(context).pop();
+              onBusinessSettingsTap();
+            },
           ),
           const Divider(height: 1),
           _ProfileMenuItem(
@@ -543,6 +553,9 @@ class _SideNavBarState extends State<SideNavBar> {
     NavItem(
       title: 'Inventori',
       icon: Icons.inventory_2_rounded,
+      children: [
+        NavItem(title: 'Daftar Stok', icon: Icons.inventory_2_rounded)
+      ]
     ),
     NavItem(
         title: 'Pelanggan',
@@ -553,7 +566,6 @@ class _SideNavBarState extends State<SideNavBar> {
         icon: Icons.sell_rounded,
         children: [
           NavItem(title: 'Daftar Kupon', icon: Icons.local_offer_rounded),
-          NavItem(title: 'Tambah Kupon', icon: Icons.add_circle_outline_rounded)
         ]),
     NavItem(
         title: 'Outlet',

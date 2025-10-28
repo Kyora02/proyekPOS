@@ -311,4 +311,120 @@ class ApiService {
       throw Exception('Failed to delete pelanggan: ${response.body}');
     }
   }
+
+  Future<List<Map<String, dynamic>>> getKaryawan() async {
+    try {
+      final token = await _getAuthToken();
+      final url = Uri.parse('$_baseUrl/karyawan');
+      final response = await http.get(
+        url,
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+      } else {
+        throw Exception('Gagal memuat karyawan: ${response.body}');
+      }
+    } catch (e) {
+      print('Error di getKaryawan: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> addKaryawan({
+    required String nama,
+    required String nip,
+    required String email,
+    required String password,
+    String? notelp,
+    required String outlet,
+    required String status,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      final url = Uri.parse('$_baseUrl/karyawan');
+      final body = jsonEncode({
+        'nama': nama,
+        'nip': nip,
+        'email': email,
+        'password': password,
+        'notelp': notelp,
+        'outlet': outlet,
+        'status': status,
+      });
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+        body: body,
+      );
+
+      if (response.statusCode != 201) {
+        throw Exception('Gagal menambah karyawan: ${response.body}');
+      }
+    } catch (e) {
+      print('Error di addKaryawan: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateKaryawan({
+    required String id,
+    required String nama,
+    required String nip,
+    String? notelp,
+    required String outlet,
+    required String status,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      final url = Uri.parse('$_baseUrl/karyawan/$id');
+      final body = jsonEncode({
+        'nama': nama,
+        'nip': nip,
+        'notelp': notelp,
+        'outlet': outlet,
+        'status': status,
+      });
+
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+        body: body,
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Gagal mengupdate karyawan: ${response.body}');
+      }
+    } catch (e) {
+      print('Error di updateKaryawan: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteKaryawan(String id) async {
+    try {
+      final token = await _getAuthToken();
+      final url = Uri.parse('$_baseUrl/karyawan/$id');
+      final response = await http.delete(
+        url,
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Gagal menghapus karyawan: ${response.body}');
+      }
+    } catch (e) {
+      print('Error di deleteKaryawan: $e');
+      rethrow;
+    }
+  }
 }
+

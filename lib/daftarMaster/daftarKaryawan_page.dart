@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:proyekpos2/service/api_service.dart';
 
 class DaftarKaryawanPage extends StatefulWidget {
   const DaftarKaryawanPage({super.key});
@@ -8,61 +9,52 @@ class DaftarKaryawanPage extends StatefulWidget {
 }
 
 class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
+  final _apiService = ApiService();
+  List<Map<String, dynamic>> _allKaryawan = [];
+  bool _isLoading = true;
+  String? _error;
+
   String _searchQuery = '';
   int _currentPage = 1;
   final int _itemsPerPage = 10;
 
-  // Dummy data updated with NIP, notelp, and status
-  final List<Map<String, dynamic>> _allKaryawan = [
-    {
-      "nama": "Andi Wijaya",
-      "NIP": "K001",
-      "email": "andi.wijaya@example.com",
-      "notelp": "081234567890",
-      "outlet": "Kashierku Pusat",
-      "status": "Aktif"
-    },
-    {
-      "nama": "Siti Aminah",
-      "NIP": "K002",
-      "email": "siti.aminah@example.com",
-      "notelp": "082345678901",
-      "outlet": "Kashierku Cabang Surabaya",
-      "status": "Aktif"
-    },
-    {
-      "nama": "Budi Santoso",
-      "NIP": "K003",
-      "email": "budi.s@example.com",
-      "notelp": "083456789012",
-      "outlet": "Kashierku Pusat",
-      "status": "Tidak Aktif"
-    },
-    {
-      "nama": "Dewi Lestari",
-      "NIP": "K004",
-      "email": "dewi.lestari@example.com",
-      "notelp": "084567890123",
-      "outlet": "Kashierku Pusat",
-      "status": "Aktif"
-    },
-    {
-      "nama": "Eko Prasetyo",
-      "NIP": "K005",
-      "email": "eko.p@example.com",
-      "notelp": "085678901234",
-      "outlet": "Kashierku Cabang Surabaya",
-      "status": "Aktif"
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchKaryawan();
+  }
 
-  // Updated search logic
+  Future<void> _fetchKaryawan() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final karyawanList = await _apiService.getKaryawan();
+      if (mounted) {
+        setState(() {
+          _allKaryawan = karyawanList;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   List<Map<String, dynamic>> get _filteredKaryawan {
     List<Map<String, dynamic>> karyawanList = _allKaryawan;
     if (_searchQuery.isNotEmpty) {
       karyawanList = karyawanList.where((karyawan) {
         final name = (karyawan['nama'] as String? ?? '').toLowerCase();
-        final nip = (karyawan['NIP'] as String? ?? '').toLowerCase();
+        final nip = (karyawan['nip'] as String? ?? '').toLowerCase();
         final email = (karyawan['email'] as String? ?? '').toLowerCase();
         final phone = (karyawan['notelp'] as String? ?? '').toLowerCase();
         final outlet = (karyawan['outlet'] as String? ?? '').toLowerCase();
@@ -81,17 +73,85 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
 
   void _navigateToAddKaryawan() {
     Navigator.of(context, rootNavigator: true)
-        .pushNamed('/tambah-karyawan');
+        .pushNamed('/tambah-karyawan')
+        .then((success) {
+      if (success == true) {
+        _fetchKaryawan();
+      }
+    });
   }
+
+  void _navigateToEditKaryawan(Map<String, dynamic> karyawan) {
+    Navigator.of(context, rootNavigator: true)
+        .pushNamed('/tambah-karyawan', arguments: karyawan)
+        .then((success) {
+      if (success == true) {
+        _fetchKaryawan();
+      }
+    });
+  }
+
+  Future<void> _handleDelete(String id, String name) async {
+    try {
+      await _apiService.deleteKaryawan(id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Karyawan "$name" berhasil dihapus'),
+              backgroundColor: Colors.green),
+        );
+        _fetchKaryawan();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menghapus: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _showDeleteConfirmationDialog(
+      BuildContext context, String name, String id) async {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: const Text('Konfirmasi Hapus'),
+          content: Text('Apakah Anda yakin ingin menghapus "$name"?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Batal'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red, foregroundColor: Colors.white),
+              child: const Text('Hapus'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _handleDelete(id, name);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
-    final totalItems = _filteredKaryawan.length;
+    final filteredList = _filteredKaryawan;
+    final totalItems = filteredList.length;
     final totalPages = (totalItems / _itemsPerPage).ceil();
     final startIndex = (_currentPage - 1) * _itemsPerPage;
     final endIndex = (startIndex + _itemsPerPage).clamp(0, totalItems);
     final karyawanOnCurrentPage =
-    _filteredKaryawan.sublist(startIndex, endIndex);
+    filteredList.sublist(startIndex, endIndex);
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -110,10 +170,26 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
                     const SizedBox(height: 24),
                     _buildFilterBar(),
                     const SizedBox(height: 24),
-                    isMobile
-                        ? _buildMobileKaryawanList(karyawanOnCurrentPage)
-                        : _buildDesktopKaryawanTable(karyawanOnCurrentPage),
-                    if (!isMobile && totalPages > 1) ...[
+                    if (_isLoading)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(48.0),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else if (_error != null)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(48.0),
+                          child: Text('Gagal memuat data: $_error',
+                              style: const TextStyle(color: Colors.red)),
+                        ),
+                      )
+                    else
+                      isMobile
+                          ? _buildMobileKaryawanList(karyawanOnCurrentPage)
+                          : _buildDesktopKaryawanTable(karyawanOnCurrentPage),
+                    if (!_isLoading && _error == null && totalItems > 0) ...[
                       const Divider(height: 32),
                       _buildPaginationFooter(
                           totalItems, totalPages, startIndex, endIndex),
@@ -183,7 +259,7 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
         borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withAlpha(26), // <-- FIX for withOpacity
+            color: Colors.grey.withAlpha(26),
             spreadRadius: 1,
             blurRadius: 2,
             offset: const Offset(0, 1),
@@ -241,12 +317,11 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
         Expanded(flex: 2, child: Text('NOTELP', style: headerStyle)),
         Expanded(flex: 2, child: Text('OUTLET', style: headerStyle)),
         Expanded(flex: 1, child: Text('STATUS', style: headerStyle)),
-        const SizedBox(width: 48), // For the menu button
+        const SizedBox(width: 48),
       ]),
     );
   }
 
-  // Updated Desktop Table Row (Checkbox removed)
   Widget _buildTableRow(Map<String, dynamic> karyawan) {
     TextStyle cellStyle = const TextStyle(fontSize: 14, color: Colors.black87);
     return Container(
@@ -257,7 +332,7 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
         Expanded(
             flex: 3, child: Text(karyawan['nama'] ?? 'N/A', style: cellStyle)),
         Expanded(
-            flex: 2, child: Text(karyawan['NIP'] ?? 'N/A', style: cellStyle)),
+            flex: 2, child: Text(karyawan['nip'] ?? 'N/A', style: cellStyle)),
         Expanded(
             flex: 3, child: Text(karyawan['email'] ?? 'N/A', style: cellStyle)),
         Expanded(
@@ -285,11 +360,10 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
     );
   }
 
-  // Updated Mobile Card
   Widget _buildMobileCard(Map<String, dynamic> karyawan) {
     return Card(
       elevation: 1,
-      shadowColor: Colors.black.withAlpha(20), // <-- FIX for withOpacity
+      shadowColor: Colors.black.withAlpha(20),
       color: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -312,8 +386,7 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
                               style: const TextStyle(
                                   fontSize: 18, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 4),
-                          // Using NIP as subtitle instead of Jabatan
-                          Text('NIP: ${karyawan['NIP'] ?? 'N/A'}',
+                          Text('NIP: ${karyawan['nip'] ?? 'N/A'}',
                               style: TextStyle(
                                   fontSize: 14, color: Colors.grey[600])),
                         ]),
@@ -321,7 +394,6 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
                   _buildPopupMenuButton(karyawan),
                 ]),
             const Divider(height: 24),
-            // Updated Info Rows
             _buildInfoRow(Icons.email_outlined, 'Email',
                 text: karyawan['email'] ?? 'N/A'),
             _buildInfoRow(Icons.phone_outlined, 'Notelp',
@@ -336,30 +408,24 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
     );
   }
 
-  // Helper widget for status badge
   Widget _buildStatusWidget(String? status) {
     final bool isActive = status == 'Aktif';
-
-    // --- FIX ---
-    // Define all colors explicitly based on the condition
     final Color bgColor = isActive ? Colors.green.shade50 : Colors.red.shade50;
     final Color borderColor =
     isActive ? Colors.green.shade100 : Colors.red.shade100;
     final Color textColor =
     isActive ? Colors.green.shade700 : Colors.red.shade700;
-    // --- END FIX ---
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-          color: bgColor, // Use specific bg color
+          color: bgColor,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: borderColor) // Use specific border color
-      ),
+          border: Border.all(color: borderColor)),
       child: Text(
         status ?? 'N/A',
         style: TextStyle(
-          color: textColor, // Use specific text color
+          color: textColor,
           fontWeight: FontWeight.w500,
           fontSize: 12,
         ),
@@ -368,7 +434,6 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
     );
   }
 
-  // Updated InfoRow to accept either text or a custom widget
   Widget _buildInfoRow(IconData icon, String label,
       {String? text, Widget? valueWidget}) {
     return Padding(
@@ -406,7 +471,11 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
         icon: const Icon(Icons.more_horiz, color: Colors.grey),
         onSelected: (String value) {
-          // Handle menu actions
+          if (value == 'ubah') {
+            _navigateToEditKaryawan(karyawan);
+          } else if (value == 'hapus') {
+            _showDeleteConfirmationDialog(context, karyawan['nama'], karyawan['id']);
+          }
         },
         itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
           _buildPopupMenuItem(

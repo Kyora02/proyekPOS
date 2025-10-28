@@ -103,7 +103,11 @@ class MyApp extends StatelessWidget {
               builder: (_) => TambahPelangganPage(pelanggan: pelanggan),
             );
           case '/tambah-karyawan':
-            return MaterialPageRoute(builder: (_) => TambahKaryawanPage());
+            final Map<String, dynamic>? karyawan =
+            settings.arguments as Map<String, dynamic>?;
+            return MaterialPageRoute(
+              builder: (_) => TambahKaryawanPage(karyawan: karyawan),
+            );
           default:
             return MaterialPageRoute(
               builder: (_) => const Scaffold(

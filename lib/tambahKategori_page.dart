@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:proyekpos2/service/api_service.dart'; // Assuming this is your service
+import 'package:proyekpos2/service/api_service.dart';
 
 class TambahKategoriPage extends StatefulWidget {
   // 1. Add this field to accept an optional category for editing

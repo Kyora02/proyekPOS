@@ -3,14 +3,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:proyekpos2/daftarMaster/daftarKaryawan_page.dart';
+import 'package:proyekpos2/tambahKupon_page.dart';
 import 'template/dashboard_layout.dart';
 import 'profile_page.dart';
 import 'daftarMaster/daftarProduk_page.dart';
 import 'daftarMaster/daftarKategori_page.dart';
 import 'daftarMaster/daftarPelanggan_page.dart';
 import 'daftarMaster/daftarKupon_page.dart';
-import 'daftarMaster/daftarTambahKupon_page.dart';
 import 'daftarMaster/daftarOutlet_page.dart';
+import 'profileBusiness_page.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -89,6 +90,14 @@ class _DashboardHostState extends State<DashboardHost> {
             );
           }
           break;
+        case 'Pengaturan Bisnis':
+          if (_userData != null) {
+            _currentPage = ProfileBusinessPage(
+                userData: _userData!,
+                onProfileUpdated: _fetchUserData,
+            );
+          }
+          break;
         case 'Daftar Pelanggan':
           _currentPage = const DaftarPelangganPage();
           break;
@@ -96,7 +105,7 @@ class _DashboardHostState extends State<DashboardHost> {
           _currentPage = const DaftarKuponPage();
           break;
         case 'Tambah Kupon':
-          _currentPage = const DaftarTambahKuponPage();
+          _currentPage = const TambahKuponPage();
           break;
         case 'Daftar Outlet':
           _currentPage = const DaftarOutletPage();

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:proyekpos2/service/api_service.dart';
+import 'dart:math' as math;
 
 class DaftarProdukPage extends StatefulWidget {
   const DaftarProdukPage({super.key});
@@ -17,10 +18,12 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
   String? _error;
 
   String _searchQuery = '';
-  String? _selectedCategoryId; // Changed to ID
+  String? _selectedCategoryId;
   int _currentPage = 1;
   int _itemsPerPage = 10;
   String? _firstOutletId;
+
+  // --- LOGIKA INTI (Sama untuk Web & Mobile) ---
 
   @override
   void initState() {
@@ -36,7 +39,6 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
     });
 
     try {
-      // 1. Get Outlets to find the first one
       final outlets = await _apiService.getOutlets();
       if (outlets.isEmpty) {
         if (mounted) {
@@ -50,21 +52,19 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
       }
       _firstOutletId = outlets.first['id'];
 
-      // 2. Fetch Categories for that outlet
       final categories =
       await _apiService.getCategories(outletId: _firstOutletId!);
       _kategoriOptions = [
-        {'id': 'semua', 'name': 'Semua Kategori'}, // Add "All" option
+        {'id': 'semua', 'name': 'Semua Kategori'},
         ...categories
       ];
 
-      // 3. Fetch Products for that outlet
       final products = await _apiService.getProducts(outletId: _firstOutletId!);
 
       if (mounted) {
         setState(() {
           _allProducts = products;
-          _selectedCategoryId = 'semua'; // Default to "All"
+          _selectedCategoryId = 'semua';
           _isLoading = false;
         });
       }
@@ -108,12 +108,21 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
     }
   }
 
+  String _formatCurrency(num amount) {
+    final formatter = NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    );
+    return formatter.format(amount);
+  }
+
   void _navigateToAddProduct() {
     Navigator.of(context, rootNavigator: true)
         .pushNamed('/tambah-produk')
         .then((success) {
       if (success == true) {
-        _fetchData(); // Refresh list if a product was added
+        _fetchData();
       }
     });
   }
@@ -123,7 +132,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
         .pushNamed('/tambah-produk', arguments: product)
         .then((success) {
       if (success == true) {
-        _fetchData(); // Refresh list if a product was updated
+        _fetchData();
       }
     });
   }
@@ -137,7 +146,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
               content: Text('Produk "$productName" berhasil dihapus'),
               backgroundColor: Colors.green),
         );
-        _fetchData(); // Refresh list
+        _fetchData();
       }
     } catch (e) {
       if (mounted) {
@@ -193,8 +202,47 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
     );
   }
 
+  // --- BUILD UTAMA (Peralihan Web/Mobile) ---
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text('Gagal memuat data: $_error',
+                style: const TextStyle(color: Colors.red)),
+          ));
+    }
+
+    final products = _filteredProducts;
+    final totalItems = products.length;
+    final totalPages = (totalItems / _itemsPerPage).ceil();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Tentukan breakpoint. 720 cukup baik untuk membedakan tablet/web vs hp
+        const double webBreakpoint = 720.0;
+
+        if (constraints.maxWidth > webBreakpoint) {
+          // TAMPILAN WEB (Kode asli Anda)
+          return _buildWebLayout(context, products, totalItems, totalPages);
+        } else {
+          // TAMPILAN MOBILE (Sesuai gambar Anda)
+          return _buildMobileLayout(context, products, totalItems, totalPages);
+        }
+      },
+    );
+  }
+
+  // --- WIDGET TATA LETAK WEB (Kode Asli Anda) ---
+
+  Widget _buildWebLayout(BuildContext context,
+      List<Map<String, dynamic>> products, int totalItems, int totalPages) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(32.0),
       child: Center(
@@ -203,32 +251,13 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(),
+              _buildHeaderWeb(),
               const SizedBox(height: 24),
-              _buildFilterAndActionButton(),
+              _buildFilterAndActionButtonWeb(),
               const SizedBox(height: 24),
-              if (_isLoading)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(48.0),
-                    child: CircularProgressIndicator(),
-                  ),
-                )
-              else if (_error != null)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(48.0),
-                    child: Text('Gagal memuat data: $_error',
-                        style: const TextStyle(color: Colors.red)),
-                  ),
-                )
-              else
-                _buildProductTable(_filteredProducts),
+              _buildProductTableWeb(products),
               const SizedBox(height: 24),
-              if (!_isLoading && _error == null)
-                _buildPagination(
-                    _filteredProducts.length,
-                    (_filteredProducts.length / _itemsPerPage).ceil()),
+              _buildPaginationWeb(totalItems, totalPages),
             ],
           ),
         ),
@@ -236,7 +265,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeaderWeb() {
     return Row(
       children: [
         const Text(
@@ -265,7 +294,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
     );
   }
 
-  Widget _buildFilterAndActionButton() {
+  Widget _buildFilterAndActionButtonWeb() {
     return Wrap(
       spacing: 16.0,
       runSpacing: 16.0,
@@ -326,7 +355,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
     );
   }
 
-  Widget _buildProductTable(List<Map<String, dynamic>> products) {
+  Widget _buildProductTableWeb(List<Map<String, dynamic>> products) {
     final int totalItems = products.length;
     final int startIndex = (_currentPage - 1) * _itemsPerPage;
     final int endIndex = (startIndex + _itemsPerPage).clamp(0, totalItems);
@@ -354,8 +383,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
                 const SizedBox(width: 8),
                 Expanded(
                     flex: 3,
-                    child:
-                    Text('NAMA PRODUK', style: _tableHeaderStyle())),
+                    child: Text('NAMA PRODUK', style: _tableHeaderStyle())),
                 Expanded(
                     flex: 2, child: Text('SKU', style: _tableHeaderStyle())),
                 Expanded(
@@ -379,23 +407,14 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
             )
           else
             ...productsOnCurrentPage
-                .map((product) => _buildProductTableRow(product))
+                .map((product) => _buildProductTableRowWeb(product))
                 .toList(),
         ],
       ),
     );
   }
 
-  Widget _buildProductTableRow(Map<String, dynamic> product) {
-    String formatCurrency(num amount) {
-      final formatter = NumberFormat.currency(
-        locale: 'id_ID',
-        symbol: 'Rp ',
-        decimalDigits: 0,
-      );
-      return formatter.format(amount);
-    }
-
+  Widget _buildProductTableRowWeb(Map<String, dynamic> product) {
     return Column(
       children: [
         Padding(
@@ -419,12 +438,12 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
               ),
               Expanded(
                 flex: 2,
-                child: Text(formatCurrency(product['costPrice'] ?? 0),
+                child: Text(_formatCurrency(product['costPrice'] ?? 0),
                     style: _tableBodyStyle()),
               ),
               Expanded(
                 flex: 2,
-                child: Text(formatCurrency(product['sellingPrice'] ?? 0),
+                child: Text(_formatCurrency(product['sellingPrice'] ?? 0),
                     style: _tableBodyStyle()),
               ),
               SizedBox(
@@ -491,7 +510,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
     return const TextStyle(fontSize: 14, color: Colors.black87);
   }
 
-  Widget _buildPagination(int totalItems, int totalPages) {
+  Widget _buildPaginationWeb(int totalItems, int totalPages) {
     if (totalItems == 0) return const SizedBox.shrink();
 
     return Row(
@@ -529,7 +548,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
             ),
             const SizedBox(width: 16),
             Text(
-              'Ditampilkan ${((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems)} - ${(_currentPage * _itemsPerPage).clamp(1, totalItems)} dari $totalItems data',
+              'Ditampilkan ${((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems)} - ${math.min(_currentPage * _itemsPerPage, totalItems)} dari $totalItems data',
               style: const TextStyle(color: Colors.grey),
             ),
           ],
@@ -563,6 +582,331 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
           ],
         ),
       ],
+    );
+  }
+
+  // --- WIDGET TATA LETAK MOBILE (Sesuai Gambar Anda) ---
+
+  Widget _buildMobileLayout(BuildContext context,
+      List<Map<String, dynamic>> products, int totalItems, int totalPages) {
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      appBar: AppBar(
+        title: const Text(
+          'Daftar Produk',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF333333),
+          ),
+        ),
+        backgroundColor: Colors.grey[100],
+        elevation: 0,
+        foregroundColor: const Color(0xFF333333),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _fetchData,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _navigateToAddProduct,
+                  icon: const Icon(Icons.add, color: Colors.white),
+                  label: const Text('Tambah Produk'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF279E9E),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            _buildFilterAndSearchMobile(),
+            Expanded(
+              child: _buildProductListMobile(products),
+            ),
+            _buildPaginationMobile(totalItems, totalPages),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterAndSearchMobile() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
+      child: Column(
+        children: [
+          TextField(
+            decoration: InputDecoration(
+              hintText: 'Cari produk (nama atau SKU)...',
+              prefixIcon: const Icon(Icons.search, color: Colors.grey),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(vertical: 10),
+            ),
+            onChanged: (value) {
+              setState(() {
+                _searchQuery = value;
+                _currentPage = 1;
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12.0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                isExpanded: true,
+                dropdownColor: Colors.white,
+                value: _selectedCategoryId,
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _selectedCategoryId = newValue;
+                    _currentPage = 1;
+                  });
+                },
+                items: _kategoriOptions
+                    .map<DropdownMenuItem<String>>((Map<String, dynamic> value) {
+                  return DropdownMenuItem<String>(
+                    value: value['id'],
+                    child: Text(value['name']),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductListMobile(List<Map<String, dynamic>> products) {
+    final int totalItems = products.length;
+    final int startIndex = (_currentPage - 1) * _itemsPerPage;
+    final int endIndex = (startIndex + _itemsPerPage).clamp(0, totalItems);
+    final List<Map<String, dynamic>> productsOnCurrentPage =
+    products.sublist(startIndex, endIndex);
+
+    if (productsOnCurrentPage.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+              _searchQuery.isEmpty && _selectedCategoryId == 'semua'
+                  ? 'Belum ada produk.'
+                  : 'Tidak ada produk ditemukan.',
+              style: TextStyle(color: Colors.grey[600], fontSize: 16)),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 8.0),
+      itemCount: productsOnCurrentPage.length,
+      itemBuilder: (context, index) {
+        final product = productsOnCurrentPage[index];
+        return _buildProductCardMobile(product);
+      },
+    );
+  }
+
+  Widget _buildProductCardMobile(Map<String, dynamic> product) {
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 12.0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        product['name'] ?? 'N/A',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF333333),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'SKU: ${product['sku'] ?? 'N/A'}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: 40,
+                  child: PopupMenuButton<String>(
+                    color: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                    icon: const Icon(Icons.more_horiz),
+                    onSelected: (String value) {
+                      switch (value) {
+                        case 'ubah':
+                          _navigateToEditProduct(product);
+                          break;
+                        case 'hapus':
+                          _showDeleteConfirmationDialog(
+                              context, product['id'], product['name']);
+                          break;
+                      }
+                    },
+                    itemBuilder: (BuildContext context) =>
+                    <PopupMenuEntry<String>>[
+                      const PopupMenuItem<String>(
+                        value: 'ubah',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined,
+                                size: 20, color: Colors.black54),
+                            SizedBox(width: 12),
+                            Text('Ubah'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem<String>(
+                        value: 'hapus',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline,
+                                size: 20, color: Colors.red),
+                            SizedBox(width: 12),
+                            Text('Hapus', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 24),
+            _buildDetailRowMobile(
+              Icons.category_outlined,
+              'Kategori',
+              _getCategoryName(product['categoryId'] ?? ''),
+            ),
+            const SizedBox(height: 10),
+            _buildDetailRowMobile(
+              Icons.shopping_bag_outlined,
+              'Harga Beli',
+              _formatCurrency(product['costPrice'] ?? 0),
+            ),
+            const SizedBox(height: 10),
+            _buildDetailRowMobile(
+              Icons.sell_outlined,
+              'Harga Jual',
+              _formatCurrency(product['sellingPrice'] ?? 0),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRowMobile(IconData icon, String title, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: Colors.grey[700]),
+        const SizedBox(width: 12),
+        Text(
+          '$title:',
+          style: TextStyle(color: Colors.grey[700], fontSize: 14),
+        ),
+        const Spacer(),
+        Text(
+          value,
+          style: const TextStyle(
+              fontWeight: FontWeight.w500,
+              fontSize: 14,
+              color: Color(0xFF333333)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPaginationMobile(int totalItems, int totalPages) {
+    if (totalItems == 0) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      color: Colors.white,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            '${((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems)} - ${math.min(_currentPage * _itemsPerPage, totalItems)} dari $totalItems',
+            style: TextStyle(color: Colors.grey[700], fontSize: 13),
+          ),
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_ios, size: 16),
+                onPressed: _currentPage > 1
+                    ? () => setState(() => _currentPage--)
+                    : null,
+                disabledColor: Colors.grey[300],
+              ),
+              Container(
+                padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF279E9E),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$_currentPage',
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.arrow_forward_ios, size: 16),
+                onPressed: _currentPage < totalPages
+                    ? () => setState(() => _currentPage++)
+                    : null,
+                disabledColor: Colors.grey[300],
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
