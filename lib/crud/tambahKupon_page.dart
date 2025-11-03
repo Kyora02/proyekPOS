@@ -19,7 +19,7 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
   final _deskripsiC = TextEditingController();
   final _nilaiKuponC = TextEditingController();
 
-  String? _selectedOutlet;
+  String? _selectedOutletId;
   String _tipeNilaiKupon = 'percent';
   DateTime? _tanggalMulai;
   DateTime? _tanggalSelesai;
@@ -27,7 +27,7 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
   bool _isLoadingOutlets = true;
   bool _isSaving = false;
 
-  List<String> _outletOptions = ['Pilih'];
+  List<Map<String, dynamic>> _outletData = [];
 
   bool get _isEditMode => widget.kupon != null;
 
@@ -40,32 +40,51 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
         _namaKuponC.text = kupon['nama'] ?? '';
         _deskripsiC.text = kupon['deskripsi'] ?? '';
         _nilaiKuponC.text = (kupon['nilai'] ?? 0).toString();
-        _selectedOutlet = kupon['outlet'];
+
+        _selectedOutletId = kupon['outletId'];
+
         _tipeNilaiKupon = kupon['tipeNilai'] ?? 'percent';
         _kuponStatus = kupon['status'] ?? true;
 
         if (kupon['tanggalMulai'] != null) {
-          _tanggalMulai = DateTime.parse(kupon['tanggalMulai']);
+          _tanggalMulai = _parseFirestoreDate(kupon['tanggalMulai']);
         }
         if (kupon['tanggalSelesai'] != null) {
-          _tanggalSelesai = DateTime.parse(kupon['tanggalSelesai']);
+          _tanggalSelesai = _parseFirestoreDate(kupon['tanggalSelesai']);
         }
-      } else {
-        _selectedOutlet = _outletOptions.first;
       }
     });
+  }
+
+  DateTime? _parseFirestoreDate(dynamic dateValue) {
+    if (dateValue == null) return null;
+    if (dateValue is String) return DateTime.tryParse(dateValue);
+    if (dateValue is Map) {
+      final seconds = dateValue['_seconds'] ?? dateValue['seconds'];
+      if (seconds != null) {
+        final nanoseconds =
+            dateValue['_nanoseconds'] ?? dateValue['nanoseconds'] ?? 0;
+        return DateTime.fromMillisecondsSinceEpoch(
+          (seconds as int) * 1000 + (nanoseconds as int) ~/ 1000000,
+        );
+      }
+    }
+    return null;
   }
 
   Future<void> _fetchOutlets() async {
     setState(() => _isLoadingOutlets = true);
     try {
       final outlets = await _apiService.getOutlets();
-      final outletNames =
-      outlets.map((o) => o['name'] as String).toList();
       setState(() {
-        _outletOptions = ['Pilih', 'Semua Outlet', ...outletNames];
-        if (!_isEditMode) {
-          _selectedOutlet = _outletOptions.first;
+        _outletData = outlets;
+
+        if (_isEditMode && _selectedOutletId != null) {
+          final bool idExists =
+          outlets.any((o) => o['id'] == _selectedOutletId);
+          if (!idExists) {
+            _selectedOutletId = null;
+          }
         }
         _isLoadingOutlets = false;
       });
@@ -128,6 +147,16 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
         );
         return;
       }
+
+      if (_selectedOutletId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Outlet wajib dipilih'),
+              backgroundColor: Colors.red),
+        );
+        return;
+      }
+
       setState(() => _isSaving = true);
 
       try {
@@ -139,7 +168,7 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
             nama: _namaKuponC.text,
             deskripsi: _deskripsiC.text,
             nilai: nilai,
-            outlet: _selectedOutlet!,
+            outletId: _selectedOutletId!,
             tipeNilai: _tipeNilaiKupon,
             tanggalMulai: _tanggalMulai!,
             tanggalSelesai: _tanggalSelesai!,
@@ -150,7 +179,7 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
             nama: _namaKuponC.text,
             deskripsi: _deskripsiC.text,
             nilai: nilai,
-            outlet: _selectedOutlet!,
+            outletId: _selectedOutletId!,
             tipeNilai: _tipeNilaiKupon,
             tanggalMulai: _tanggalMulai!,
             tanggalSelesai: _tanggalSelesai!,
@@ -232,7 +261,8 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
           ),
           if (_isSaving)
             Container(
-              color: Colors.black.withOpacity(0.5),
+              // FIX: Replaced deprecated withOpacity with withAlpha
+              color: Colors.black.withAlpha(128),
               child: const Center(
                   child: CircularProgressIndicator(color: Colors.white)),
             ),
@@ -262,20 +292,29 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildDropdownField(
-              label: 'Daftar Outlet',
-              value: _selectedOutlet,
-              items: _outletOptions,
+            const Text('Daftar Outlet*',
+                style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16)),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _selectedOutletId,
+              items: _outletData.map((outlet) {
+                return DropdownMenuItem<String>(
+                  value: outlet['id'],
+                  child: Text(outlet['name']),
+                );
+              }).toList(),
               onChanged: _isLoadingOutlets
                   ? null
                   : (newValue) {
                 setState(() {
-                  _selectedOutlet = newValue;
+                  _selectedOutletId = newValue;
                 });
               },
-              validator: (value) => value == 'Pilih' || value == null
-                  ? 'Outlet wajib dipilih'
-                  : null,
+              decoration: _inputDecoration(
+                  hint: _isLoadingOutlets ? 'Memuat...' : 'Pilih Outlet'),
+              validator: (value) =>
+              value == null ? 'Outlet wajib dipilih' : null,
+              dropdownColor: Colors.white,
             ),
             const SizedBox(height: 16),
             _buildTextField(
@@ -577,34 +616,6 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
                   (value) => value == null || value.isEmpty
                   ? '$label wajib diisi'
                   : null),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDropdownField({
-    required String label,
-    required String? value,
-    required List<String> items,
-    ValueChanged<String?>? onChanged,
-    String? Function(String?)? validator,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('$label*',
-            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16)),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          value: value,
-          items: items
-              .map((item) => DropdownMenuItem(value: item, child: Text(item)))
-              .toList(),
-          onChanged: onChanged,
-          decoration: _inputDecoration(
-              hint: _isLoadingOutlets ? 'Memuat...' : 'Pilih'),
-          validator: validator,
-          dropdownColor: Colors.white,
         ),
       ],
     );
