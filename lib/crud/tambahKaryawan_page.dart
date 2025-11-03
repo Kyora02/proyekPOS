@@ -147,10 +147,13 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 1,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.black),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -215,7 +218,7 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
                           controller: _emailController,
                           hintText: 'contoh: email@domain.com',
                           keyboardType: TextInputType.emailAddress,
-                          readOnly: _isEditMode, // Email tidak bisa diubah
+                          readOnly: _isEditMode,
                           validator: (value) {
                             if (!_isEditMode &&
                                 (value == null || value.isEmpty)) {
@@ -224,7 +227,6 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
                             return null;
                           },
                         ),
-
                         if (!_isEditMode) ...[
                           _buildLabel('Password *'),
                           _buildTextField(
@@ -252,20 +254,16 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
                             },
                           ),
                         ],
-
                         _buildLabel('No. Telp'),
                         _buildTextField(
                           controller: _notelpController,
                           hintText: 'Contoh: 08123456789',
                           keyboardType: TextInputType.phone,
                         ),
-
                         _buildLabel('Outlet *'),
                         _buildOutletDropdown(),
-
                         _buildLabel('Status'),
                         _buildStatusToggle(),
-
                         const SizedBox(height: 32),
                         _buildActionButtons(),
                       ],
@@ -423,16 +421,6 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        TextButton(
-          onPressed: () {
-            Navigator.of(context).pop(); // Just close the page
-          },
-          child: const Text(
-            'Batal',
-            style: TextStyle(color: Color(0xFF279E9E), fontSize: 16),
-          ),
-        ),
-        const SizedBox(width: 16),
         ElevatedButton(
           onPressed: _isLoading ? null : _saveForm,
           style: ElevatedButton.styleFrom(

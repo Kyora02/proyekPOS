@@ -38,6 +38,7 @@ class ApiService {
       rethrow;
     }
   }
+
   Future<void> addCategory({
     required String name,
     required int order,
@@ -53,12 +54,8 @@ class ApiService {
         'Authorization': 'Bearer $token',
       };
 
-      final body = jsonEncode({
-        'name': name,
-        'order': order,
-        'outlets': outlets,
-        'productQty' : productQty
-      });
+      final body = jsonEncode(
+          {'name': name, 'order': order, 'outlets': outlets, 'productQty': productQty});
 
       final response = await http.post(url, headers: headers, body: body);
 
@@ -67,14 +64,14 @@ class ApiService {
       }
 
       print('Kategori berhasil ditambahkan!');
-
     } catch (e) {
       print('Error di addCategory: $e');
       rethrow;
     }
   }
 
-  Future<List<Map<String, dynamic>>> getCategories({required String outletId}) async {
+  Future<List<Map<String, dynamic>>> getCategories(
+      {required String outletId}) async {
     try {
       final token = await _getAuthToken();
 
@@ -126,7 +123,6 @@ class ApiService {
         throw Exception('Failed to update category: ${errorBody['message']}');
       }
       print('Kategori berhasil diupdate!');
-
     } catch (e) {
       print('Error in updateCategory: $e');
       throw Exception('Failed to update category. $e');
@@ -165,7 +161,8 @@ class ApiService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> getProducts({required String outletId}) async {
+  Future<List<Map<String, dynamic>>> getProducts(
+      {required String outletId}) async {
     final token = await _getAuthToken();
     final url = Uri.parse('$_baseUrl/products?outletId=$outletId');
     final response = await http.get(
@@ -223,7 +220,6 @@ class ApiService {
       throw Exception('Failed to delete product: ${response.body}');
     }
   }
-  // --- ADD THESE METHODS TO ApiService ---
 
   Future<List<Map<String, dynamic>>> getPelanggan() async {
     final token = await _getAuthToken();
@@ -262,7 +258,12 @@ class ApiService {
       'notes': notes,
     });
 
-    final response = await http.post(url, headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'}, body: body);
+    final response = await http.post(url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+        body: body);
 
     if (response.statusCode != 201) {
       throw Exception('Failed to add pelanggan: ${response.body}');
@@ -293,7 +294,12 @@ class ApiService {
       'notes': notes,
     });
 
-    final response = await http.put(url, headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'}, body: body);
+    final response = await http.put(url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+        body: body);
 
     if (response.statusCode != 200) {
       throw Exception('Failed to update pelanggan: ${response.body}');
@@ -426,5 +432,101 @@ class ApiService {
       rethrow;
     }
   }
-}
 
+  Future<List<Map<String, dynamic>>> getKupon() async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/kupon');
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load kupon: ${response.body}');
+    }
+  }
+
+  Future<void> addKupon({
+    required String nama,
+    String? deskripsi,
+    required double nilai,
+    required String outlet,
+    required String tipeNilai,
+    required DateTime tanggalMulai,
+    required DateTime tanggalSelesai,
+    required bool status,
+  }) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/kupon');
+    final body = jsonEncode({
+      'nama': nama,
+      'deskripsi': deskripsi,
+      'nilai': nilai,
+      'outlet': outlet,
+      'tipeNilai': tipeNilai,
+      'tanggalMulai': tanggalMulai.toIso8601String(),
+      'tanggalSelesai': tanggalSelesai.toIso8601String(),
+      'status': status,
+    });
+
+    final response = await http.post(url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+        body: body);
+
+    if (response.statusCode != 201) {
+      throw Exception('Failed to add kupon: ${response.body}');
+    }
+  }
+
+  Future<void> updateKupon({
+    required String id,
+    required String nama,
+    String? deskripsi,
+    required double nilai,
+    required String outlet,
+    required String tipeNilai,
+    required DateTime tanggalMulai,
+    required DateTime tanggalSelesai,
+    required bool status,
+  }) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/kupon/$id');
+    final body = jsonEncode({
+      'nama': nama,
+      'deskripsi': deskripsi,
+      'nilai': nilai,
+      'outlet': outlet,
+      'tipeNilai': tipeNilai,
+      'tanggalMai': tanggalMulai.toIso8601String(),
+      'tanggalSelesai': tanggalSelesai.toIso8601String(),
+      'status': status,
+    });
+
+    final response = await http.put(url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+        body: body);
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update kupon: ${response.body}');
+    }
+  }
+
+  Future<void> deleteKupon(String id) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/kupon/$id');
+    final response = await http.delete(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete kupon: ${response.body}');
+    }
+  }
+}

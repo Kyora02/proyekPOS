@@ -3,7 +3,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:proyekpos2/daftarMaster/daftarKaryawan_page.dart';
-import 'package:proyekpos2/tambahKupon_page.dart';
+import 'package:proyekpos2/laporan/detailPenjualan_page.dart';
+import 'package:proyekpos2/laporan/laporanPelanggan_page.dart';
+import 'package:proyekpos2/laporan/penjualanKategori_page.dart';
+import 'package:proyekpos2/laporan/penjualanProduk_page.dart';
+import 'package:proyekpos2/laporan/ringkasanPenjualan_page.dart';
+import 'package:proyekpos2/crud/tambahKupon_page.dart';
 import 'template/dashboard_layout.dart';
 import 'profile_page.dart';
 import 'daftarMaster/daftarProduk_page.dart';
@@ -112,6 +117,22 @@ class _DashboardHostState extends State<DashboardHost> {
           break;
         case 'Daftar Karyawan' :
           _currentPage = const DaftarKaryawanPage();
+          break;
+        case 'Ringkasan Penjualan' :
+          _currentPage = const RingkasanPenjualanPage();
+          break;
+        case 'Detail Penjualan' :
+          _currentPage = const DetailPenjualanPage();
+          break;
+        case 'Penjualan Produk' :
+          _currentPage = const PenjualanProdukPage();
+          break;
+        case 'Penjualan Kategori' :
+          _currentPage = const PenjualanKategoriPage();
+          break;
+        case 'Laporan Pelanggan' :
+          _currentPage = const LaporanPelangganPage();
+          break;
         default:
           _currentPage = const DashboardContent();
       }
@@ -186,7 +207,7 @@ class DashboardContent extends StatelessWidget {
         maxCrossAxisExtent: 320,
         mainAxisSpacing: 20,
         crossAxisSpacing: 20,
-        childAspectRatio: 1.8,
+        childAspectRatio: 1.2,
       ),
       itemCount: stats.length,
       itemBuilder: (context, index) {
@@ -261,17 +282,30 @@ class StatCard extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(title, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+          Text(
+            title,
+            style: TextStyle(color: Colors.grey[600], fontSize: 14),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
           const SizedBox(height: 8),
-          Text(value,
-              style:
-              const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              maxLines: 1,
+            ),
+          ),
+
           if (chart != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 16.0),
-              child: SizedBox(height: 40, child: chart),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 16.0),
+                child: chart,
+              ),
             ),
         ],
       ),

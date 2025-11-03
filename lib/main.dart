@@ -2,25 +2,27 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:proyekpos2/tambahKaryawan_page.dart';
-
-import 'package:proyekpos2/tambahKupon_page.dart';
-import 'package:proyekpos2/tambahPelanggan_page.dart';
+import 'package:proyekpos2/crud/tambahKaryawan_page.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:proyekpos2/crud/tambahKupon_page.dart';
+import 'package:proyekpos2/crud/tambahPelanggan_page.dart';
+import 'package:proyekpos2/daftarMaster/daftarKupon_page.dart';
 import 'daftarMaster/daftarProduk_page.dart';
-import '/tambahProduk_page.dart';
+import 'crud/tambahProduk_page.dart';
 import 'business_page.dart';
 import 'dashboard_page.dart';
-import 'firebase_options.dart';
+import 'service/firebase_options.dart';
 import 'login_page.dart';
 import 'register_page.dart';
 import 'daftarMaster/daftarKategori_page.dart';
-import 'tambahKategori_page.dart';
+import 'crud/tambahKategori_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await initializeDateFormatting('id_ID', null);
   runApp(const MyApp());
 }
 
@@ -94,8 +96,14 @@ class MyApp extends StatelessWidget {
             return MaterialPageRoute(
               builder: (_) => TambahKategoriPage(kategori: kategori),
             );
+          case '/daftar-kupon':
+            return MaterialPageRoute(builder: (_) => const DaftarKuponPage());
           case '/tambah-kupon':
-            return MaterialPageRoute(builder: (_) => const TambahKuponPage());
+            final Map<String, dynamic>? kupon =
+            settings.arguments as Map<String, dynamic>?;
+            return MaterialPageRoute(
+              builder: (_) => TambahKuponPage(kupon: kupon),
+            );
           case '/tambah-pelanggan':
             final Map<String, dynamic>? pelanggan =
             settings.arguments as Map<String, dynamic>?;

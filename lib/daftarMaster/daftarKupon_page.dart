@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:proyekpos2/service/api_service.dart';
+import 'package:proyekpos2/crud/tambahKupon_page.dart';
 
 class DaftarKuponPage extends StatefulWidget {
   const DaftarKuponPage({super.key});
@@ -9,70 +11,65 @@ class DaftarKuponPage extends StatefulWidget {
 }
 
 class _DaftarKuponPageState extends State<DaftarKuponPage> {
-  final List<Map<String, dynamic>> _dummyCoupons = [
-    {
-      "nama": "Diskon Gila",
-      "kode": "GILA10K",
-      "besaranTipe": "rupiah",
-      "besaranNilai": 10000,
-      "tanggalMulai": "2025-10-01",
-      "tanggalSelesai": "2025-10-15",
-      "status": "Baru",
-      "outlet": "Kashierku Pusat"
-    },
-    {
-      "nama": "Promo Gajian",
-      "kode": "GAJIAN25",
-      "besaranTipe": "persen",
-      "besaranNilai": 25,
-      "tanggalMulai": "2025-09-25",
-      "tanggalSelesai": "2025-10-05",
-      "status": "Digunakan",
-      "outlet": "Semua Outlet"
-    },
-    {
-      "nama": "Spesial Oktober",
-      "kode": "OKTOBERFEST",
-      "besaranTipe": "persen",
-      "besaranNilai": 15,
-      "tanggalMulai": "2025-10-10",
-      "tanggalSelesai": "2025-10-31",
-      "status": "Baru",
-      "outlet": "Kashierku Cabang A"
-    },
-    {
-      "nama": "Kupon Hangus",
-      "kode": "LAMA01",
-      "besaranTipe": "rupiah",
-      "besaranNilai": 5000,
-      "tanggalMulai": "2025-09-01",
-      "tanggalSelesai": "2025-09-30",
-      "status": "Kedaluwarsa",
-      "outlet": "Kashierku Cabang B"
-    },
-  ];
+  final ApiService _apiService = ApiService();
+  List<Map<String, dynamic>> _kuponList = [];
+  List<Map<String, dynamic>> _outletList = [];
+  bool _isLoading = true;
 
-  // State for filters
   String _searchQuery = '';
   String? _selectedStatus = 'Semua Status';
-  String? _selectedOutlet = 'Semua Outlet';
+  String? _selectedOutletId = 'Semua Outlet';
 
-  // Options for dropdowns
-  final List<String> _statusOptions = ['Semua Status', 'Baru', 'Digunakan', 'Kedaluwarsa'];
-  final List<String> _outletOptions = ['Semua Outlet', 'Kashierku Pusat', 'Kashierku Cabang A', 'Kashierku Cabang B'];
-
+  final List<String> _statusOptions = ['Semua Status', 'Aktif', 'Tidak Aktif'];
+  List<Map<String, dynamic>> _dynamicOutletOptions = [];
 
   int _currentPage = 1;
   final int _itemsPerPage = 10;
 
-  String _formatCurrency(int amount) {
-    final format = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    setState(() => _isLoading = true);
+    try {
+      final kupons = await _apiService.getKupon();
+      final outlets = await _apiService.getOutlets();
+
+      if (mounted) {
+        setState(() {
+          _kuponList = kupons;
+          _outletList = outlets;
+          _dynamicOutletOptions = [
+            {'id': 'Semua Outlet', 'name': 'Semua Outlet'},
+            ...outlets
+          ];
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Gagal memuat data: $e'),
+              backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  String _formatCurrency(num amount) {
+    final format = NumberFormat.currency(
+        locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
     return format.format(amount);
   }
 
   String _formatBesaran(Map<String, dynamic> coupon) {
-    String type = coupon['besaranTipe'] ?? '';
-    int value = coupon['besaranNilai'] ?? 0;
+    String type = coupon['tipeNilai'] ?? '';
+    num value = coupon['nilai'] ?? 0;
     if (type == 'persen') {
       return '$value%';
     }
@@ -81,34 +78,50 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
 
   String _formatDurasi(Map<String, dynamic> coupon) {
     try {
-      final startDate = DateFormat('yyyy-MM-dd').parse(coupon['tanggalMulai']);
-      final endDate = DateFormat('yyyy-MM-dd').parse(coupon['tanggalSelesai']);
+      DateTime parseDate(dynamic dateValue) {
+        if (dateValue == null) throw Exception("Date is null");
+        if (dateValue is String) {
+          return DateTime.parse(dateValue); // Handles ISO String
+        }
+        if (dateValue is Map) {
+          // Handles Firestore Timestamp object: {"_seconds": ..., "_nanoseconds": ...}
+          return DateTime.fromMillisecondsSinceEpoch(
+              dateValue['_seconds'] * 1000);
+        }
+        throw Exception("Unknown date format");
+      }
+
+      final startDate = parseDate(coupon['tanggalMulai']);
+      final endDate = parseDate(coupon['tanggalSelesai']);
       final format = DateFormat('dd MMM yyyy', 'id_ID');
       return '${format.format(startDate)} - ${format.format(endDate)}';
     } catch (e) {
+      print('Error parsing date ($e) for coupon: ${coupon['nama']}');
       return 'N/A';
     }
   }
 
   List<Map<String, dynamic>> get _filteredCoupons {
-    List<Map<String, dynamic>> coupons = _dummyCoupons;
+    List<Map<String, dynamic>> coupons = _kuponList;
 
     if (_searchQuery.isNotEmpty) {
       coupons = coupons.where((coupon) {
         final name = coupon['nama']?.toLowerCase() ?? '';
-        final code = coupon['kode']?.toLowerCase() ?? '';
         final query = _searchQuery.toLowerCase();
-        return name.contains(query) || code.contains(query);
+        return name.contains(query);
       }).toList();
     }
 
-    if (_selectedStatus != null && _selectedStatus != 'Semua Status') {
-      coupons = coupons.where((coupon) => coupon['status'] == _selectedStatus).toList();
+    if (_selectedStatus == 'Aktif') {
+      coupons = coupons.where((coupon) => coupon['status'] == true).toList();
+    } else if (_selectedStatus == 'Tidak Aktif') {
+      coupons = coupons.where((coupon) => coupon['status'] == false).toList();
     }
 
-    if (_selectedOutlet != null && _selectedOutlet != 'Semua Outlet') {
+    if (_selectedOutletId != null && _selectedOutletId != 'Semua Outlet') {
       coupons = coupons.where((coupon) {
-        return coupon['outlet'] == _selectedOutlet || coupon['outlet'] == 'Semua Outlet';
+        return coupon['outlet'] == _selectedOutletId ||
+            coupon['outlet'] == 'Semua Outlet';
       }).toList();
     }
 
@@ -117,29 +130,68 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
 
   void _navigateToAddKupon() {
     Navigator.of(context, rootNavigator: true)
-        .pushNamed('/tambah-kupon')
+        .push(
+      MaterialPageRoute(builder: (context) => const TambahKuponPage()),
+    )
         .then((success) {
+      if (success == true) {
+        _fetchData();
+      }
     });
   }
 
-  Future<void> _showDeleteConfirmationDialog(BuildContext context, String couponName) {
+  void _navigateToEditKupon(Map<String, dynamic> kupon) {
+    Navigator.of(context, rootNavigator: true)
+        .push(
+      MaterialPageRoute(
+          builder: (context) => TambahKuponPage(kupon: kupon)),
+    )
+        .then((success) {
+      if (success == true) {
+        _fetchData();
+      }
+    });
+  }
+
+  Future<void> _showDeleteConfirmationDialog(
+      BuildContext context, Map<String, dynamic> coupon) async {
     return showDialog<void>(
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             title: const Text('Konfirmasi Hapus'),
-            content: Text('Apakah Anda yakin ingin menghapus kupon "$couponName"?'),
+            content: Text(
+                'Apakah Anda yakin ingin menghapus kupon "${coupon['nama']}"?'),
             actions: <Widget>[
-              TextButton(child: const Text('Batal'), onPressed: () => Navigator.of(context).pop()),
+              TextButton(
+                  child: const Text('Batal'),
+                  onPressed: () => Navigator.of(context).pop()),
               ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white),
                 child: const Text('Hapus'),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Kupon "$couponName" berhasil dihapus'), backgroundColor: Colors.green),
-                  );
+                onPressed: () async {
+                  try {
+                    await _apiService.deleteKupon(coupon['id']);
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content:
+                          Text('Kupon "${coupon['nama']}" berhasil dihapus'),
+                          backgroundColor: Colors.green),
+                    );
+                    _fetchData();
+                  } catch (e) {
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text('Gagal menghapus kupon: $e'),
+                          backgroundColor: Colors.red),
+                    );
+                  }
                 },
               ),
             ],
@@ -164,7 +216,9 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
 
         return Scaffold(
           backgroundColor: isMobile ? Colors.grey[100] : Colors.grey[50],
-          body: SingleChildScrollView(
+          body: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
             padding: EdgeInsets.all(pagePadding),
             child: Center(
               child: ConstrainedBox(
@@ -172,15 +226,15 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // --- THIS IS THE CHANGE ---
                     _buildHeader(isMobile),
-                    // --- END OF CHANGE ---
                     const SizedBox(height: 24),
                     _buildFilterActions(),
                     const SizedBox(height: 24),
-                    _buildCouponTable(couponsOnCurrentPage, constraints),
+                    _buildCouponTable(
+                        couponsOnCurrentPage, constraints),
                     const SizedBox(height: 24),
-                    if (totalItems > 0) _buildPagination(totalItems, totalPages),
+                    if (totalItems > 0)
+                      _buildPagination(totalItems, totalPages),
                   ],
                 ),
               ),
@@ -239,31 +293,45 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
           width: 250,
           child: TextField(
             decoration: InputDecoration(
-              hintText: 'Cari nama/kode kupon...',
+              hintText: 'Cari nama kupon...',
               prefixIcon: const Icon(Icons.search, color: Colors.grey),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none),
               filled: true,
               fillColor: Colors.white,
               contentPadding: const EdgeInsets.symmetric(vertical: 10),
             ),
-            onChanged: (value) => setState(() { _searchQuery = value; _currentPage = 1; }),
+            onChanged: (value) => setState(() {
+              _searchQuery = value;
+              _currentPage = 1;
+            }),
           ),
         ),
         _buildDropdownFilter(
           value: _selectedStatus,
-          items: _statusOptions,
-          onChanged: (newValue) => setState(() { _selectedStatus = newValue; _currentPage = 1; }),
+          items: _statusOptions.map((s) => {'id': s, 'name': s}).toList(),
+          onChanged: (newValue) => setState(() {
+            _selectedStatus = newValue;
+            _currentPage = 1;
+          }),
         ),
         _buildDropdownFilter(
-          value: _selectedOutlet,
-          items: _outletOptions,
-          onChanged: (newValue) => setState(() { _selectedOutlet = newValue; _currentPage = 1; }),
+          value: _selectedOutletId,
+          items: _dynamicOutletOptions,
+          onChanged: (newValue) => setState(() {
+            _selectedOutletId = newValue;
+            _currentPage = 1;
+          }),
         ),
       ],
     );
   }
 
-  Widget _buildDropdownFilter({ required String? value, required List<String> items, required ValueChanged<String?> onChanged}) {
+  Widget _buildDropdownFilter(
+      {required String? value,
+        required List<Map<String, dynamic>> items,
+        required ValueChanged<String?> onChanged}) {
     return Container(
       width: 200,
       height: 48,
@@ -280,15 +348,20 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
           icon: const Icon(Icons.keyboard_arrow_down, color: Colors.black54),
           dropdownColor: Colors.white,
           onChanged: onChanged,
-          items: items.map<DropdownMenuItem<String>>((String value) => DropdownMenuItem<String>(
-            value: value, child: Text(value, style: const TextStyle(fontSize: 14)),
-          )).toList(),
+          items: items.map<DropdownMenuItem<String>>(
+                  (Map<String, dynamic> item) {
+                return DropdownMenuItem<String>(
+                  value: item['id'],
+                  child: Text(item['name'], style: const TextStyle(fontSize: 14)),
+                );
+              }).toList(),
         ),
       ),
     );
   }
 
-  Widget _buildCouponTable(List<Map<String, dynamic>> coupons, BoxConstraints constraints) {
+  Widget _buildCouponTable(
+      List<Map<String, dynamic>> coupons, BoxConstraints constraints) {
     final bool isMobile = constraints.maxWidth <= 850;
 
     Widget content;
@@ -296,12 +369,15 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
       content = const Center(
         child: Padding(
           padding: EdgeInsets.symmetric(vertical: 48.0),
-          child: Text('Tidak ada kupon ditemukan.', style: TextStyle(fontSize: 16, color: Colors.grey)),
+          child: Text('Tidak ada kupon ditemukan.',
+              style: TextStyle(fontSize: 16, color: Colors.grey)),
         ),
       );
     } else if (isMobile) {
       content = ListView.separated(
-        shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: coupons.length,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: coupons.length,
         separatorBuilder: (context, index) => const SizedBox(height: 12),
         itemBuilder: (context, index) => _buildMobileCouponCard(coupons[index]),
       );
@@ -310,7 +386,9 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
         children: [
           _buildDesktopTableHeader(),
           const Divider(height: 1, color: Colors.grey),
-          ...coupons.map((coupon) => _buildDesktopCouponTableRow(coupon)).toList(),
+          ...coupons
+              .map((coupon) => _buildDesktopCouponTableRow(coupon))
+              .toList(),
         ],
       );
     }
@@ -319,16 +397,33 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
       decoration: BoxDecoration(
         color: isMobile ? Colors.transparent : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: isMobile ? [] : [ BoxShadow(color: Colors.grey.withOpacity(0.1), spreadRadius: 1, blurRadius: 10)],
+        boxShadow: isMobile
+            ? []
+            : [
+          BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 1,
+              blurRadius: 10)
+        ],
       ),
       child: content,
     );
   }
 
+  String _getOutletName(String outletValue) {
+    if (outletValue == 'Semua Outlet') return 'Semua Outlet';
+    try {
+      return _outletList.firstWhere((o) => o['id'] == outletValue)['name'];
+    } catch (e) {
+      return outletValue;
+    }
+  }
+
   Widget _buildMobileCouponCard(Map<String, dynamic> coupon) {
     return Card(
       color: Colors.white,
-      elevation: 2, shadowColor: Colors.black.withOpacity(0.1),
+      elevation: 2,
+      shadowColor: Colors.black.withOpacity(0.1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -343,9 +438,10 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(coupon['nama'] ?? 'N/A', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text(coupon['nama'] ?? 'N/A',
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
-                      Text('Kode: ${coupon['kode'] ?? 'N/A'}', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
                     ],
                   ),
                 ),
@@ -355,17 +451,20 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
             const SizedBox(height: 12),
             const Divider(),
             const SizedBox(height: 12),
-            _buildInfoRow(Icons.sell_outlined, 'Besaran: ${_formatBesaran(coupon)}'),
+            _buildInfoRow(
+                Icons.sell_outlined, 'Besaran: ${_formatBesaran(coupon)}'),
             const SizedBox(height: 8),
             _buildInfoRow(Icons.date_range_outlined, _formatDurasi(coupon)),
             const SizedBox(height: 8),
-            _buildInfoRow(Icons.storefront_outlined, coupon['outlet'] ?? 'N/A'),
+            _buildInfoRow(Icons.storefront_outlined,
+                _getOutletName(coupon['outlet'] ?? 'N/A')),
             const SizedBox(height: 8),
             Row(
               children: [
-                Icon(Icons.check_circle_outline, size: 16, color: Colors.grey[600]),
+                Icon(Icons.check_circle_outline,
+                    size: 16, color: Colors.grey[600]),
                 const SizedBox(width: 8),
-                _buildStatusChip(coupon['status'] ?? 'N/A'),
+                _buildStatusChip(coupon['status'] ?? false),
               ],
             ),
           ],
@@ -379,7 +478,9 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
       children: [
         Icon(icon, size: 16, color: Colors.grey[600]),
         const SizedBox(width: 8),
-        Expanded(child: Text(text, style: TextStyle(fontSize: 14, color: Colors.grey[800]))),
+        Expanded(
+            child: Text(text,
+                style: TextStyle(fontSize: 14, color: Colors.grey[800]))),
       ],
     );
   }
@@ -389,8 +490,8 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       child: Row(
         children: [
-          Expanded(flex: 2, child: Text('KODE KUPON', style: _tableHeaderStyle())),
-          Expanded(flex: 3, child: Text('NAMA KUPON', style: _tableHeaderStyle())),
+          Expanded(
+              flex: 3, child: Text('NAMA KUPON', style: _tableHeaderStyle())),
           Expanded(flex: 2, child: Text('BESARAN', style: _tableHeaderStyle())),
           Expanded(flex: 4, child: Text('DURASI', style: _tableHeaderStyle())),
           Expanded(flex: 3, child: Text('OUTLET', style: _tableHeaderStyle())),
@@ -409,32 +510,39 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Expanded(flex: 2, child: Text(coupon['kode'] ?? 'N/A', style: _tableBodyStyle())),
-              Expanded(flex: 3, child: Text(coupon['nama'] ?? 'N/A', style: _tableBodyStyle())),
-              Expanded(flex: 2, child: Text(_formatBesaran(coupon), style: _tableBodyStyle())),
-              Expanded(flex: 4, child: Text(_formatDurasi(coupon), style: _tableBodyStyle())),
-              Expanded(flex: 3, child: Text(coupon['outlet'] ?? 'N/A', style: _tableBodyStyle())),
-              Expanded(flex: 2, child: _buildStatusChip(coupon['status'] ?? 'N/A')),
+              Expanded(
+                  flex: 3,
+                  child: Text(coupon['nama'] ?? 'N/A', style: _tableBodyStyle())),
+              Expanded(
+                  flex: 2,
+                  child:
+                  Text(_formatBesaran(coupon), style: _tableBodyStyle())),
+              Expanded(
+                  flex: 4,
+                  child: Text(_formatDurasi(coupon), style: _tableBodyStyle())),
+              Expanded(
+                  flex: 3,
+                  child: Text(_getOutletName(coupon['outlet'] ?? 'N/A'),
+                      style: _tableBodyStyle())),
+              Expanded(
+                  flex: 2, child: _buildStatusChip(coupon['status'] ?? false)),
               _buildPopupMenuButton(coupon),
             ],
           ),
         ),
-        const Divider(height: 1, indent: 24, endIndent: 24, color: Color(0xFFEEEEEE)),
+        const Divider(
+            height: 1, indent: 24, endIndent: 24, color: Color(0xFFEEEEEE)),
       ],
     );
   }
 
-  Widget _buildStatusChip(String status) {
-    Color chipColor;
-    Color textColor = Colors.white;
-    switch (status) {
-      case 'Baru': chipColor = Colors.green; break;
-      case 'Digunakan': chipColor = Colors.blue; break;
-      case 'Kedaluwarsa': chipColor = Colors.red; break;
-      default: chipColor = Colors.grey;
-    }
+  Widget _buildStatusChip(bool isActive) {
+    Color chipColor = isActive ? Colors.green : Colors.red;
+    String text = isActive ? 'Aktif' : 'Tidak Aktif';
     return Chip(
-      label: Text(status, style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 12)),
+      label: Text(text,
+          style: const TextStyle(
+              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
       backgroundColor: chipColor,
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
       labelPadding: EdgeInsets.zero,
@@ -446,22 +554,35 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
     return SizedBox(
       width: 48,
       child: PopupMenuButton<String>(
-        color: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+        color: Colors.white,
+        shape:
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
         icon: const Icon(Icons.more_horiz),
         onSelected: (String value) {
           if (value == 'hapus') {
-            _showDeleteConfirmationDialog(context, coupon['nama']);
+            _showDeleteConfirmationDialog(context, coupon);
+          } else if (value == 'ubah') {
+            _navigateToEditKupon(coupon);
           }
         },
         itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-          _buildPopupMenuItem(value: 'ubah', text: 'Ubah', icon: Icons.edit_outlined),
-          _buildPopupMenuItem(value: 'hapus', text: 'Hapus', icon: Icons.delete_outline, isDestructive: true),
+          _buildPopupMenuItem(
+              value: 'ubah', text: 'Ubah', icon: Icons.edit_outlined),
+          _buildPopupMenuItem(
+              value: 'hapus',
+              text: 'Hapus',
+              icon: Icons.delete_outline,
+              isDestructive: true),
         ],
       ),
     );
   }
 
-  PopupMenuItem<String> _buildPopupMenuItem({required String value, required String text, required IconData icon, bool isDestructive = false}) {
+  PopupMenuItem<String> _buildPopupMenuItem(
+      {required String value,
+        required String text,
+        required IconData icon,
+        bool isDestructive = false}) {
     return PopupMenuItem<String>(
       value: value,
       child: Row(
@@ -474,20 +595,34 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
     );
   }
 
-  TextStyle _tableHeaderStyle() => TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey[600]);
-  TextStyle _tableBodyStyle() => const TextStyle(fontSize: 14, color: Colors.black87);
+  TextStyle _tableHeaderStyle() =>
+      TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey[600]);
+  TextStyle _tableBodyStyle() =>
+      const TextStyle(fontSize: 14, color: Colors.black87);
 
   Widget _buildPagination(int totalItems, int totalPages) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        IconButton(icon: const Icon(Icons.arrow_back_ios, size: 16), onPressed: _currentPage > 1 ? () => setState(() => _currentPage--) : null),
+        IconButton(
+            icon: const Icon(Icons.arrow_back_ios, size: 16),
+            onPressed: _currentPage > 1
+                ? () => setState(() => _currentPage--)
+                : null),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(color: const Color(0xFF279E9E), borderRadius: BorderRadius.circular(8)),
-          child: Text('$_currentPage', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          decoration: BoxDecoration(
+              color: const Color(0xFF279E9E),
+              borderRadius: BorderRadius.circular(8)),
+          child: Text('$_currentPage',
+              style:
+              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         ),
-        IconButton(icon: const Icon(Icons.arrow_forward_ios, size: 16), onPressed: _currentPage < totalPages ? () => setState(() => _currentPage++) : null),
+        IconButton(
+            icon: const Icon(Icons.arrow_forward_ios, size: 16),
+            onPressed: _currentPage < totalPages
+                ? () => setState(() => _currentPage++)
+                : null),
       ],
     );
   }

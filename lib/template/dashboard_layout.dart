@@ -56,7 +56,8 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                         userData: widget.userData,
                         isLoading: widget.isLoading,
                         onProfileSettingsTap: () => widget.onNavigate('Profile'),
-                        onBusinessSettingsTap: () => widget.onNavigate('Pengaturan Bisnis'),
+                        onBusinessSettingsTap: () =>
+                            widget.onNavigate('Pengaturan Bisnis'),
                       ),
                       Expanded(
                         child: widget.child,
@@ -74,7 +75,8 @@ class _DashboardLayoutState extends State<DashboardLayout> {
               userData: widget.userData,
               isLoading: widget.isLoading,
               onProfileSettingsTap: () => widget.onNavigate('Profile'),
-              onBusinessSettingsTap: () => widget.onNavigate('Pengaturan Bisnis'),
+              onBusinessSettingsTap: () =>
+                  widget.onNavigate('Pengaturan Bisnis'),
             ),
             drawer: SideNavBar(
               isCollapsed: false,
@@ -415,16 +417,16 @@ class NavItem {
 class NavListTile extends StatefulWidget {
   final bool isCollapsed;
   final NavItem item;
-  final EdgeInsetsGeometry? padding;
-  final bool isSelected;
-  final VoidCallback onTap;
+  final EdgeInsetsGeometry padding;
+  final String selectedItem;
+  final Function(String) onTap;
 
   const NavListTile({
     super.key,
     required this.isCollapsed,
     required this.item,
-    this.padding,
-    required this.isSelected,
+    required this.padding,
+    required this.selectedItem,
     required this.onTap,
   });
 
@@ -435,72 +437,113 @@ class NavListTile extends StatefulWidget {
 class _NavListTileState extends State<NavListTile> {
   bool _isHovering = false;
 
+  bool _isChildSelected(NavItem item, String selectedItem) {
+    if (item.children.isEmpty) return false;
+    bool containsSelected = false;
+    for (var child in item.children) {
+      if (child.title == selectedItem) {
+        containsSelected = true;
+        break;
+      }
+      if (child.children.isNotEmpty) {
+        containsSelected = _isChildSelected(child, selectedItem);
+        if (containsSelected) break;
+      }
+    }
+    return containsSelected;
+  }
+
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovering = true),
-      onExit: (_) => setState(() => _isHovering = false),
-      child: Container(
-        decoration: BoxDecoration(
-          color:
-          _isHovering ? Colors.white.withOpacity(0.1) : Colors.transparent,
-          border: Border(
-            right: BorderSide(
-              color: widget.isSelected
-                  ? const Color(0xFFFFC107)
+    final bool isSelected = widget.selectedItem == item.title;
+
+    final bool isChildSelected = _isChildSelected(item, widget.selectedItem);
+
+    if (widget.isCollapsed) {
+      return Tooltip(
+        message: item.title,
+        child: InkWell(
+          onTap: () {
+            widget.onTap(item.title);
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: _isHovering
+                  ? Colors.white.withOpacity(0.1)
                   : Colors.transparent,
-              width: 4.0,
+              border: Border(
+                right: BorderSide(
+                  color: isSelected
+                      ? const Color(0xFFFFC107)
+                      : Colors.transparent,
+                  width: 4.0,
+                ),
+              ),
+            ),
+            height: 48.0,
+            child: Center(
+              child: Icon(item.icon, color: Colors.white, size: 22),
             ),
           ),
         ),
-        child: widget.isCollapsed
-            ? Tooltip(
-          message: item.title,
-          child: InkWell(
-            onTap: widget.onTap,
-            child: SizedBox(
-              height: 48.0,
-              child: Center(
-                child: Icon(item.icon, color: Colors.white, size: 22),
+      );
+    }
+
+    if (item.children.isEmpty) {
+      return MouseRegion(
+        onEnter: (_) => setState(() => _isHovering = true),
+        onExit: (_) => setState(() => _isHovering = false),
+        child: Container(
+          decoration: BoxDecoration(
+            color: _isHovering
+                ? Colors.white.withOpacity(0.1)
+                : Colors.transparent,
+            border: Border(
+              right: BorderSide(
+                color: isSelected
+                    ? const Color(0xFFFFC107)
+                    : Colors.transparent,
+                width: 4.0,
               ),
             ),
           ),
-        )
-            : item.children.isEmpty
-            ? ListTile(
-          contentPadding: widget.padding ??
-              const EdgeInsets.symmetric(horizontal: 24),
-          leading: Icon(item.icon, color: Colors.white, size: 22),
-          title: Text(item.title,
-              style:
-              const TextStyle(color: Colors.white, fontSize: 15)),
-          onTap: widget.onTap,
-        )
-            : Theme(
-          data: Theme.of(context)
-              .copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            tilePadding: widget.padding ??
-                const EdgeInsets.symmetric(horizontal: 24),
+          child: ListTile(
+            contentPadding: widget.padding,
             leading: Icon(item.icon, color: Colors.white, size: 22),
             title: Text(item.title,
-                style:
-                const TextStyle(color: Colors.white, fontSize: 15)),
-            trailing: const Icon(Icons.keyboard_arrow_down,
-                color: Colors.white),
-            children: item.children
-                .map((child) => NavListTile(
-              isCollapsed: widget.isCollapsed,
-              item: child,
-              isSelected: false,
-              onTap: () {},
-              padding: const EdgeInsets.only(left: 48.0),
-            ))
-                .toList(),
+                style: const TextStyle(color: Colors.white, fontSize: 15)),
+            onTap: () => widget.onTap(item.title),
           ),
         ),
+      );
+    }
+
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        key: PageStorageKey(item.title),
+        initiallyExpanded: isChildSelected,
+        tilePadding: widget.padding,
+        leading: Icon(item.icon, color: Colors.white, size: 22),
+        title: Text(item.title,
+            style: const TextStyle(color: Colors.white, fontSize: 15)),
+        trailing: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
+        children: item.children.map((child) {
+          final newPadding = EdgeInsets.only(
+            left: (widget.padding as EdgeInsets).left + 24.0,
+            right: (widget.padding as EdgeInsets).right,
+          );
+
+          return NavListTile(
+            isCollapsed: widget.isCollapsed,
+            item: child,
+            padding: newPadding,
+            selectedItem: widget.selectedItem,
+            onTap: widget.onTap,
+          );
+        }).toList(),
       ),
     );
   }
@@ -534,12 +577,54 @@ class _SideNavBarState extends State<SideNavBar> {
       title: 'Laporan',
       icon: Icons.bar_chart_rounded,
       children: [
-        NavItem(title: 'Laporan Penjualan', icon: Icons.point_of_sale),
-        NavItem(title: 'Laporan Pembelian', icon: Icons.shopping_bag),
-        NavItem(title: 'Laporan Produk', icon: Icons.inventory_2_rounded),
-        NavItem(title: 'Laporan Customer', icon: Icons.people_alt_rounded),
-        NavItem(title: 'Laporan Karyawan', icon: Icons.people_alt_rounded),
-        NavItem(title: 'Laporan Neraca', icon: Icons.balance)
+        NavItem(
+            title: 'Laporan Penjualan',
+            icon: Icons.point_of_sale,
+            children: [
+              NavItem(
+                  title: 'Ringkasan Penjualan', icon: Icons.summarize_rounded),
+              NavItem(
+                  title: 'Detail Penjualan', icon: Icons.receipt_long_rounded),
+              NavItem(
+                  title: 'Penjualan Per Periode',
+                  icon: Icons.date_range_outlined),
+            ]),
+        NavItem(
+            title: 'Laporan Pembelian',
+            icon: Icons.shopping_bag,
+            children: [
+              NavItem(
+                  title: 'Ringkasan Pembelian',
+                  icon: Icons.assessment_outlined),
+              NavItem(
+                  title: 'Detail Pembelian', icon: Icons.description_outlined)
+            ]),
+        NavItem(
+            title: 'Laporan Produk',
+            icon: Icons.inventory_2_rounded,
+            children: [
+              NavItem(title: 'Penjualan Produk', icon: Icons.sell_rounded),
+              NavItem(
+                  title: 'Penjualan Kategori', icon: Icons.category_rounded)
+            ]),
+        NavItem(
+            title: 'Laporan Pelanggan',
+            icon: Icons.people_alt_rounded,
+            children: [
+              NavItem(title: 'Laporan Pelanggan', icon: Icons.analytics_rounded)
+            ]),
+        NavItem(
+            title: 'Laporan Karyawan',
+            icon: Icons.people_alt_rounded,
+            children: [
+              NavItem(title: 'Absensi', icon: Icons.fingerprint_rounded)
+            ]),
+        NavItem(
+            title: 'Laporan Keuangan',
+            icon: Icons.balance,
+            children: [
+              NavItem(title: 'Laporan Neraca', icon: Icons.balance)
+            ])
       ],
     ),
     NavItem(
@@ -551,12 +636,11 @@ class _SideNavBarState extends State<SideNavBar> {
       ],
     ),
     NavItem(
-      title: 'Inventori',
-      icon: Icons.inventory_2_rounded,
-      children: [
-        NavItem(title: 'Daftar Stok', icon: Icons.inventory_2_rounded)
-      ]
-    ),
+        title: 'Inventori',
+        icon: Icons.inventory_2_rounded,
+        children: [
+          NavItem(title: 'Daftar Stok', icon: Icons.inventory_2_rounded)
+        ]),
     NavItem(
         title: 'Pelanggan',
         icon: Icons.people_alt_rounded,
@@ -570,11 +654,9 @@ class _SideNavBarState extends State<SideNavBar> {
     NavItem(
         title: 'Outlet',
         icon: Icons.storefront_rounded,
-        children: [
-          NavItem(title: 'Daftar Outlet', icon: Icons.store)
-        ]),
+        children: [NavItem(title: 'Daftar Outlet', icon: Icons.store)]),
     NavItem(
-        title: 'Karyawan', 
+        title: 'Karyawan',
         icon: Icons.person_outline,
         children: [
           NavItem(title: 'Daftar Karyawan', icon: Icons.person_outline),
@@ -605,7 +687,6 @@ class _SideNavBarState extends State<SideNavBar> {
                 opacity: anim1,
                 child: Material(
                   type: MaterialType.transparency,
-                  // MODIFIED: Removed userData parameter
                   child: OutletSelectionDialog(),
                 ),
               ),
@@ -635,62 +716,18 @@ class _SideNavBarState extends State<SideNavBar> {
               itemBuilder: (context, index) {
                 final item = _navItems[index];
 
-                if (item.children.isEmpty) {
-                  return NavListTile(
-                    isCollapsed: widget.isCollapsed,
-                    item: item,
-                    isSelected: _selectedItem == item.title,
-                    onTap: () {
-                      setState(() {
-                        _selectedItem = item.title;
-                      });
-                      widget.onNavigate(item.title);
-                    },
-                  );
-                } else {
-                  if (widget.isCollapsed) {
-                    return Tooltip(
-                      message: item.title,
-                      child: SizedBox(
-                        height: 48.0,
-                        child: Center(
-                          child:
-                          Icon(item.icon, color: Colors.white, size: 22),
-                        ),
-                      ),
-                    );
-                  } else {
-                    return Theme(
-                      data: Theme.of(context)
-                          .copyWith(dividerColor: Colors.transparent),
-                      child: ExpansionTile(
-                        key: PageStorageKey(item.title),
-                        tilePadding:
-                        const EdgeInsets.symmetric(horizontal: 24),
-                        leading: Icon(item.icon, color: Colors.white, size: 22),
-                        title: Text(item.title,
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 15)),
-                        trailing: const Icon(Icons.keyboard_arrow_down,
-                            color: Colors.white),
-                        children: item.children.map((child) {
-                          return NavListTile(
-                            isCollapsed: widget.isCollapsed,
-                            item: child,
-                            isSelected: _selectedItem == child.title,
-                            padding: const EdgeInsets.only(left: 48.0),
-                            onTap: () {
-                              setState(() {
-                                _selectedItem = child.title;
-                              });
-                              widget.onNavigate(child.title);
-                            },
-                          );
-                        }).toList(),
-                      ),
-                    );
-                  }
-                }
+                return NavListTile(
+                  isCollapsed: widget.isCollapsed,
+                  item: item,
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  selectedItem: _selectedItem,
+                  onTap: (String title) {
+                    setState(() {
+                      _selectedItem = title;
+                    });
+                    widget.onNavigate(title);
+                  },
+                );
               },
             ),
           ),
@@ -754,10 +791,6 @@ class _SideNavBarState extends State<SideNavBar> {
   }
 }
 
-// =========================================================================
-// REPLACED OutletSelectionDialog
-// =========================================================================
-
 class OutletSelectionDialog extends StatefulWidget {
   const OutletSelectionDialog({super.key});
 
@@ -769,12 +802,12 @@ class _OutletSelectionDialogState extends State<OutletSelectionDialog> {
   String? _selectedOutletId;
   bool _isLoading = true;
   List<QueryDocumentSnapshot> _outlets = [];
-  final String _allOutletsValue = 'Semua Outlet'; // Constant for the "All" option
+  final String _allOutletsValue = 'Semua Outlet';
 
   @override
   void initState() {
     super.initState();
-    _selectedOutletId = _allOutletsValue; // Default selection
+    _selectedOutletId = _allOutletsValue;
     _fetchUserOutlets();
   }
 
@@ -788,10 +821,9 @@ class _OutletSelectionDialogState extends State<OutletSelectionDialog> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         if (mounted) setState(() => _isLoading = false);
-        return; // Not logged in
+        return;
       }
 
-      // Query the 'outlets' collection based on the 'userId' field
       final querySnapshot = await FirebaseFirestore.instance
           .collection('outlets')
           .where('userId', isEqualTo: user.uid)
@@ -853,8 +885,6 @@ class _OutletSelectionDialogState extends State<OutletSelectionDialog> {
               ),
             ),
             const SizedBox(height: 8),
-
-            // "All Outlets" Radio Button
             RadioListTile<String>(
               title: const Text('Semua Outlet'),
               secondary: Text(
@@ -868,8 +898,6 @@ class _OutletSelectionDialogState extends State<OutletSelectionDialog> {
               controlAffinity: ListTileControlAffinity.leading,
             ),
             const Divider(),
-
-            // Conditional list for outlets
             if (_isLoading)
               const Center(
                 child: Padding(
@@ -889,7 +917,6 @@ class _OutletSelectionDialogState extends State<OutletSelectionDialog> {
                 ),
               )
             else
-            // This ConstrainedBox prevents the dialog from growing too tall
               ConstrainedBox(
                 constraints: BoxConstraints(
                   maxHeight: MediaQuery.of(context).size.height * 0.4,
@@ -902,19 +929,16 @@ class _OutletSelectionDialogState extends State<OutletSelectionDialog> {
                     final outletData =
                     outletDoc.data() as Map<String, dynamic>;
 
-                    // Get outlet name, default to 'Unnamed' if null
                     final outletName =
                         outletData['name'] ?? 'Outlet Tanpa Nama';
                     final outletId = outletDoc.id;
 
                     return RadioListTile<String>(
                       title: Text(outletName),
-                      value: outletId, // Use the document ID as the unique value
+                      value: outletId,
                       groupValue: _selectedOutletId,
                       onChanged: (value) {
                         setState(() => _selectedOutletId = value);
-                        // You can add logic here to notify the rest of the app
-                        // that the selected outlet has changed.
                       },
                       activeColor: const Color(0xFF279E9E),
                       controlAffinity: ListTileControlAffinity.leading,

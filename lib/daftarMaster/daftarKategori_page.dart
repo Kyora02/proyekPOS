@@ -233,7 +233,7 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
                     children: [
                       _buildHeader(isMobile),
                       const SizedBox(height: 24),
-                      _buildFilterActions(),
+                      _buildFilterActions(isMobile),
                       const SizedBox(height: 24),
                       if (_isLoading)
                         const Center(
@@ -250,10 +250,12 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
                                 style: const TextStyle(color: Colors.red)),
                           ),
                         )
-                      else
-                        _buildCategoryTable(categoriesOnCurrentPage),
+                      else if (isMobile)
+                          _buildCategoryListMobile(categoriesOnCurrentPage)
+                        else
+                          _buildCategoryTable(categoriesOnCurrentPage),
                       const SizedBox(height: 24),
-                      if (!_isLoading && _error == null)
+                      if (!_isLoading && _error == null && !isMobile)
                         _buildPagination(totalItems, totalPages),
                     ],
                   ),
@@ -305,9 +307,9 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
     }
   }
 
-  Widget _buildFilterActions() {
+  Widget _buildFilterActions(bool isMobile) {
     return SizedBox(
-      width: 250,
+      width: isMobile ? double.infinity : 250,
       child: TextField(
         decoration: InputDecoration(
           hintText: 'Cari kategori...',
@@ -323,6 +325,119 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
           _searchQuery = value;
           _currentPage = 1;
         }),
+      ),
+    );
+  }
+
+  Widget _buildCategoryListMobile(List<Map<String, dynamic>> categories) {
+    if (categories.isEmpty) {
+      return const Padding(
+          padding: EdgeInsets.all(24.0),
+          child: Center(child: Text('Tidak ada kategori ditemukan.')));
+    }
+
+    return ListView.separated(
+      itemCount: categories.length,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final category = categories[index];
+        return _buildCategoryCardMobile(category);
+      },
+    );
+  }
+
+  Widget _buildCategoryCardMobile(Map<String, dynamic> category) {
+    final String categoryName = category['name'] ?? 'N/A';
+    final String categoryId = category['id'];
+    final String urutan = category['order']?.toString() ?? 'N/A';
+    final String jumlahProduk = '0';
+
+    return Card(
+      elevation: 1,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        categoryName,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Urutan: $urutan',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: 48,
+                  height: 24,
+                  child: PopupMenuButton<String>(
+                    color: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8.0)),
+                    icon: const Icon(Icons.more_horiz),
+                    onSelected: (String value) {
+                      if (value == 'ubah') {
+                        _navigateToEditCategory(category);
+                      } else if (value == 'hapus') {
+                        _showDeleteConfirmationDialog(
+                            context, categoryName, categoryId);
+                      }
+                    },
+                    itemBuilder: (BuildContext context) =>
+                    <PopupMenuEntry<String>>[
+                      _buildPopupMenuItem(
+                          value: 'ubah',
+                          text: 'Ubah',
+                          icon: Icons.edit_outlined),
+                      _buildPopupMenuItem(
+                          value: 'hapus',
+                          text: 'Hapus',
+                          icon: Icons.delete_outline,
+                          isDestructive: true),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Divider(),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.inventory_2_outlined,
+                    color: Colors.grey[700], size: 20),
+                const SizedBox(width: 12),
+                Text('Jumlah Produk:',
+                    style: TextStyle(color: Colors.grey[700])),
+                const Spacer(),
+                Text(jumlahProduk,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

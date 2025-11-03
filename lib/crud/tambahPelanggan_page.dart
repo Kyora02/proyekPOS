@@ -55,11 +55,9 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
         : JenisKelamin.lakiLaki;
 
     if (data['dob'] != null) {
-      // Handle Firebase Timestamp or ISO String
       if (data['dob'] is String) {
         _selectedDate = DateTime.parse(data['dob']);
       } else if (data['dob'] is Map) {
-        // Assuming Firestore Timestamp
         _selectedDate = DateTime.fromMillisecondsSinceEpoch(
             data['dob']['_seconds'] * 1000);
       }
@@ -192,10 +190,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
         backgroundColor: Colors.white,
         elevation: 1,
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.black87),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        automaticallyImplyLeading: false,
         title: Text(
           _isEditMode ? 'Edit Pelanggan' : 'Tambahkan Pelanggan',
           style: const TextStyle(
@@ -203,6 +198,12 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
             fontWeight: FontWeight.bold,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.black87),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
       ),
       body: Form(
         key: _formKey,
@@ -268,15 +269,8 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
                   ),
                   const SizedBox(height: 32),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text(
-                          'Batal',
-                          style: TextStyle(color: Color(0xFF00A3A3)),
-                        ),
-                      ),
                       ElevatedButton(
                         onPressed: _isSaving ? null : _savePelanggan,
                         style: ElevatedButton.styleFrom(

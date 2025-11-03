@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:proyekpos2/service/api_service.dart';
 
 class TambahProdukPage extends StatefulWidget {
-  final Map<String, dynamic>? product; // To accept product data for editing
+  final Map<String, dynamic>? product;
 
   const TambahProdukPage({super.key, this.product});
 
@@ -14,7 +14,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
   final _formKey = GlobalKey<FormState>();
   final _apiService = ApiService();
   bool _isLoading = false;
-  bool _isFetchingData = true; // For initial data load
+  bool _isFetchingData = true;
 
   final _namaProdukController = TextEditingController();
   final _deskripsiController = TextEditingController();
@@ -22,7 +22,6 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
   final _hargaJualController = TextEditingController();
   final _hargaBeliController = TextEditingController();
 
-  // Dynamic data state
   List<Map<String, dynamic>> _outletOptions = [];
   List<Map<String, dynamic>> _kategoriOptions = [];
   List<Map<String, dynamic>> _selectedOutlets = [];
@@ -43,9 +42,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
   Future<void> _loadInitialData() async {
     setState(() => _isFetchingData = true);
     try {
-      // Fetch both outlets and categories
       final outlets = await _apiService.getOutlets();
-      // Get categories for the first outlet by default
       final categories = outlets.isNotEmpty
           ? await _apiService.getCategories(outletId: outlets.first['id'])
           : <Map<String, dynamic>>[];
@@ -54,7 +51,6 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
         setState(() {
           _outletOptions = outlets;
           _kategoriOptions = categories;
-          // If in edit mode, populate fields
           if (_isEditMode) {
             _populateFieldsForEdit();
           }
@@ -84,7 +80,6 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
     _hargaBeliController.text = product['costPrice']?.toString() ?? '0';
     _selectedKategoriId = product['categoryId'];
 
-    // Match selected outlets
     final List<String> outletIds =
     List<String>.from(product['outletIds'] ?? []);
     _selectedOutlets =
@@ -127,7 +122,6 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
       final costPrice = double.tryParse(_hargaBeliController.text);
 
       if (_isEditMode) {
-        // Update logic
         await _apiService.updateProduct(
           id: widget.product!['id'],
           name: _namaProdukController.text,
@@ -139,7 +133,6 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
           outlets: _selectedOutlets,
         );
       } else {
-        // Add logic
         await _apiService.addProduct(
           name: _namaProdukController.text,
           description: _deskripsiController.text,
@@ -156,7 +149,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
               content: Text('Product saved successfully!'),
               backgroundColor: Colors.green),
         );
-        Navigator.of(context).pop(true); // Pop with success
+        Navigator.of(context).pop(true);
       }
     } catch (e) {
       if (mounted) {
@@ -278,10 +271,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
           backgroundColor: Colors.white,
           elevation: 1,
           centerTitle: true,
-          leading: IconButton(
-            icon: const Icon(Icons.close, color: Colors.black87),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
+          automaticallyImplyLeading: false,
           title: Text(
             _isEditMode ? 'Edit Produk' : 'Tambahkan Produk',
             style: const TextStyle(
@@ -289,6 +279,12 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
               fontWeight: FontWeight.bold,
             ),
           ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.black87),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
         ),
         body: _isFetchingData
             ? const Center(child: CircularProgressIndicator())
@@ -380,15 +376,8 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                     ),
                     const SizedBox(height: 32),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text(
-                            'Batal',
-                            style: TextStyle(color: Color(0xFF00A3A3)),
-                          ),
-                        ),
                         ElevatedButton(
                           onPressed: _isLoading ? null : _saveProduct,
                           style: ElevatedButton.styleFrom(

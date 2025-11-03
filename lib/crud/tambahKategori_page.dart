@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:proyekpos2/service/api_service.dart';
 
 class TambahKategoriPage extends StatefulWidget {
-  // 1. Add this field to accept an optional category for editing
   final Map<String, dynamic>? kategori;
 
-  // 2. Update the constructor
   const TambahKategoriPage({
     super.key,
-    this.kategori, // Make it an optional parameter
+    this.kategori,
   });
 
   @override
@@ -29,21 +27,17 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
   bool _isOutletOverlayOpen = false;
   bool _isSaving = false;
 
-  // 3. Add a getter to easily check if we are in "Edit Mode"
   bool get _isEditMode => widget.kategori != null;
 
   @override
   void initState() {
     super.initState();
-    // 4. Modify initState to fetch outlets and *then* populate fields if editing
     _fetchOutlets().then((_) {
       if (_isEditMode && mounted) {
-        // If we are editing, populate the form
         final kategori = widget.kategori!;
         _namaKategoriController.text = kategori['name'] ?? '';
         _urutanController.text = kategori['order']?.toString() ?? '';
 
-        // Match the saved outletIds with the full outlet objects
         final List<String> outletIds =
         List<String>.from(kategori['outletIds'] ?? []);
 
@@ -132,7 +126,6 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // This is your fix from before
                     if (_outletOptions.length > 1)
                       CheckboxListTile(
                         title: const Text('Pilih Semua'),
@@ -151,7 +144,6 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
                         activeColor: const Color(0xFF00A3A3),
                       ),
                     ..._outletOptions.map((outlet) {
-                      // Check if the current outlet is in the selected list
                       final isSelected = _selectedOutlets.any(
                             (selected) => selected['id'] == outlet['id'],
                       );
@@ -254,11 +246,7 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
           backgroundColor: Colors.white,
           elevation: 1,
           centerTitle: true,
-          leading: IconButton(
-            icon: const Icon(Icons.close, color: Colors.black87),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-          // 6. Make the AppBar title dynamic
+          automaticallyImplyLeading: false,
           title: Text(
             _isEditMode ? 'Edit Kategori' : 'Tambahkan Kategori',
             style: const TextStyle(
@@ -266,6 +254,12 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
               fontWeight: FontWeight.bold,
             ),
           ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.black87),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
         ),
         body: Form(
           key: _formKey,
@@ -302,15 +296,8 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
                     ),
                     const SizedBox(height: 32),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text(
-                            'Batal',
-                            style: TextStyle(color: Color(0xFF00A3A3)),
-                          ),
-                        ),
                         ElevatedButton(
                           onPressed: _isSaving ? null : _saveCategory,
                           style: ElevatedButton.styleFrom(
