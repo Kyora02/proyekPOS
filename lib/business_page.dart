@@ -12,6 +12,7 @@ class BusinessPage extends StatefulWidget {
 class _BusinessPageState extends State<BusinessPage> {
   final _ownerNameController = TextEditingController();
   final _businessNameController = TextEditingController();
+  final _alamatController = TextEditingController();
   final _cityController = TextEditingController();
   String? _operationDuration;
   bool _isLoading = false;
@@ -19,6 +20,7 @@ class _BusinessPageState extends State<BusinessPage> {
   Future<void> _saveBusinessInfo() async {
     if (_ownerNameController.text.isEmpty ||
         _businessNameController.text.isEmpty ||
+        _alamatController.text.isEmpty ||
         _cityController.text.isEmpty ||
         _operationDuration == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -43,8 +45,9 @@ class _BusinessPageState extends State<BusinessPage> {
         'userId': user.uid,
         'ownerName': _ownerNameController.text.trim(),
         'name': _businessNameController.text.trim(),
-        'operationDuration': _operationDuration,
+        'alamat': _alamatController.text.trim(),
         'city': _cityController.text.trim(),
+        'operationDuration': _operationDuration,
         'createdAt': Timestamp.now(),
       };
 
@@ -77,6 +80,7 @@ class _BusinessPageState extends State<BusinessPage> {
   void dispose() {
     _ownerNameController.dispose();
     _businessNameController.dispose();
+    _alamatController.dispose();
     _cityController.dispose();
     super.dispose();
   }
@@ -140,6 +144,14 @@ class _BusinessPageState extends State<BusinessPage> {
                             controller: _businessNameController,
                             label: 'Nama Usaha',
                             hint: 'Contoh: Toko Sahaja'),
+                        _buildTextField(
+                            controller: _alamatController,
+                            label: 'Alamat',
+                            hint: 'Contoh: Jl. Merdeka No. 1'),
+                        _buildTextField(
+                            controller: _cityController,
+                            label: 'Kota',
+                            hint: 'Contoh: Surabaya'),
                         _buildDropdownField(
                             label: 'Lama Beroperasi',
                             hint: 'Pilih',
@@ -147,10 +159,6 @@ class _BusinessPageState extends State<BusinessPage> {
                             items: ['< 1 Tahun', '1-3 Tahun', '> 3 Tahun'],
                             onChanged: (val) =>
                                 setState(() => _operationDuration = val)),
-                        _buildTextField(
-                            controller: _cityController,
-                            label: 'Kota',
-                            hint: 'Contoh: Surabaya'),
                       ],
                     ),
                     const SizedBox(height: 32),

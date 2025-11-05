@@ -2,20 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:proyekpos2/crud/tambahKaryawan_page.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:proyekpos2/crud/tambahKupon_page.dart';
-import 'package:proyekpos2/crud/tambahPelanggan_page.dart';
-import 'package:proyekpos2/daftarMaster/daftarKupon_page.dart';
-import 'daftarMaster/daftarProduk_page.dart';
-import 'crud/tambahProduk_page.dart';
 import 'business_page.dart';
 import 'dashboard_page.dart';
 import 'service/firebase_options.dart';
 import 'login_page.dart';
 import 'register_page.dart';
-import 'daftarMaster/daftarKategori_page.dart';
-import 'crud/tambahKategori_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -79,43 +71,6 @@ class MyApp extends StatelessWidget {
             return MaterialPageRoute(builder: (_) => const BusinessPage());
           case '/dashboard':
             return MaterialPageRoute(builder: (_) => const DashboardPage());
-          case '/daftar-produk':
-            return MaterialPageRoute(builder: (_) => const DaftarProdukPage());
-          case '/tambah-produk':
-            final Map<String, dynamic>? product =
-            settings.arguments as Map<String, dynamic>?;
-            return MaterialPageRoute(
-              builder: (_) => TambahProdukPage(product: product),
-            );
-          case '/daftar-kategori':
-            return MaterialPageRoute(builder: (_) => const DaftarKategoriPage());
-
-          case '/tambah-kategori':
-            final Map<String, dynamic>? kategori =
-            settings.arguments as Map<String, dynamic>?;
-            return MaterialPageRoute(
-              builder: (_) => TambahKategoriPage(kategori: kategori),
-            );
-          case '/daftar-kupon':
-            return MaterialPageRoute(builder: (_) => const DaftarKuponPage());
-          case '/tambah-kupon':
-            final Map<String, dynamic>? kupon =
-            settings.arguments as Map<String, dynamic>?;
-            return MaterialPageRoute(
-              builder: (_) => TambahKuponPage(kupon: kupon),
-            );
-          case '/tambah-pelanggan':
-            final Map<String, dynamic>? pelanggan =
-            settings.arguments as Map<String, dynamic>?;
-            return MaterialPageRoute(
-              builder: (_) => TambahPelangganPage(pelanggan: pelanggan),
-            );
-          case '/tambah-karyawan':
-            final Map<String, dynamic>? karyawan =
-            settings.arguments as Map<String, dynamic>?;
-            return MaterialPageRoute(
-              builder: (_) => TambahKaryawanPage(karyawan: karyawan),
-            );
           default:
             return MaterialPageRoute(
               builder: (_) => const Scaffold(

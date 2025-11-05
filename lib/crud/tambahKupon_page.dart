@@ -4,8 +4,13 @@ import 'package:proyekpos2/service/api_service.dart';
 
 class TambahKuponPage extends StatefulWidget {
   final Map<String, dynamic>? kupon;
+  final String outletId;
 
-  const TambahKuponPage({super.key, this.kupon});
+  const TambahKuponPage({
+    super.key,
+    this.kupon,
+    required this.outletId,
+  });
 
   @override
   State<TambahKuponPage> createState() => _TambahKuponPageState();
@@ -19,41 +24,35 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
   final _deskripsiC = TextEditingController();
   final _nilaiKuponC = TextEditingController();
 
-  String? _selectedOutletId;
   String _tipeNilaiKupon = 'percent';
   DateTime? _tanggalMulai;
   DateTime? _tanggalSelesai;
   bool _kuponStatus = true;
-  bool _isLoadingOutlets = true;
   bool _isSaving = false;
-
-  List<Map<String, dynamic>> _outletData = [];
 
   bool get _isEditMode => widget.kupon != null;
 
   @override
   void initState() {
     super.initState();
-    _fetchOutlets().then((_) {
-      if (_isEditMode) {
-        final kupon = widget.kupon!;
-        _namaKuponC.text = kupon['nama'] ?? '';
-        _deskripsiC.text = kupon['deskripsi'] ?? '';
-        _nilaiKuponC.text = (kupon['nilai'] ?? 0).toString();
 
-        _selectedOutletId = kupon['outletId'];
+    if (_isEditMode) {
+      final kupon = widget.kupon!;
+      _namaKuponC.text = kupon['nama'] ?? '';
+      _deskripsiC.text = kupon['deskripsi'] ?? '';
+      _nilaiKuponC.text = (kupon['nilai'] ?? 0).toString();
 
-        _tipeNilaiKupon = kupon['tipeNilai'] ?? 'percent';
-        _kuponStatus = kupon['status'] ?? true;
 
-        if (kupon['tanggalMulai'] != null) {
-          _tanggalMulai = _parseFirestoreDate(kupon['tanggalMulai']);
-        }
-        if (kupon['tanggalSelesai'] != null) {
-          _tanggalSelesai = _parseFirestoreDate(kupon['tanggalSelesai']);
-        }
+      _tipeNilaiKupon = kupon['tipeNilai'] ?? 'percent';
+      _kuponStatus = kupon['status'] ?? true;
+
+      if (kupon['tanggalMulai'] != null) {
+        _tanggalMulai = _parseFirestoreDate(kupon['tanggalMulai']);
       }
-    });
+      if (kupon['tanggalSelesai'] != null) {
+        _tanggalSelesai = _parseFirestoreDate(kupon['tanggalSelesai']);
+      }
+    }
   }
 
   DateTime? _parseFirestoreDate(dynamic dateValue) {
@@ -72,29 +71,6 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
     return null;
   }
 
-  Future<void> _fetchOutlets() async {
-    setState(() => _isLoadingOutlets = true);
-    try {
-      final outlets = await _apiService.getOutlets();
-      setState(() {
-        _outletData = outlets;
-
-        if (_isEditMode && _selectedOutletId != null) {
-          final bool idExists =
-          outlets.any((o) => o['id'] == _selectedOutletId);
-          if (!idExists) {
-            _selectedOutletId = null;
-          }
-        }
-        _isLoadingOutlets = false;
-      });
-    } catch (e) {
-      setState(() => _isLoadingOutlets = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal memuat outlet: $e')),
-      );
-    }
-  }
 
   @override
   void dispose() {
@@ -148,10 +124,10 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
         return;
       }
 
-      if (_selectedOutletId == null) {
+      if (widget.outletId.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Outlet wajib dipilih'),
+              content: Text('ID Outlet tidak ditemukan'),
               backgroundColor: Colors.red),
         );
         return;
@@ -168,7 +144,7 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
             nama: _namaKuponC.text,
             deskripsi: _deskripsiC.text,
             nilai: nilai,
-            outletId: _selectedOutletId!,
+            outletId: widget.outletId,
             tipeNilai: _tipeNilaiKupon,
             tanggalMulai: _tanggalMulai!,
             tanggalSelesai: _tanggalSelesai!,
@@ -179,7 +155,7 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
             nama: _namaKuponC.text,
             deskripsi: _deskripsiC.text,
             nilai: nilai,
-            outletId: _selectedOutletId!,
+            outletId: widget.outletId,
             tipeNilai: _tipeNilaiKupon,
             tanggalMulai: _tanggalMulai!,
             tanggalSelesai: _tanggalSelesai!,
@@ -261,7 +237,6 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
           ),
           if (_isSaving)
             Container(
-              // FIX: Replaced deprecated withOpacity with withAlpha
               color: Colors.black.withAlpha(128),
               child: const Center(
                   child: CircularProgressIndicator(color: Colors.white)),
@@ -292,29 +267,25 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Daftar Outlet*',
+            // REPLACED: The dropdown with a simple text
+            const Text('Outlet',
                 style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16)),
             const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: _selectedOutletId,
-              items: _outletData.map((outlet) {
-                return DropdownMenuItem<String>(
-                  value: outlet['id'],
-                  child: Text(outlet['name']),
-                );
-              }).toList(),
-              onChanged: _isLoadingOutlets
-                  ? null
-                  : (newValue) {
-                setState(() {
-                  _selectedOutletId = newValue;
-                });
-              },
-              decoration: _inputDecoration(
-                  hint: _isLoadingOutlets ? 'Memuat...' : 'Pilih Outlet'),
-              validator: (value) =>
-              value == null ? 'Outlet wajib dipilih' : null,
-              dropdownColor: Colors.white,
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300)
+              ),
+              child: Text(
+                'Kupon akan ditambahkan ke outlet Anda saat ini.',
+                style: TextStyle(
+                    fontSize: 14,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey[700]),
+              ),
             ),
             const SizedBox(height: 16),
             _buildTextField(

@@ -3,8 +3,15 @@ import 'package:proyekpos2/service/api_service.dart';
 
 class TambahKaryawanPage extends StatefulWidget {
   final Map<String, dynamic>? karyawan;
+  final String outletId;
+  final String outletName;
 
-  const TambahKaryawanPage({super.key, this.karyawan});
+  const TambahKaryawanPage({
+    super.key,
+    this.karyawan,
+    required this.outletId,
+    required this.outletName,
+  });
 
   @override
   State<TambahKaryawanPage> createState() => _TambahKaryawanPageState();
@@ -20,10 +27,7 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
   final _passwordController = TextEditingController();
   final _notelpController = TextEditingController();
 
-  String? _selectedOutlet;
-  List<String> _outletOptions = [];
-  bool _isLoadingOutlets = true;
-
+  final _outletController = TextEditingController();
   bool _statusAktif = true;
   bool _isPasswordVisible = false;
 
@@ -34,7 +38,7 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
   @override
   void initState() {
     super.initState();
-    _fetchOutlets();
+    _outletController.text = widget.outletName;
 
     if (widget.karyawan != null) {
       _isEditMode = true;
@@ -43,32 +47,9 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
       _nipController.text = widget.karyawan!['nip'] ?? '';
       _emailController.text = widget.karyawan!['email'] ?? '';
       _notelpController.text = widget.karyawan!['notelp'] ?? '';
-      _selectedOutlet = widget.karyawan!['outlet'];
       _statusAktif = widget.karyawan!['status'] == 'Aktif';
     }
   }
-
-  Future<void> _fetchOutlets() async {
-    try {
-      final outlets = await _apiService.getOutlets();
-      setState(() {
-        _outletOptions =
-            outlets.map((outlet) => outlet['name'] as String).toList();
-        _isLoadingOutlets = false;
-        if (_isEditMode && !_outletOptions.contains(_selectedOutlet)) {
-          _selectedOutlet = null;
-        }
-      });
-    } catch (e) {
-      setState(() {
-        _isLoadingOutlets = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal memuat outlet: $e')),
-      );
-    }
-  }
-
   @override
   void dispose() {
     _namaController.dispose();
@@ -76,6 +57,7 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
     _emailController.dispose();
     _passwordController.dispose();
     _notelpController.dispose();
+    _outletController.dispose();
     super.dispose();
   }
 
@@ -90,7 +72,9 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
       final email = _emailController.text;
       final password = _passwordController.text;
       final notelp = _notelpController.text;
-      final outlet = _selectedOutlet!;
+
+      final outletId = widget.outletId;
+      final outletName = widget.outletName;
       final status = _statusAktif ? 'Aktif' : 'Tidak Aktif';
 
       try {
@@ -100,7 +84,8 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
             nama: nama,
             nip: nip,
             notelp: notelp,
-            outlet: outlet,
+            outlet: outletName,
+            outletId: outletId,
             status: status,
           );
         } else {
@@ -110,7 +95,8 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
             email: email,
             password: password,
             notelp: notelp,
-            outlet: outlet,
+            outlet: outletName,
+            outletId: outletId,
             status: status,
           );
         }
@@ -261,7 +247,11 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
                           keyboardType: TextInputType.phone,
                         ),
                         _buildLabel('Outlet *'),
-                        _buildOutletDropdown(),
+                        _buildTextField(
+                          controller: _outletController,
+                          hintText: 'Outlet Karyawan',
+                          readOnly: true,
+                        ),
                         _buildLabel('Status'),
                         _buildStatusToggle(),
                         const SizedBox(height: 32),
@@ -355,43 +345,7 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
     );
   }
 
-  Widget _buildOutletDropdown() {
-    return DropdownButtonFormField<String>(
-      value: _selectedOutlet,
-      hint: Text(_isLoadingOutlets ? 'Memuat outlet...' : 'Pilih outlet'),
-      items: _outletOptions.map((String outlet) {
-        return DropdownMenuItem<String>(
-          value: outlet,
-          child: Text(outlet),
-        );
-      }).toList(),
-      onChanged: (String? newValue) {
-        setState(() {
-          _selectedOutlet = newValue;
-        });
-      },
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        contentPadding:
-        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      ),
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Outlet harus dipilih';
-        }
-        return null;
-      },
-    );
-  }
+  // REMOVED: _buildOutletDropdown()
 
   Widget _buildStatusToggle() {
     return Container(

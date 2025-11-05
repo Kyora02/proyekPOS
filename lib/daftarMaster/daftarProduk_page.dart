@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:proyekpos2/crud/tambahProduk_page.dart';
 import 'package:proyekpos2/service/api_service.dart';
 import 'dart:math' as math;
 
 class DaftarProdukPage extends StatefulWidget {
-  const DaftarProdukPage({super.key});
-
+  final String outletId;
+  const DaftarProdukPage({
+    super.key,
+    required this.outletId,
+  });
   @override
   State<DaftarProdukPage> createState() => _DaftarProdukPageState();
 }
@@ -21,50 +25,37 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
   String? _selectedCategoryId;
   int _currentPage = 1;
   int _itemsPerPage = 10;
-  String? _firstOutletId;
-
-  // --- LOGIKA INTI (Sama untuk Web & Mobile) ---
 
   @override
   void initState() {
     super.initState();
-    _fetchData();
+    _fetchProductsAndCategoriesForOutlet(widget.outletId);
   }
 
-  Future<void> _fetchData() async {
+  Future<void> _fetchProductsAndCategoriesForOutlet(String outletId) async {
     if (!mounted) return;
     setState(() {
       _isLoading = true;
       _error = null;
+      _allProducts = [];
     });
 
     try {
-      final outlets = await _apiService.getOutlets();
-      if (outlets.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _allProducts = [];
-            _kategoriOptions = [];
-            _isLoading = false;
-          });
-        }
-        return;
-      }
-      _firstOutletId = outlets.first['id'];
-
-      final categories =
-      await _apiService.getCategories(outletId: _firstOutletId!);
+      // Fetch categories based on the active outlet
+      final categories = await _apiService.getCategories(outletId: outletId);
       _kategoriOptions = [
         {'id': 'semua', 'name': 'Semua Kategori'},
         ...categories
       ];
 
-      final products = await _apiService.getProducts(outletId: _firstOutletId!);
+      // Fetch products based on the active outlet
+      final products = await _apiService.getProducts(outletId: outletId);
 
       if (mounted) {
         setState(() {
           _allProducts = products;
           _selectedCategoryId = 'semua';
+          _currentPage = 1;
           _isLoading = false;
         });
       }
@@ -119,20 +110,27 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
 
   void _navigateToAddProduct() {
     Navigator.of(context, rootNavigator: true)
-        .pushNamed('/tambah-produk')
+        .push(MaterialPageRoute(
+      builder: (_) => TambahProdukPage(outletId: widget.outletId),
+    ))
         .then((success) {
       if (success == true) {
-        _fetchData();
+        _fetchProductsAndCategoriesForOutlet(widget.outletId);
       }
     });
   }
 
   void _navigateToEditProduct(Map<String, dynamic> product) {
     Navigator.of(context, rootNavigator: true)
-        .pushNamed('/tambah-produk', arguments: product)
+        .push(MaterialPageRoute(
+      builder: (_) => TambahProdukPage(
+        product: product,
+        outletId: widget.outletId,
+      ),
+    ))
         .then((success) {
       if (success == true) {
-        _fetchData();
+        _fetchProductsAndCategoriesForOutlet(widget.outletId);
       }
     });
   }
@@ -146,7 +144,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
               content: Text('Produk "$productName" berhasil dihapus'),
               backgroundColor: Colors.green),
         );
-        _fetchData();
+        _fetchProductsAndCategoriesForOutlet(widget.outletId);
       }
     } catch (e) {
       if (mounted) {
@@ -202,8 +200,6 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
     );
   }
 
-  // --- BUILD UTAMA (Peralihan Web/Mobile) ---
-
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -225,21 +221,16 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Tentukan breakpoint. 720 cukup baik untuk membedakan tablet/web vs hp
         const double webBreakpoint = 720.0;
 
         if (constraints.maxWidth > webBreakpoint) {
-          // TAMPILAN WEB (Kode asli Anda)
           return _buildWebLayout(context, products, totalItems, totalPages);
         } else {
-          // TAMPILAN MOBILE (Sesuai gambar Anda)
           return _buildMobileLayout(context, products, totalItems, totalPages);
         }
       },
     );
   }
-
-  // --- WIDGET TATA LETAK WEB (Kode Asli Anda) ---
 
   Widget _buildWebLayout(BuildContext context,
       List<Map<String, dynamic>> products, int totalItems, int totalPages) {
@@ -301,6 +292,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
       alignment: WrapAlignment.start,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
+        // REMOVED: Outlet Dropdown is no longer needed here
         SizedBox(
           width: 250,
           child: TextField(
@@ -395,12 +387,17 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
                 Expanded(
                     flex: 2,
                     child: Text('HARGA JUAL', style: _tableHeaderStyle())),
-                const SizedBox(width: 48), // Untuk menu ellipsis
+                const SizedBox(width: 48),
               ],
             ),
           ),
           const Divider(height: 1, color: Colors.grey),
-          if (productsOnCurrentPage.isEmpty)
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.all(48.0),
+              child: CircularProgressIndicator(),
+            )
+          else if (productsOnCurrentPage.isEmpty)
             const Padding(
               padding: EdgeInsets.all(24.0),
               child: Text('Tidak ada produk ditemukan.'),
@@ -585,8 +582,6 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
     );
   }
 
-  // --- WIDGET TATA LETAK MOBILE (Sesuai Gambar Anda) ---
-
   Widget _buildMobileLayout(BuildContext context,
       List<Map<String, dynamic>> products, int totalItems, int totalPages) {
     return Scaffold(
@@ -605,7 +600,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
         foregroundColor: const Color(0xFF333333),
       ),
       body: RefreshIndicator(
-        onRefresh: _fetchData,
+        onRefresh: () => _fetchProductsAndCategoriesForOutlet(widget.outletId),
         child: Column(
           children: [
             Padding(
@@ -632,9 +627,16 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
               ),
             ),
             _buildFilterAndSearchMobile(),
-            Expanded(
-              child: _buildProductListMobile(products),
-            ),
+            if (_isLoading)
+              const Expanded(
+                child: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else
+              Expanded(
+                child: _buildProductListMobile(products),
+              ),
             _buildPaginationMobile(totalItems, totalPages),
           ],
         ),
@@ -647,6 +649,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
       padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
       child: Column(
         children: [
+          // REMOVED: Outlet Dropdown
           TextField(
             decoration: InputDecoration(
               hintText: 'Cari produk (nama atau SKU)...',

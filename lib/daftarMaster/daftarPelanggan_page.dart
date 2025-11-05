@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:proyekpos2/crud/tambahPelanggan_page.dart';
 import 'package:proyekpos2/service/api_service.dart';
 
 class DaftarPelangganPage extends StatefulWidget {
-  const DaftarPelangganPage({super.key});
+  final String outletId;
+
+  const DaftarPelangganPage({
+    super.key,
+    required this.outletId,
+  });
 
   @override
   State<DaftarPelangganPage> createState() => _DaftarPelangganPageState();
@@ -32,7 +38,7 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
     });
 
     try {
-      final pelanggan = await _apiService.getPelanggan();
+      final pelanggan = await _apiService.getPelanggan(outletId: widget.outletId);
       if (mounted) {
         setState(() {
           _allPelanggan = pelanggan;
@@ -69,7 +75,11 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
 
   void _navigateToAddPelanggan() {
     Navigator.of(context, rootNavigator: true)
-        .pushNamed('/tambah-pelanggan')
+        .push(
+      MaterialPageRoute(
+        builder: (context) => TambahPelangganPage(outletId: widget.outletId),
+      ),
+    )
         .then((success) {
       if (success == true) {
         _fetchPelanggan();
@@ -79,9 +89,13 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
 
   void _navigateToEditPelanggan(Map<String, dynamic> pelanggan) {
     Navigator.of(context, rootNavigator: true)
-        .pushNamed(
-      '/tambah-pelanggan',
-      arguments: pelanggan,
+        .push(
+      MaterialPageRoute(
+        builder: (context) => TambahPelangganPage(
+          pelanggan: pelanggan,
+          outletId: widget.outletId,
+        ),
+      ),
     )
         .then((success) {
       if (success == true) {

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:proyekpos2/crud/tambahOutlet_page.dart';
+import 'package:proyekpos2/service/api_service.dart';
 
 class DaftarOutletPage extends StatefulWidget {
   const DaftarOutletPage({super.key});
@@ -8,33 +10,50 @@ class DaftarOutletPage extends StatefulWidget {
 }
 
 class _DaftarOutletPageState extends State<DaftarOutletPage> {
+  final ApiService _apiService = ApiService();
+  List<Map<String, dynamic>> _allOutlets = [];
+  bool _isLoading = true;
+
   String _searchQuery = '';
   int _currentPage = 1;
   final int _itemsPerPage = 10;
 
-  final List<Map<String, dynamic>> _allOutlets = [
-    {
-      "nama": "Kashierku Pusat",
-      "alamat": "Jl. Merdeka No. 1, Jakarta Pusat",
-      "kota": "Jakarta",
-      "owner": "Budi Santoso"
-    },
-    {
-      "nama": "Kashierku Cabang Surabaya",
-      "alamat": "Jl. Pahlawan No. 10, Surabaya",
-      "kota": "Surabaya",
-      "owner": "Citra Dewi"
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    setState(() => _isLoading = true);
+    try {
+      final outlets = await _apiService.getOutlets();
+      if (mounted) {
+        setState(() {
+          _allOutlets = outlets;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Gagal memuat outlet: $e'),
+              backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
 
   List<Map<String, dynamic>> get _filteredOutlets {
     List<Map<String, dynamic>> outlets = _allOutlets;
     if (_searchQuery.isNotEmpty) {
       outlets = outlets.where((outlet) {
-        final name = (outlet['nama'] as String? ?? '').toLowerCase();
+        final name = (outlet['name'] as String? ?? '').toLowerCase();
         final address = (outlet['alamat'] as String? ?? '').toLowerCase();
-        final city = (outlet['kota'] as String? ?? '').toLowerCase();
-        final owner = (outlet['owner'] as String? ?? '').toLowerCase();
+        final city = (outlet['city'] as String? ?? '').toLowerCase();
+        final owner = (outlet['ownerName'] as String? ?? '').toLowerCase();
         final query = _searchQuery.toLowerCase();
         return name.contains(query) ||
             address.contains(query) ||
@@ -46,15 +65,100 @@ class _DaftarOutletPageState extends State<DaftarOutletPage> {
   }
 
   void _navigateToAddOutlet() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Navigasi ke halaman Tambah Outlet...')),
-    );
+    Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute(
+        builder: (context) => const TambahOutletPage(),
+      ),
+    ).then((success) {
+      if (success == true) {
+        _fetchData();
+      }
+    });
+  }
+
+  void _navigateToEditOutlet(Map<String, dynamic> outlet) {
+    Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute(
+        builder: (context) => TambahOutletPage(outlet: outlet),
+      ),
+    ).then((success) {
+      if (success == true) {
+        _fetchData();
+      }
+    });
+  }
+
+  Future<void> _showDeleteConfirmationDialog(Map<String, dynamic> outlet) async {
+    return showDialog<void>(
+        context: context,
+        builder: (BuildContext dialogContext) {
+          return AlertDialog(
+            shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: const Text('Konfirmasi Hapus'),
+            content: Text(
+                'Apakah Anda yakin ingin menghapus outlet "${outlet['name']}"?'),
+            actions: <Widget>[
+              TextButton(
+                  child: const Text('Batal'),
+                  onPressed: () => Navigator.of(dialogContext).pop()),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red, foregroundColor: Colors.white),
+                child: const Text('Hapus'),
+                onPressed: () async {
+                  try {
+                    await _apiService.deleteOutlet(outlet['id']);
+                    Navigator.of(dialogContext).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content:
+                          Text('Outlet "${outlet['name']}" berhasil dihapus'),
+                          backgroundColor: Colors.green),
+                    );
+                    _fetchData();
+                  } catch (e) {
+                    Navigator.of(dialogContext).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text('Gagal menghapus outlet: $e'),
+                          backgroundColor: Colors.red),
+                    );
+                  }
+                },
+              ),
+            ],
+          );
+        });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: Colors.grey[100],
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final totalItems = _filteredOutlets.length;
-    final totalPages = (_filteredOutlets.length / _itemsPerPage).ceil();
+    final totalPages = (totalItems / _itemsPerPage).ceil().clamp(1, double.infinity).toInt();
+
+    if (_currentPage > totalPages) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _currentPage = totalPages;
+          });
+        }
+      });
+      if (totalPages == 0) {
+        _currentPage = 1;
+      } else {
+        return const Center(child: CircularProgressIndicator());
+      }
+    }
+
     final startIndex = (_currentPage - 1) * _itemsPerPage;
     final endIndex = (startIndex + _itemsPerPage).clamp(0, totalItems);
     final outletsOnCurrentPage = _filteredOutlets.sublist(startIndex, endIndex);
@@ -79,7 +183,7 @@ class _DaftarOutletPageState extends State<DaftarOutletPage> {
                     isMobile
                         ? _buildMobileOutletList(outletsOnCurrentPage)
                         : _buildDesktopOutletTable(outletsOnCurrentPage),
-                    if (!isMobile) ...[
+                    if (totalItems > 0 && !isMobile) ...[
                       const Divider(height: 32),
                       _buildPaginationFooter(totalItems, totalPages),
                     ]
@@ -130,7 +234,8 @@ class _DaftarOutletPageState extends State<DaftarOutletPage> {
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF279E9E),
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            padding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8)),
           ),
@@ -141,7 +246,7 @@ class _DaftarOutletPageState extends State<DaftarOutletPage> {
 
   Widget _buildFilterBar() {
     return Container(
-      width: 280, // Same width as the customer list search bar
+      width: 280,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
@@ -162,7 +267,10 @@ class _DaftarOutletPageState extends State<DaftarOutletPage> {
           contentPadding:
           const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
-        onChanged: (value) => setState(() => _searchQuery = value),
+        onChanged: (value) => setState(() {
+          _searchQuery = value;
+          _currentPage = 1;
+        }),
       ),
     );
   }
@@ -189,8 +297,8 @@ class _DaftarOutletPageState extends State<DaftarOutletPage> {
   }
 
   Widget _buildDesktopTableHeader() {
-    TextStyle headerStyle =
-    TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey[600]);
+    TextStyle headerStyle = TextStyle(
+        fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey[600]);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       child: Row(children: [
@@ -199,7 +307,7 @@ class _DaftarOutletPageState extends State<DaftarOutletPage> {
         Expanded(flex: 4, child: Text('ALAMAT', style: headerStyle)),
         Expanded(flex: 2, child: Text('KOTA', style: headerStyle)),
         Expanded(flex: 2, child: Text('OWNER', style: headerStyle)),
-        const SizedBox(width: 48), // For the menu button
+        const SizedBox(width: 48),
       ]),
     );
   }
@@ -212,11 +320,15 @@ class _DaftarOutletPageState extends State<DaftarOutletPage> {
           border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE)))),
       child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
         const SizedBox(width: 8),
-        Expanded(flex: 3, child: Text(outlet['nama'] ?? 'N/A', style: cellStyle)),
+        Expanded(
+            flex: 3, child: Text(outlet['name'] ?? 'N/A', style: cellStyle)),
         Expanded(
             flex: 4, child: Text(outlet['alamat'] ?? 'N/A', style: cellStyle)),
-        Expanded(flex: 2, child: Text(outlet['kota'] ?? 'N/A', style: cellStyle)),
-        Expanded(flex: 2, child: Text(outlet['owner'] ?? 'N/A', style: cellStyle)),
+        Expanded(
+            flex: 2, child: Text(outlet['city'] ?? 'N/A', style: cellStyle)),
+        Expanded(
+            flex: 2,
+            child: Text(outlet['ownerName'] ?? 'N/A', style: cellStyle)),
         _buildPopupMenuButton(outlet),
       ]),
     );
@@ -259,20 +371,22 @@ class _DaftarOutletPageState extends State<DaftarOutletPage> {
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(outlet['nama'] ?? 'N/A',
+                          Text(outlet['name'] ?? 'N/A',
                               style: const TextStyle(
                                   fontSize: 18, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 4),
-                          Text('Owner: ${outlet['owner'] ?? 'N/A'}',
-                              style:
-                              TextStyle(fontSize: 14, color: Colors.grey[600])),
+                          Text('Owner: ${outlet['ownerName'] ?? 'N/A'}',
+                              style: TextStyle(
+                                  fontSize: 14, color: Colors.grey[600])),
                         ]),
                   ),
                   _buildPopupMenuButton(outlet),
                 ]),
             const Divider(height: 24),
-            _buildInfoRow(Icons.location_on_outlined, 'Alamat', outlet['alamat'] ?? 'N/A'),
-            _buildInfoRow(Icons.location_city_outlined, 'Kota', outlet['kota'] ?? 'N/A'),
+            _buildInfoRow(Icons.location_on_outlined, 'Alamat',
+                outlet['alamat'] ?? 'N/A'),
+            _buildInfoRow(
+                Icons.location_city_outlined, 'Kota', outlet['city'] ?? 'N/A'),
           ],
         ),
       ),
@@ -286,9 +400,16 @@ class _DaftarOutletPageState extends State<DaftarOutletPage> {
         Icon(icon, size: 16, color: Colors.grey[600]),
         const SizedBox(width: 8),
         Text('$label:',
-            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-        const Spacer(),
-        Text(value, style: const TextStyle(fontSize: 14, color: Colors.black87)),
+            style:
+            const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 14, color: Colors.black87),
+            textAlign: TextAlign.right,
+          ),
+        ),
       ]),
     );
   }
@@ -301,11 +422,20 @@ class _DaftarOutletPageState extends State<DaftarOutletPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
         icon: const Icon(Icons.more_horiz, color: Colors.grey),
         onSelected: (String value) {
-          // Handle menu actions here
+          if (value == 'ubah') {
+            _navigateToEditOutlet(outlet);
+          } else if (value == 'hapus') {
+            _showDeleteConfirmationDialog(outlet);
+          }
         },
         itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-          _buildPopupMenuItem(value: 'ubah', text: 'Ubah', icon: Icons.edit_outlined),
-          _buildPopupMenuItem(value: 'hapus', text: 'Hapus', icon: Icons.delete_outline, isDestructive: true),
+          _buildPopupMenuItem(
+              value: 'ubah', text: 'Ubah', icon: Icons.edit_outlined),
+          _buildPopupMenuItem(
+              value: 'hapus',
+              text: 'Hapus',
+              icon: Icons.delete_outline,
+              isDestructive: true),
         ],
       ),
     );
@@ -342,12 +472,14 @@ class _DaftarOutletPageState extends State<DaftarOutletPage> {
             color: const Color(0xFF279E9E),
             borderRadius: BorderRadius.circular(8)),
         child: Text('$_currentPage',
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            style:
+            const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
       IconButton(
         icon: const Icon(Icons.arrow_forward_ios, size: 16),
-        onPressed:
-        _currentPage < totalPages ? () => setState(() => _currentPage++) : null,
+        onPressed: _currentPage < totalPages
+            ? () => setState(() => _currentPage++)
+            : null,
         color: _currentPage < totalPages ? Colors.black87 : Colors.grey,
       ),
     ]);

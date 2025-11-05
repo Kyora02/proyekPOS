@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:proyekpos2/crud/tambahKaryawan_page.dart';
 import 'package:proyekpos2/service/api_service.dart';
 
 class DaftarKaryawanPage extends StatefulWidget {
-  const DaftarKaryawanPage({super.key});
+  final String outletId;
 
+  const DaftarKaryawanPage({
+    super.key,
+    required this.outletId,
+  });
   @override
   State<DaftarKaryawanPage> createState() => _DaftarKaryawanPageState();
 }
@@ -13,6 +18,7 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
   List<Map<String, dynamic>> _allKaryawan = [];
   bool _isLoading = true;
   String? _error;
+  String _activeOutletName = "Outlet";
 
   String _searchQuery = '';
   int _currentPage = 1;
@@ -32,7 +38,12 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
     });
 
     try {
-      final karyawanList = await _apiService.getKaryawan();
+      final karyawanList = await _apiService.getKaryawan(outletId: widget.outletId);
+
+      if (karyawanList.isNotEmpty) {
+        _activeOutletName = karyawanList.first['outlet'] ?? 'Outlet';
+      }
+
       if (mounted) {
         setState(() {
           _allKaryawan = karyawanList;
@@ -51,20 +62,19 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
 
   List<Map<String, dynamic>> get _filteredKaryawan {
     List<Map<String, dynamic>> karyawanList = _allKaryawan;
+
     if (_searchQuery.isNotEmpty) {
       karyawanList = karyawanList.where((karyawan) {
         final name = (karyawan['nama'] as String? ?? '').toLowerCase();
         final nip = (karyawan['nip'] as String? ?? '').toLowerCase();
         final email = (karyawan['email'] as String? ?? '').toLowerCase();
         final phone = (karyawan['notelp'] as String? ?? '').toLowerCase();
-        final outlet = (karyawan['outlet'] as String? ?? '').toLowerCase();
         final status = (karyawan['status'] as String? ?? '').toLowerCase();
         final query = _searchQuery.toLowerCase();
         return name.contains(query) ||
             nip.contains(query) ||
             email.contains(query) ||
             phone.contains(query) ||
-            outlet.contains(query) ||
             status.contains(query);
       }).toList();
     }
@@ -73,7 +83,14 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
 
   void _navigateToAddKaryawan() {
     Navigator.of(context, rootNavigator: true)
-        .pushNamed('/tambah-karyawan')
+        .push(
+      MaterialPageRoute(
+        builder: (context) => TambahKaryawanPage(
+          outletId: widget.outletId,
+          outletName: _activeOutletName,
+        ),
+      ),
+    )
         .then((success) {
       if (success == true) {
         _fetchKaryawan();
@@ -83,7 +100,15 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
 
   void _navigateToEditKaryawan(Map<String, dynamic> karyawan) {
     Navigator.of(context, rootNavigator: true)
-        .pushNamed('/tambah-karyawan', arguments: karyawan)
+        .push(
+      MaterialPageRoute(
+        builder: (context) => TambahKaryawanPage(
+          karyawan: karyawan,
+          outletId: widget.outletId,
+          outletName: _activeOutletName,
+        ),
+      ),
+    )
         .then((success) {
       if (success == true) {
         _fetchKaryawan();

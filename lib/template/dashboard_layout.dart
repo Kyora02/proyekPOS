@@ -1,7 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DashboardLayout extends StatefulWidget {
@@ -9,6 +7,7 @@ class DashboardLayout extends StatefulWidget {
   final Function(String) onNavigate;
   final Map<String, dynamic>? userData;
   final bool isLoading;
+  final VoidCallback onRefreshUserData;
 
   const DashboardLayout({
     super.key,
@@ -16,6 +15,7 @@ class DashboardLayout extends StatefulWidget {
     required this.onNavigate,
     required this.userData,
     required this.isLoading,
+    required this.onRefreshUserData,
   });
 
   @override
@@ -46,6 +46,7 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                   userData: widget.userData,
                   isLoading: widget.isLoading,
                   onNavigate: widget.onNavigate,
+                  onRefreshUserData: widget.onRefreshUserData,
                 ),
                 Expanded(
                   child: Column(
@@ -83,6 +84,7 @@ class _DashboardLayoutState extends State<DashboardLayout> {
               userData: widget.userData,
               isLoading: widget.isLoading,
               onNavigate: widget.onNavigate,
+              onRefreshUserData: widget.onRefreshUserData,
             ),
             body: widget.child,
           );
@@ -554,6 +556,7 @@ class SideNavBar extends StatefulWidget {
   final Map<String, dynamic>? userData;
   final bool isLoading;
   final Function(String) onNavigate;
+  final VoidCallback onRefreshUserData;
 
   const SideNavBar({
     super.key,
@@ -561,6 +564,7 @@ class SideNavBar extends StatefulWidget {
     this.userData,
     required this.isLoading,
     required this.onNavigate,
+    required this.onRefreshUserData,
   });
 
   @override
@@ -687,7 +691,10 @@ class _SideNavBarState extends State<SideNavBar> {
                 opacity: anim1,
                 child: Material(
                   type: MaterialType.transparency,
-                  child: OutletSelectionDialog(),
+                  child: OutletSelectionDialog(
+                    userData: widget.userData,
+                    onRefreshUserData: widget.onRefreshUserData,
+                  ),
                 ),
               ),
             ),
@@ -792,7 +799,14 @@ class _SideNavBarState extends State<SideNavBar> {
 }
 
 class OutletSelectionDialog extends StatefulWidget {
-  const OutletSelectionDialog({super.key});
+  final Map<String, dynamic>? userData;
+  final VoidCallback onRefreshUserData;
+
+  const OutletSelectionDialog({
+    super.key,
+    this.userData,
+    required this.onRefreshUserData,
+  });
 
   @override
   State<OutletSelectionDialog> createState() => _OutletSelectionDialogState();
@@ -802,12 +816,11 @@ class _OutletSelectionDialogState extends State<OutletSelectionDialog> {
   String? _selectedOutletId;
   bool _isLoading = true;
   List<QueryDocumentSnapshot> _outlets = [];
-  final String _allOutletsValue = 'Semua Outlet';
 
   @override
   void initState() {
     super.initState();
-    _selectedOutletId = _allOutletsValue;
+    _selectedOutletId = widget.userData?['activeOutletId'];
     _fetchUserOutlets();
   }
 
@@ -832,6 +845,12 @@ class _OutletSelectionDialogState extends State<OutletSelectionDialog> {
       if (mounted) {
         setState(() {
           _outlets = querySnapshot.docs;
+          final currentOutletId = widget.userData?['activeOutletId'];
+          if (currentOutletId != null) {
+            _selectedOutletId = currentOutletId;
+          } else if (_outlets.isNotEmpty) {
+            _selectedOutletId = _outlets.first.id;
+          }
           _isLoading = false;
         });
       }
@@ -885,19 +904,6 @@ class _OutletSelectionDialogState extends State<OutletSelectionDialog> {
               ),
             ),
             const SizedBox(height: 8),
-            RadioListTile<String>(
-              title: const Text('Semua Outlet'),
-              secondary: Text(
-                '${_outlets.length} Outlet',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-              value: _allOutletsValue,
-              groupValue: _selectedOutletId,
-              onChanged: (value) => setState(() => _selectedOutletId = value),
-              activeColor: const Color(0xFF279E9E),
-              controlAffinity: ListTileControlAffinity.leading,
-            ),
-            const Divider(),
             if (_isLoading)
               const Center(
                 child: Padding(
@@ -937,8 +943,38 @@ class _OutletSelectionDialogState extends State<OutletSelectionDialog> {
                       title: Text(outletName),
                       value: outletId,
                       groupValue: _selectedOutletId,
-                      onChanged: (value) {
-                        setState(() => _selectedOutletId = value);
+                      onChanged: (value) async {
+                        if (value == null || value == _selectedOutletId) return;
+
+                        setState(() {
+                          _selectedOutletId = value;
+                        });
+
+                        try {
+                          final user = FirebaseAuth.instance.currentUser;
+                          if (user == null) throw Exception("No user logged in");
+
+                          final outletDoc = _outlets.firstWhere((doc) => doc.id == value);
+                          final outletData = outletDoc.data() as Map<String, dynamic>;
+                          final newBusinessName = outletData['name'];
+                          final String newOutletId = outletDoc.id;
+
+                          await FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(user.uid)
+                              .update({
+                            'businessName': newBusinessName,
+                            'activeOutletId': newOutletId,
+                          });
+
+                          widget.onRefreshUserData();
+
+                          if (mounted) {
+                            Navigator.of(context).pop();
+                          }
+                        } catch (e) {
+                          debugPrint("Error switching outlet: $e");
+                        }
                       },
                       activeColor: const Color(0xFF279E9E),
                       controlAffinity: ListTileControlAffinity.leading,

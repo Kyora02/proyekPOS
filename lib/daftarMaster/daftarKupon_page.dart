@@ -4,7 +4,12 @@ import 'package:proyekpos2/service/api_service.dart';
 import 'package:proyekpos2/crud/tambahkupon_page.dart';
 
 class DaftarKuponPage extends StatefulWidget {
-  const DaftarKuponPage({super.key});
+  final String outletId;
+
+  const DaftarKuponPage({
+    super.key,
+    required this.outletId,
+  });
 
   @override
   State<DaftarKuponPage> createState() => _DaftarKuponPageState();
@@ -17,10 +22,8 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
 
   String _searchQuery = '';
   String? _selectedStatus = 'Semua Status';
-  String? _selectedOutlet = 'Semua Outlet';
 
   final List<String> _statusOptions = ['Semua Status', 'Aktif', 'Tidak Aktif'];
-  List<String> _outletOptions = ['Semua Outlet'];
 
   int _currentPage = 1;
   final int _itemsPerPage = 10;
@@ -34,15 +37,12 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
   Future<void> _fetchData() async {
     setState(() => _isLoading = true);
     try {
-      final kupons = await _apiService.getKupon();
-      final outlets = await _apiService.getOutlets();
+      final kupons = await _apiService.getKupon(outletId: widget.outletId);
 
-      final outletNames = outlets.map((o) => o['name'] as String).toList();
 
       if (mounted) {
         setState(() {
           _kuponList = kupons;
-          _outletOptions = ['Semua Outlet', ...outletNames];
           _isLoading = false;
         });
       }
@@ -123,21 +123,15 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
     } else if (_selectedStatus == 'Tidak Aktif') {
       coupons = coupons.where((coupon) => coupon['status'] == false).toList();
     }
-
-    if (_selectedOutlet != null && _selectedOutlet != 'Semua Outlet') {
-      coupons = coupons.where((coupon) {
-        return coupon['outletName'] == _selectedOutlet ||
-            coupon['outletName'] == 'Semua Outlet';
-      }).toList();
-    }
-
     return coupons;
   }
 
   void _navigateToAddKupon() {
     Navigator.of(context, rootNavigator: true)
         .push(
-      MaterialPageRoute(builder: (context) => const TambahKuponPage()),
+      MaterialPageRoute(
+        builder: (context) => TambahKuponPage(outletId: widget.outletId),
+      ),
     )
         .then((success) {
       if (success == true) {
@@ -149,7 +143,12 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
   void _navigateToEditKupon(Map<String, dynamic> kupon) {
     Navigator.of(context, rootNavigator: true)
         .push(
-      MaterialPageRoute(builder: (context) => TambahKuponPage(kupon: kupon)),
+      MaterialPageRoute(
+        builder: (context) => TambahKuponPage(
+          kupon: kupon,
+          outletId: widget.outletId,
+        ),
+      ),
     )
         .then((success) {
       if (success == true) {
@@ -211,7 +210,7 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
         final int totalPages =
         (totalItems / _itemsPerPage).ceil().clamp(1, double.infinity).toInt();
 
-        if (_currentPage > totalPages) {
+        if (_currentPage > totalPages && totalPages > 0) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               setState(() {
@@ -225,7 +224,7 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
         final int startIndex = (_currentPage - 1) * _itemsPerPage;
         final int endIndex = (startIndex + _itemsPerPage).clamp(0, totalItems);
         final List<Map<String, dynamic>> couponsOnCurrentPage =
-        _filteredCoupons.sublist(startIndex, endIndex);
+        (totalItems > 0) ? _filteredCoupons.sublist(startIndex, endIndex) : [];
 
         final isMobile = constraints.maxWidth <= 850;
         final pagePadding = isMobile ? 16.0 : 32.0;
@@ -331,14 +330,11 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
             _currentPage = 1;
           }),
         ),
-        _buildDropdownFilter(
-          value: _selectedOutlet,
-          items: _outletOptions,
-          onChanged: (newValue) => setState(() {
-            _selectedOutlet = newValue;
-            _currentPage = 1;
-          }),
-        ),
+        // 12. HAPUS WIDGET DROPDOWN OUTLET
+        // _buildDropdownFilter(
+        //   value: _selectedOutlet,
+        //   ...
+        // ),
       ],
     );
   }
@@ -396,7 +392,8 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
           physics: const NeverScrollableScrollPhysics(),
           itemCount: coupons.length,
           separatorBuilder: (context, index) => const SizedBox(height: 12),
-          itemBuilder: (context, index) => _buildMobileCouponCard(coupons[index]),
+          itemBuilder: (context, index) =>
+              _buildMobileCouponCard(coupons[index]),
         );
       }
     } else {

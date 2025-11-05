@@ -3,8 +3,13 @@ import 'package:proyekpos2/service/api_service.dart';
 
 class TambahProdukPage extends StatefulWidget {
   final Map<String, dynamic>? product;
+  final String outletId;
 
-  const TambahProdukPage({super.key, this.product});
+  const TambahProdukPage({
+    super.key,
+    this.product,
+    required this.outletId,
+  });
 
   @override
   State<TambahProdukPage> createState() => _TambahProdukPageState();
@@ -43,16 +48,26 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
     setState(() => _isFetchingData = true);
     try {
       final outlets = await _apiService.getOutlets();
-      final categories = outlets.isNotEmpty
-          ? await _apiService.getCategories(outletId: outlets.first['id'])
-          : <Map<String, dynamic>>[];
+
+      final categories = await _apiService.getCategories(outletId: widget.outletId);
 
       if (mounted) {
         setState(() {
           _outletOptions = outlets;
           _kategoriOptions = categories;
+
           if (_isEditMode) {
             _populateFieldsForEdit();
+          } else {
+            // ADD MODE: Auto-select the current active outlet
+            try {
+              final activeOutlet = _outletOptions.firstWhere(
+                    (opt) => opt['id'] == widget.outletId,
+              );
+              _selectedOutlets = [activeOutlet];
+            } catch (e) {
+              debugPrint("Active outlet not found in options: $e");
+            }
           }
         });
       }
@@ -78,7 +93,11 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
     _skuController.text = product['sku'] ?? '';
     _hargaJualController.text = product['sellingPrice']?.toString() ?? '';
     _hargaBeliController.text = product['costPrice']?.toString() ?? '0';
-    _selectedKategoriId = product['categoryId'];
+
+    final savedCategoryId = product['categoryId'];
+    if (_kategoriOptions.any((cat) => cat['id'] == savedCategoryId)) {
+      _selectedKategoriId = savedCategoryId;
+    }
 
     final List<String> outletIds =
     List<String>.from(product['outletIds'] ?? []);
@@ -140,7 +159,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
           sellingPrice: sellingPrice,
           costPrice: costPrice,
           categoryId: _selectedKategoriId!,
-          outlets: _selectedOutlets,
+          outlets: _selectedOutlets, // Already set to [activeOutlet]
         );
       }
       if (mounted) {
@@ -302,7 +321,13 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                       title: 'Informasi Produk',
                       child: Column(
                         children: [
-                          _buildMultiSelectOutletField(),
+                          // *** LOGIC TO HIDE/SHOW DROPDOWN ***
+                          if (_isEditMode) ...[
+                            _buildMultiSelectOutletField(),
+                          ] else ...[
+                            _buildActiveOutletDisplay(),
+                          ],
+                          // ********************************
                           const SizedBox(height: 16),
                           _buildTextField(
                             controller: _namaProdukController,
@@ -407,6 +432,47 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
       ),
     );
   }
+
+  // ADDED: This widget displays the active outlet in "Add Mode"
+  Widget _buildActiveOutletDisplay() {
+    String outletName = '...';
+    if (_selectedOutlets.isNotEmpty) {
+      outletName = _selectedOutlets.first['name'];
+    } else if (_isFetchingData) {
+      outletName = 'Memuat outlet...';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: const [
+            Text('Atur Outlet', style: TextStyle(fontWeight: FontWeight.w600)),
+            Text(' *', style: TextStyle(color: Colors.red)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.grey[200], // Make it look disabled
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey[300]!),
+          ),
+          child: Text(
+            outletName,
+            style: const TextStyle(
+              color: Colors.black54,
+              fontSize: 16,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
 
   Widget _buildSectionCard({required String title, required Widget child}) {
     return Card(

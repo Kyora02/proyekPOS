@@ -221,9 +221,10 @@ class ApiService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> getPelanggan() async {
+  Future<List<Map<String, dynamic>>> getPelanggan(
+      {required String outletId}) async {
     final token = await _getAuthToken();
-    final url = Uri.parse('$_baseUrl/pelanggan');
+    final url = Uri.parse('$_baseUrl/pelanggan?outletId=$outletId');
     final response = await http.get(
       url,
       headers: {'Authorization': 'Bearer $token'},
@@ -244,6 +245,7 @@ class ApiService {
     String? city,
     String? address,
     String? notes,
+    required String outletId,
   }) async {
     final token = await _getAuthToken();
     final url = Uri.parse('$_baseUrl/pelanggan');
@@ -256,6 +258,7 @@ class ApiService {
       'city': city,
       'address': address,
       'notes': notes,
+      'outletId': outletId,
     });
 
     final response = await http.post(url,
@@ -280,6 +283,7 @@ class ApiService {
     String? city,
     String? address,
     String? notes,
+    required String outletId,
   }) async {
     final token = await _getAuthToken();
     final url = Uri.parse('$_baseUrl/pelanggan/$id');
@@ -292,6 +296,7 @@ class ApiService {
       'city': city,
       'address': address,
       'notes': notes,
+      'outletId': outletId,
     });
 
     final response = await http.put(url,
@@ -318,10 +323,12 @@ class ApiService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> getKaryawan() async {
+  Future<List<Map<String, dynamic>>> getKaryawan(
+      {required String outletId}) async {
     try {
       final token = await _getAuthToken();
-      final url = Uri.parse('$_baseUrl/karyawan');
+      // v-- ADD THE QUERY PARAMETER HERE
+      final url = Uri.parse('$_baseUrl/karyawan?outletId=$outletId');
       final response = await http.get(
         url,
         headers: {'Authorization': 'Bearer $token'},
@@ -345,6 +352,7 @@ class ApiService {
     required String password,
     String? notelp,
     required String outlet,
+    required String outletId,
     required String status,
   }) async {
     try {
@@ -357,6 +365,7 @@ class ApiService {
         'password': password,
         'notelp': notelp,
         'outlet': outlet,
+        'outletId': outletId,
         'status': status,
       });
 
@@ -384,6 +393,7 @@ class ApiService {
     required String nip,
     String? notelp,
     required String outlet,
+    required String outletId,
     required String status,
   }) async {
     try {
@@ -394,6 +404,7 @@ class ApiService {
         'nip': nip,
         'notelp': notelp,
         'outlet': outlet,
+        'outletId': outletId,
         'status': status,
       });
 
@@ -433,9 +444,10 @@ class ApiService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> getKupon() async {
+  Future<List<Map<String, dynamic>>> getKupon(
+      {required String outletId}) async {
     final token = await _getAuthToken();
-    final url = Uri.parse('$_baseUrl/kupon');
+    final url = Uri.parse('$_baseUrl/kupon?outletId=$outletId');
     final response = await http.get(
       url,
       headers: {'Authorization': 'Bearer $token'},
@@ -527,6 +539,127 @@ class ApiService {
     );
     if (response.statusCode != 200) {
       throw Exception('Failed to delete kupon: ${response.body}');
+    }
+  }
+
+  Future<void> addOutlet({
+    required String name,
+    required String alamat,
+    required String city,
+    required String ownerName,
+    required String operationDuration,
+  }) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/outlets');
+    final body = jsonEncode({
+      'name': name,
+      'alamat': alamat,
+      'city': city,
+      'ownerName': ownerName,
+      'operationDuration': operationDuration,
+    });
+
+    final response = await http.post(url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+        body: body);
+
+    if (response.statusCode != 201) {
+      throw Exception('Failed to add outlet: ${response.body}');
+    }
+  }
+
+  Future<void> updateOutlet({
+    required String id,
+    required String name,
+    required String alamat,
+    required String city,
+    required String operationDuration,
+  }) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/outlets/$id');
+    final body = jsonEncode({
+      'name': name,
+      'alamat': alamat,
+      'city': city,
+      'operationDuration': operationDuration,
+    });
+
+    final response = await http.put(url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+        body: body);
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update outlet: ${response.body}');
+    }
+  }
+
+  Future<void> deleteOutlet(String id) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/outlets/$id');
+    final response = await http.delete(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete outlet: ${response.body}');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getStockProducts(String outletId) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/stok/products/$outletId');
+    final response = await http.get(url, headers: {
+      'Authorization': 'Bearer $token',
+    });
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load stock products: ${response.body}');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getAllStock(
+      {required String outletId}) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/stok/all?outletId=$outletId');
+    final response = await http.get(url, headers: {
+      'Authorization': 'Bearer $token',
+    });
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load all stock: ${response.body}');
+    }
+  }
+
+  Future<void> addStock({
+    required String outletId,
+    required String productId,
+    required String stokToAdd,
+  }) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/stok/add');
+    final body = jsonEncode({
+      'outletId': outletId,
+      'productId': productId,
+      'stokToAdd': stokToAdd,
+    });
+
+    final response = await http.post(url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+        body: body);
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to add stock: ${response.body}');
     }
   }
 }

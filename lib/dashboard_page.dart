@@ -3,12 +3,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:proyekpos2/daftarMaster/daftarKaryawan_page.dart';
+import 'package:proyekpos2/daftarMaster/daftarStok_page.dart';
 import 'package:proyekpos2/laporan/detailPenjualan_page.dart';
 import 'package:proyekpos2/laporan/laporanPelanggan_page.dart';
 import 'package:proyekpos2/laporan/penjualanKategori_page.dart';
 import 'package:proyekpos2/laporan/penjualanProduk_page.dart';
 import 'package:proyekpos2/laporan/ringkasanPenjualan_page.dart';
-import 'package:proyekpos2/crud/tambahKupon_page.dart';
 import 'template/dashboard_layout.dart';
 import 'profile_page.dart';
 import 'daftarMaster/daftarProduk_page.dart';
@@ -45,96 +45,232 @@ class DashboardHost extends StatefulWidget {
 
 class _DashboardHostState extends State<DashboardHost> {
   Widget _currentPage = const DashboardContent();
+  String _currentRouteName = 'Dashboard';
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchUserData();
+    _refreshDataAndState();
   }
 
-  Future<void> _fetchUserData() async {
-    // Fetches data only ONCE
+  Future<void> _checkAndSetInitialOutlet(
+      DocumentReference userRef, Map<String, dynamic> data, String userId) async {
+    String? activeId = data['activeOutletId'] as String?;
+
+    if (activeId == null || activeId.isEmpty) {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('outlets')
+          .where('userId', isEqualTo: userId)
+          .get();
+
+      if (querySnapshot.docs.length == 1) {
+        try {
+          final firstOutletDoc = querySnapshot.docs.first;
+          final firstOutletData =
+          firstOutletDoc.data() as Map<String, dynamic>;
+          final String firstOutletId = firstOutletDoc.id;
+          final String firstOutletName =
+              firstOutletData['name'] ?? 'Bisnis Anda';
+
+          if (firstOutletId.isNotEmpty) {
+            await userRef.update({
+              'activeOutletId': firstOutletId,
+              'businessName': firstOutletName,
+            });
+
+            data['activeOutletId'] = firstOutletId;
+            data['businessName'] = firstOutletName;
+          }
+        } catch (e) {
+          debugPrint("Error auto-setting active outlet: $e");
+        }
+      }
+    }
+  }
+
+  Future<void> _refreshDataAndState() async {
     if (!mounted) return;
-    setState(() { _isLoading = true; });
+    setState(() {
+      _isLoading = true;
+    });
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        final userRef =
+        FirebaseFirestore.instance.collection('users').doc(user.uid);
+        final doc = await userRef.get();
         if (doc.exists && mounted) {
-          setState(() { _userData = doc.data(); });
+          Map<String, dynamic> data = doc.data()!;
+
+          await _checkAndSetInitialOutlet(userRef, data, user.uid);
+
+          setState(() {
+            _userData = data;
+          });
         }
       }
     } catch (e) {
       debugPrint("Error fetching user data: $e");
     } finally {
       if (mounted) {
-        setState(() { _isLoading = false; });
+        setState(() {
+          _isLoading = false;
+        });
+        _handleNavigation(_currentRouteName);
       }
     }
   }
 
-  void _handleNavigation(String route) {
+  Future<void> _fetchUserData() async {
+    if (!mounted) return;
     setState(() {
+      _isLoading = true;
+    });
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final userRef =
+        FirebaseFirestore.instance.collection('users').doc(user.uid);
+        final doc = await userRef.get();
+        if (doc.exists && mounted) {
+          Map<String, dynamic> data = doc.data()!;
+
+          await _checkAndSetInitialOutlet(userRef, data, user.uid);
+
+          setState(() {
+            _userData = data;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching user data: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleProfileBusinessUpdate() async {
+    await _fetchUserData();
+    if (mounted) {
+      _handleNavigation('Dashboard');
+    }
+  }
+
+  void _handleNavigation(String route) {
+    final String? activeOutletId = _userData?['activeOutletId'];
+    final Map<String, dynamic>? currentData = _userData;
+
+    if (_isLoading && _userData == null) {
+      _currentPage = const Center(child: CircularProgressIndicator());
+      return;
+    }
+
+    const Widget noOutletSelected = Center(
+      child: Padding(
+        padding: EdgeInsets.all(24.0),
+        child: Text(
+          "Silakan pilih outlet terlebih dahulu dari menu di sidebar.",
+          style: TextStyle(fontSize: 18, color: Colors.grey),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+
+    setState(() {
+      _currentRouteName = route;
       switch (route) {
         case 'Dashboard':
-          _currentPage = const DashboardContent();
+          _currentPage = (activeOutletId != null)
+              ? const DashboardContent()
+              : noOutletSelected;
           break;
+
         case 'Daftar Produk':
-          _currentPage = const DaftarProdukPage();
+          _currentPage = (activeOutletId != null)
+              ? DaftarProdukPage(outletId: activeOutletId)
+              : noOutletSelected;
           break;
         case 'Daftar Kategori':
-          _currentPage = const DaftarKategoriPage();
-          break;
-        case 'Profile':
-          if (_userData != null) {
-            _currentPage = ProfilePage(
-              userData: _userData!,
-              onProfileUpdated: _fetchUserData,
-            );
-          }
-          break;
-        case 'Pengaturan Bisnis':
-          if (_userData != null) {
-            _currentPage = ProfileBusinessPage(
-                userData: _userData!,
-                onProfileUpdated: _fetchUserData,
-            );
-          }
-          break;
-        case 'Daftar Pelanggan':
-          _currentPage = const DaftarPelangganPage();
+          _currentPage = (activeOutletId != null)
+              ? DaftarKategoriPage(outletId: activeOutletId)
+              : noOutletSelected;
           break;
         case 'Daftar Kupon':
-          _currentPage = const DaftarKuponPage();
+          _currentPage = (activeOutletId != null)
+              ? DaftarKuponPage(outletId: activeOutletId)
+              : noOutletSelected;
           break;
-        case 'Tambah Kupon':
-          _currentPage = const TambahKuponPage();
+        case 'Daftar Karyawan':
+          _currentPage = (activeOutletId != null)
+              ? DaftarKaryawanPage(outletId: activeOutletId)
+              : noOutletSelected;
+          break;
+        case 'Daftar Stok':
+          _currentPage = (activeOutletId != null)
+              ? DaftarStokPage(outletId: activeOutletId)
+              : noOutletSelected;
+          break;
+        case 'Ringkasan Penjualan':
+          _currentPage = (activeOutletId != null)
+              ? const RingkasanPenjualanPage()
+              : noOutletSelected;
+          break;
+        case 'Detail Penjualan':
+          _currentPage = (activeOutletId != null)
+              ? const DetailPenjualanPage()
+              : noOutletSelected;
+          break;
+        case 'Penjualan Produk':
+          _currentPage = (activeOutletId != null)
+              ? const PenjualanProdukPage()
+              : noOutletSelected;
+          break;
+        case 'Penjualan Kategori':
+          _currentPage = (activeOutletId != null)
+              ? const PenjualanKategoriPage()
+              : noOutletSelected;
+          break;
+        case 'Laporan Pelanggan':
+          _currentPage = (activeOutletId != null)
+              ? const LaporanPelangganPage()
+              : noOutletSelected;
+          break;
+
+        case 'Daftar Pelanggan':
+          _currentPage = (activeOutletId != null)
+              ? DaftarPelangganPage(outletId: activeOutletId)
+              : noOutletSelected;
           break;
         case 'Daftar Outlet':
           _currentPage = const DaftarOutletPage();
           break;
-        case 'Daftar Karyawan' :
-          _currentPage = const DaftarKaryawanPage();
+
+        case 'Profile':
+          _currentPage = ProfilePage(
+            userData: currentData ?? {},
+            onProfileUpdated: _fetchUserData,
+          );
           break;
-        case 'Ringkasan Penjualan' :
-          _currentPage = const RingkasanPenjualanPage();
+        case 'Pengaturan Bisnis':
+          _currentPage = (activeOutletId != null && currentData != null)
+              ? ProfileBusinessPage(
+            userData: currentData,
+            outletId: activeOutletId,
+            onProfileUpdated: _handleProfileBusinessUpdate,
+          )
+              : noOutletSelected;
           break;
-        case 'Detail Penjualan' :
-          _currentPage = const DetailPenjualanPage();
-          break;
-        case 'Penjualan Produk' :
-          _currentPage = const PenjualanProdukPage();
-          break;
-        case 'Penjualan Kategori' :
-          _currentPage = const PenjualanKategoriPage();
-          break;
-        case 'Laporan Pelanggan' :
-          _currentPage = const LaporanPelangganPage();
-          break;
+
         default:
-          _currentPage = const DashboardContent();
+          _currentPage = (activeOutletId != null)
+              ? const DashboardContent()
+              : noOutletSelected;
       }
     });
   }
@@ -145,6 +281,7 @@ class _DashboardHostState extends State<DashboardHost> {
       userData: _userData,
       isLoading: _isLoading,
       onNavigate: _handleNavigation,
+      onRefreshUserData: _refreshDataAndState,
       child: _currentPage,
     );
   }
@@ -290,7 +427,6 @@ class StatCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 8),
-
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
@@ -299,7 +435,6 @@ class StatCard extends StatelessWidget {
               maxLines: 1,
             ),
           ),
-
           if (chart != null)
             Expanded(
               child: Padding(

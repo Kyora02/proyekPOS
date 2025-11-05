@@ -3,10 +3,12 @@ import 'package:proyekpos2/service/api_service.dart';
 
 class TambahKategoriPage extends StatefulWidget {
   final Map<String, dynamic>? kategori;
+  final String outletId;
 
   const TambahKategoriPage({
     super.key,
     this.kategori,
+    required this.outletId,
   });
 
   @override
@@ -46,6 +48,18 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
             return outletIds.contains(option['id']);
           }).toList();
         });
+      } else if (!_isEditMode && mounted) {
+        try {
+          final activeOutlet = _outletOptions.firstWhere(
+                (opt) => opt['id'] == widget.outletId,
+          );
+          setState(() {
+            _selectedOutlets = [activeOutlet];
+          });
+        } catch (e) {
+          debugPrint("Active outlet not found in options: $e");
+          _outletError = "Outlet aktif tidak ditemukan";
+        }
       }
     });
   }
@@ -275,8 +289,13 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
                       title: 'Informasi Kategori',
                       child: Column(
                         children: [
-                          _buildMultiSelectOutletField(),
-                          const SizedBox(height: 16),
+                          if (_isEditMode) ...[
+                            _buildMultiSelectOutletField(),
+                            const SizedBox(height: 16),
+                          ] else ...[
+                            _buildActiveOutletDisplay(),
+                            const SizedBox(height: 16),
+                          ],
                           _buildTextField(
                             controller: _namaKategoriController,
                             label: 'Nama Kategori',
@@ -326,6 +345,42 @@ class _TambahKategoriPageState extends State<TambahKategoriPage> {
       ),
     );
   }
+
+  Widget _buildActiveOutletDisplay() {
+    String outletName = '...';
+    if (_selectedOutlets.isNotEmpty) {
+      outletName = _selectedOutlets.first['name'];
+    } else if (_outletError != null) {
+      outletName = 'Error memuat outlet';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Atur Outlet',
+            style: TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Container(
+          padding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.grey[200], // Make it look disabled
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey[300]!),
+          ),
+          child: Text(
+            outletName,
+            style: const TextStyle(
+              color: Colors.black54,
+              fontSize: 16,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
 
   Widget _buildSectionCard({required String title, required Widget child}) {
     return Card(

@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 
 class ProfileBusinessPage extends StatefulWidget {
   final Map<String, dynamic> userData;
-  final VoidCallback onProfileUpdated;
+  final String outletId;
+  final Future<void> Function() onProfileUpdated;
 
   const ProfileBusinessPage({
     super.key,
     required this.userData,
+    required this.outletId,
     required this.onProfileUpdated,
   });
 
@@ -48,18 +50,17 @@ class _ProfileBusinessPageState extends State<ProfileBusinessPage> {
         throw Exception("Pengguna tidak login.");
       }
 
-      final querySnapshot = await FirebaseFirestore.instance
+      final outletDoc = await FirebaseFirestore.instance
           .collection('outlets')
-          .where('userId', isEqualTo: user.uid)
-          .limit(1)
+          .doc(widget.outletId)
           .get();
 
-      if (querySnapshot.docs.isEmpty) {
-        throw Exception("Tidak ada data outlet yang terhubung dengan pengguna ini.");
+      if (!outletDoc.exists) {
+        throw Exception(
+            "Tidak ada data outlet yang cocok (ID: ${widget.outletId}).");
       }
 
-      final outletDoc = querySnapshot.docs.first;
-      final data = outletDoc.data();
+      final data = outletDoc.data()!;
 
       _outletId = outletDoc.id;
 
@@ -131,15 +132,17 @@ class _ProfileBusinessPageState extends State<ProfileBusinessPage> {
 
       final batch = FirebaseFirestore.instance.batch();
 
-      final outletDocRef = FirebaseFirestore.instance.collection('outlets').doc(_outletId!);
+      final outletDocRef =
+      FirebaseFirestore.instance.collection('outlets').doc(_outletId!);
       batch.update(outletDocRef, outletDataToUpdate);
 
-      final userDocRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+      final userDocRef =
+      FirebaseFirestore.instance.collection('users').doc(user.uid);
       batch.update(userDocRef, userDataToUpdate);
 
       await batch.commit();
 
-      widget.onProfileUpdated();
+      await widget.onProfileUpdated();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -194,8 +197,7 @@ class _ProfileBusinessPageState extends State<ProfileBusinessPage> {
                     controller: _outletNameController,
                     label: 'Nama Outlet',
                     hintText: 'Masukkan nama outlet Anda',
-                    validator: (value) =>
-                    value == null || value.isEmpty
+                    validator: (value) => value == null || value.isEmpty
                         ? 'Nama outlet tidak boleh kosong'
                         : null,
                   ),
@@ -231,7 +233,8 @@ class _ProfileBusinessPageState extends State<ProfileBusinessPage> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF279E9E),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding:
+                        const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),

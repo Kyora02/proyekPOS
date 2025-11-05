@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:proyekpos2/crud/tambahKategori_page.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class DaftarKategoriPage extends StatefulWidget {
-  const DaftarKategoriPage({super.key});
+  final String outletId;
+
+  const DaftarKategoriPage({
+    super.key,
+    required this.outletId,
+  });
 
   @override
   State<DaftarKategoriPage> createState() => _DaftarKategoriPageState();
@@ -48,13 +54,15 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
         throw Exception('Not authenticated');
       }
 
-      final outletId = await _fetchFirstOutletId(token);
+      // Use the outletId passed from the widget
+      final String? outletId = widget.outletId;
 
       if (outletId == null) {
         if (mounted) {
           setState(() {
             _isLoading = false;
             _allCategories = [];
+            _error = "Outlet ID not found.";
           });
         }
         return;
@@ -86,28 +94,6 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
     }
   }
 
-  Future<String?> _fetchFirstOutletId(String token) async {
-    try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/outlets'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-
-      if (response.statusCode == 200) {
-        final List<dynamic> outlets = jsonDecode(response.body);
-        if (outlets.isNotEmpty) {
-          return outlets[0]['id'];
-        }
-        return null;
-      } else {
-        throw Exception('Failed to fetch outlets');
-      }
-    } catch (e) {
-      debugPrint("Error fetching outlet ID: $e");
-      return null;
-    }
-  }
-
   List<Map<String, dynamic>> get _filteredCategories {
     List<Map<String, dynamic>> categories = _allCategories;
 
@@ -123,19 +109,27 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
   }
 
   void _navigateToAddCategory() {
+    // FIX: Use MaterialPageRoute to pass the outletId
     Navigator.of(context, rootNavigator: true)
-        .pushNamed('/tambah-kategori')
-        .then((_) => _fetchCategories());
+        .push(MaterialPageRoute(
+      builder: (_) => TambahKategoriPage(outletId: widget.outletId),
+    ))
+        .then((result) {
+      if (result == true) _fetchCategories();
+    });
   }
 
   void _navigateToEditCategory(Map<String, dynamic> category) {
+    // FIX: Use MaterialPageRoute to pass outletId and category data
     Navigator.of(context, rootNavigator: true)
-        .pushNamed(
-      '/tambah-kategori',
-      arguments: category,
-    )
-        .then((_) {
-      _fetchCategories();
+        .push(MaterialPageRoute(
+      builder: (_) => TambahKategoriPage(
+        kategori: category,
+        outletId: widget.outletId,
+      ),
+    ))
+        .then((result) {
+      if (result == true) _fetchCategories();
     });
   }
 

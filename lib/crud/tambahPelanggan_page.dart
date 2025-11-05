@@ -3,8 +3,14 @@ import 'package:intl/intl.dart';
 import 'package:proyekpos2/service/api_service.dart';
 
 class TambahPelangganPage extends StatefulWidget {
-  final Map<String, dynamic>? pelanggan; // For Edit Mode
-  const TambahPelangganPage({super.key, this.pelanggan});
+  final Map<String, dynamic>? pelanggan;
+  final String outletId;
+
+  const TambahPelangganPage({
+    super.key,
+    this.pelanggan,
+    required this.outletId,
+  });
 
   @override
   State<TambahPelangganPage> createState() => _TambahPelangganPageState();
@@ -59,7 +65,7 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
         _selectedDate = DateTime.parse(data['dob']);
       } else if (data['dob'] is Map) {
         _selectedDate = DateTime.fromMillisecondsSinceEpoch(
-            data['dob']['_seconds'] * 1000);
+            (data['dob']['_seconds'] as int) * 1000);
       }
     }
     _tanggalLahirController.text =
@@ -118,41 +124,34 @@ class _TambahPelangganPageState extends State<TambahPelangganPage> {
       });
 
       try {
-        final data = {
-          'name': _namaController.text,
-          'phone': _teleponController.text,
-          'email': _emailController.text,
-          'gender': _selectedGender == JenisKelamin.lakiLaki
-              ? 'Laki-laki'
-              : 'Perempuan',
-          'dob': _selectedDate,
-          'city': _kotaController.text,
-          'address': _alamatController.text,
-          'notes': _catatanController.text,
-        };
-
         if (_isEditMode) {
           await _apiService.updatePelanggan(
             id: widget.pelanggan!['id'],
-            name: data['name'] as String,
-            phone: data['phone'] as String,
-            email: data['email'] as String?,
-            gender: data['gender'] as String?,
-            dob: data['dob'] as DateTime?,
-            city: data['city'] as String?,
-            address: data['address'] as String?,
-            notes: data['notes'] as String?,
+            name: _namaController.text,
+            phone: _teleponController.text,
+            email: _emailController.text,
+            gender: _selectedGender == JenisKelamin.lakiLaki
+                ? 'Laki-laki'
+                : 'Perempuan',
+            dob: _selectedDate,
+            city: _kotaController.text,
+            address: _alamatController.text,
+            notes: _catatanController.text,
+            outletId: widget.outletId,
           );
         } else {
           await _apiService.addPelanggan(
-            name: data['name'] as String,
-            phone: data['phone'] as String,
-            email: data['email'] as String?,
-            gender: data['gender'] as String?,
-            dob: data['dob'] as DateTime?,
-            city: data['city'] as String?,
-            address: data['address'] as String?,
-            notes: data['notes'] as String?,
+            name: _namaController.text,
+            phone: _teleponController.text,
+            email: _emailController.text,
+            gender: _selectedGender == JenisKelamin.lakiLaki
+                ? 'Laki-laki'
+                : 'Perempuan',
+            dob: _selectedDate,
+            city: _kotaController.text,
+            address: _alamatController.text,
+            notes: _catatanController.text,
+            outletId: widget.outletId,
           );
         }
 
