@@ -184,25 +184,31 @@ class ApiService {
     required double sellingPrice,
     double? costPrice,
     required String categoryId,
-    required List<Map<String, dynamic>> outlets,
+    List<Map<String, dynamic>>? outlets,
   }) async {
     final token = await _getAuthToken();
     final url = Uri.parse('$_baseUrl/products/$id');
+
+    final Map<String, dynamic> body = {
+      'name': name,
+      'description': description,
+      'sku': sku,
+      'sellingPrice': sellingPrice,
+      'costPrice': costPrice,
+      'categoryId': categoryId,
+    };
+
+    if (outlets != null) {
+      body['outlets'] = outlets;
+    }
+
     final response = await http.put(
       url,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       },
-      body: jsonEncode({
-        'name': name,
-        'description': description,
-        'sku': sku,
-        'sellingPrice': sellingPrice,
-        'costPrice': costPrice,
-        'categoryId': categoryId,
-        'outlets': outlets,
-      }),
+      body: jsonEncode(body),
     );
     if (response.statusCode != 200) {
       throw Exception('Failed to update product: ${response.body}');
@@ -327,7 +333,6 @@ class ApiService {
       {required String outletId}) async {
     try {
       final token = await _getAuthToken();
-      // v-- ADD THE QUERY PARAMETER HERE
       final url = Uri.parse('$_baseUrl/karyawan?outletId=$outletId');
       final response = await http.get(
         url,
@@ -660,6 +665,39 @@ class ApiService {
 
     if (response.statusCode != 200) {
       throw Exception('Failed to add stock: ${response.body}');
+    }
+  }
+
+  Future<void> updateStock({
+    required String outletId,
+    required String productId,
+    required String newStock,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      final url = Uri.parse('$_baseUrl/stok/update');
+
+      final body = jsonEncode({
+        'outletId': outletId,
+        'productId': productId,
+        'newStock': newStock,
+      });
+
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+        body: body,
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to update stock: ${response.body}');
+      }
+    } catch (e) {
+      print('Error di updateStock: $e');
+      rethrow;
     }
   }
 }

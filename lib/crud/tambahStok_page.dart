@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:proyekpos2/service/api_service.dart';
 
 class TambahStokPage extends StatefulWidget {
-  final String outletId; // <-- ADDED
+  final String outletId;
+  final Map<String, dynamic>? s; // <-- ADDED: Untuk menerima data stok saat edit
 
   const TambahStokPage({
     super.key,
-    required this.outletId, // <-- ADDED
+    required this.outletId,
+    this.s, // <-- ADDED
   });
 
   @override
@@ -21,23 +23,41 @@ class _TambahStokPageState extends State<TambahStokPage> {
   final TextEditingController _skuController = TextEditingController();
   final TextEditingController _stokController = TextEditingController();
 
-  // REMOVED: Outlet variables
-  // List<Map<String, dynamic>> _outlets = [];
-  // String? _selectedOutletId;
-  // bool _isOutletLoading = true;
-
   List<Map<String, dynamic>> _products = [];
   Map<String, dynamic>? _selectedProduct;
 
-  bool _isProductLoading = false;
+  bool _isProductLoading = true; // <-- MODIFIED: Start as true
   bool _isSaving = false;
+  bool _isEditMode = false; // <-- ADDED
+  String? _productIdToEdit; // <-- ADDED
 
   @override
   void initState() {
     super.initState();
-    // REMOVED: _fetchOutlets();
-    // UPDATED: Fetch products immediately with widget.outletId
-    _fetchProducts(widget.outletId);
+
+    // <-- MODIFIED: Logic to handle Edit vs Add mode
+    if (widget.s != null) {
+      // ** EDIT MODE **
+      setState(() {
+        _isEditMode = true;
+        _productIdToEdit = widget.s!['id']; // Asumsi 'id' adalah productId
+        _skuController.text = widget.s!['sku'] ?? '';
+        _stokController.text = widget.s!['stok']?.toString() ?? '';
+
+        // Buat item placeholder untuk ditampilkan di dropdown
+        _selectedProduct = {
+          'id': widget.s!['id'],
+          'name': widget.s!['name'],
+          'sku': widget.s!['sku'],
+        };
+        // Masukkan ke list agar dropdown valid
+        _products = [_selectedProduct!];
+        _isProductLoading = false; // Selesai loading
+      });
+    } else {
+      // ** ADD MODE **
+      _fetchProducts(widget.outletId);
+    }
   }
 
   @override
@@ -47,9 +67,8 @@ class _TambahStokPageState extends State<TambahStokPage> {
     super.dispose();
   }
 
-  // REMOVED: _fetchOutlets() method
-
   Future<void> _fetchProducts(String outletId) async {
+    // State loading sudah di-set di initState atau logic sebelumnya
     setState(() {
       _isProductLoading = true;
       _products = [];
@@ -58,7 +77,8 @@ class _TambahStokPageState extends State<TambahStokPage> {
     });
 
     try {
-      final List<Map<String, dynamic>> data = await _apiService.getStockProducts(outletId);
+      final List<Map<String, dynamic>> data =
+      await _apiService.getStockProducts(outletId);
       setState(() {
         _products = data;
         _isProductLoading = false;
@@ -78,14 +98,24 @@ class _TambahStokPageState extends State<TambahStokPage> {
       });
 
       try {
-        await _apiService.addStock(
-          outletId: widget.outletId, // <-- Use widget.outletId
-          productId: _selectedProduct!['id'],
-          stokToAdd: _stokController.text,
-        );
+        if (_isEditMode) {
+          await _apiService.updateStock(
+            outletId: widget.outletId,
+            productId: _productIdToEdit!,
+            newStock: _stokController.text,
+          );
+        } else {
+          // ** PANGGIL API ADD STOK (YANG SUDAH ADA) **
+          await _apiService.addStock(
+            outletId: widget.outletId,
+            productId: _selectedProduct!['id'],
+            stokToAdd: _stokController.text,
+          );
+        }
 
         if (mounted) {
-          Navigator.of(context).pop();
+          // Kirim 'true' untuk memberi tahu DaftarStokPage agar refresh
+          Navigator.of(context).pop(true); // <-- MODIFIED
         }
       } catch (e) {
         _showErrorSnackbar("Terjadi kesalahan: $e");
@@ -118,9 +148,10 @@ class _TambahStokPageState extends State<TambahStokPage> {
         backgroundColor: Colors.white,
         elevation: 0.5,
         centerTitle: true,
-        title: const Text(
-          'Tambahkan Stok',
-          style: TextStyle(
+        title: Text(
+          // <-- MODIFIED: Title berubah sesuai mode
+          _isEditMode ? 'Ubah Stok' : 'Tambahkan Stok',
+          style: const TextStyle(
             color: Color(0xFF333333),
             fontWeight: FontWeight.bold,
             fontSize: 18,
@@ -168,20 +199,20 @@ class _TambahStokPageState extends State<TambahStokPage> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  // REMOVED: Outlet Dropdown
                   _buildDropdownField<Map<String, dynamic>>(
                     label: 'Pilih Produk',
-                    hint: _isProductLoading
-                        ? "Memuat produk..."
-                        : "Pilih Produk",
+                    hint:
+                    _isProductLoading ? "Memuat produk..." : "Pilih Produk",
                     value: _selectedProduct,
                     items: _products.map((product) {
                       return DropdownMenuItem<Map<String, dynamic>>(
                         value: product,
-                        child: Text(product['name'] as String),
+                        // Pastikan 'name' di-cast sebagai String
+                        child: Text(product['name']?.toString() ?? 'Nama Tidak Ada'),
                       );
                     }).toList(),
-                    onChanged: (_isProductLoading)
+                    // <-- MODIFIED: Nonaktifkan dropdown jika loading atau edit mode
+                    onChanged: (_isProductLoading || _isEditMode)
                         ? null
                         : (Map<String, dynamic>? newValue) {
                       if (newValue != null) {
@@ -214,9 +245,13 @@ class _TambahStokPageState extends State<TambahStokPage> {
                   const SizedBox(height: 16),
                   _buildTextField(
                     controller: _stokController,
-                    label: 'Jumlah Stok (Akan Ditambahkan)',
-                    hint: 'Contoh: 50',
+                    // <-- MODIFIED: Label berubah sesuai mode
+                    label: _isEditMode
+                        ? 'Stok (Nilai Baru)'
+                        : 'Jumlah Stok (Akan Ditambahkan)',
+                    hint: _isEditMode ? 'Contoh: 25' : 'Contoh: 50',
                     keyboardType: TextInputType.number,
+                    // <-- MODIFIED: Validator lebih fleksibel untuk edit mode
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Stok tidak boleh kosong';
@@ -225,8 +260,11 @@ class _TambahStokPageState extends State<TambahStokPage> {
                       if (n == null) {
                         return 'Stok harus berupa angka';
                       }
-                      if (n <= 0) {
-                        return 'Stok harus lebih dari 0';
+                      if (!_isEditMode && n <= 0) {
+                        return 'Stok (penambahan) harus lebih dari 0';
+                      }
+                      if (_isEditMode && n < 0) {
+                        return 'Stok tidak boleh negatif';
                       }
                       return null;
                     },
@@ -254,9 +292,11 @@ class _TambahStokPageState extends State<TambahStokPage> {
                           strokeWidth: 2,
                         ),
                       )
-                          : const Text(
-                        'Simpan',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                          : Text(
+                        // <-- MODIFIED: Teks tombol berubah
+                        _isEditMode ? 'Update Stok' : 'Simpan',
+                        style:
+                        const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -297,7 +337,9 @@ class _TambahStokPageState extends State<TambahStokPage> {
           validator: validator,
           decoration: InputDecoration(
             filled: true,
-            fillColor: onChanged == null ? const Color(0xFFF5F5F5) : Colors.white,
+            // <-- MODIFIED: Warna abu-abu jika nonaktif
+            fillColor:
+            onChanged == null ? const Color(0xFFF5F5F5) : Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
@@ -317,6 +359,11 @@ class _TambahStokPageState extends State<TambahStokPage> {
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Colors.red, width: 1.5),
+            ),
+            // <-- ADDED: Border khusus untuk state disabled
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFF0F0F0)),
             ),
             contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -375,6 +422,11 @@ class _TambahStokPageState extends State<TambahStokPage> {
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Colors.red, width: 1.5),
+            ),
+            // <-- ADDED: Border khusus untuk state readOnly/disabled
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFF0F0F0)),
             ),
             contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

@@ -27,14 +27,11 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
   final _hargaJualController = TextEditingController();
   final _hargaBeliController = TextEditingController();
 
+  // Hapus semua state yang berhubungan dengan multi-select
   List<Map<String, dynamic>> _outletOptions = [];
   List<Map<String, dynamic>> _kategoriOptions = [];
-  List<Map<String, dynamic>> _selectedOutlets = [];
   String? _selectedKategoriId;
-
-  OverlayEntry? _overlayEntry;
-  final LayerLink _layerLink = LayerLink();
-  bool _isOutletOverlayOpen = false;
+  String _activeOutletName = 'Memuat outlet...';
 
   bool get _isEditMode => widget.product != null;
 
@@ -48,26 +45,23 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
     setState(() => _isFetchingData = true);
     try {
       final outlets = await _apiService.getOutlets();
-
-      final categories = await _apiService.getCategories(outletId: widget.outletId);
+      final categories =
+      await _apiService.getCategories(outletId: widget.outletId);
 
       if (mounted) {
         setState(() {
           _outletOptions = outlets;
           _kategoriOptions = categories;
 
+          try {
+            _activeOutletName = _outletOptions
+                .firstWhere((opt) => opt['id'] == widget.outletId)['name'];
+          } catch (e) {
+            _activeOutletName = 'Outlet Tidak Ditemukan';
+          }
+
           if (_isEditMode) {
             _populateFieldsForEdit();
-          } else {
-            // ADD MODE: Auto-select the current active outlet
-            try {
-              final activeOutlet = _outletOptions.firstWhere(
-                    (opt) => opt['id'] == widget.outletId,
-              );
-              _selectedOutlets = [activeOutlet];
-            } catch (e) {
-              debugPrint("Active outlet not found in options: $e");
-            }
           }
         });
       }
@@ -99,10 +93,6 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
       _selectedKategoriId = savedCategoryId;
     }
 
-    final List<String> outletIds =
-    List<String>.from(product['outletIds'] ?? []);
-    _selectedOutlets =
-        _outletOptions.where((opt) => outletIds.contains(opt['id'])).toList();
   }
 
   @override
@@ -112,19 +102,11 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
     _skuController.dispose();
     _hargaJualController.dispose();
     _hargaBeliController.dispose();
-    _removeOutletOverlay();
     super.dispose();
   }
 
   Future<void> _saveProduct() async {
-    final isFormValid = _formKey.currentState!.validate();
-    if (_selectedOutlets.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Outlet harus dipilih'), backgroundColor: Colors.red),
-      );
-      return;
-    }
+    // Hapus validasi _selectedOutlets
     if (_selectedKategoriId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -133,9 +115,28 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
       return;
     }
 
+    final isFormValid = _formKey.currentState!.validate();
     if (!isFormValid) return;
 
     setState(() => _isLoading = true);
+
+    Map<String, dynamic>? activeOutlet;
+    try {
+      activeOutlet =
+          _outletOptions.firstWhere((opt) => opt['id'] == widget.outletId);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Error: Outlet aktif tidak valid. $e'),
+            backgroundColor: Colors.red),
+      );
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    // Buat daftar outlet yang akan disimpan (selalu hanya 1)
+    final List<Map<String, dynamic>> outletsToSave = [activeOutlet];
+
     try {
       final sellingPrice = double.tryParse(_hargaJualController.text) ?? 0.0;
       final costPrice = double.tryParse(_hargaBeliController.text);
@@ -149,7 +150,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
           sellingPrice: sellingPrice,
           costPrice: costPrice,
           categoryId: _selectedKategoriId!,
-          outlets: _selectedOutlets,
+          outlets: outletsToSave,
         );
       } else {
         await _apiService.addProduct(
@@ -159,7 +160,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
           sellingPrice: sellingPrice,
           costPrice: costPrice,
           categoryId: _selectedKategoriId!,
-          outlets: _selectedOutlets, // Already set to [activeOutlet]
+          outlets: outletsToSave,
         );
       }
       if (mounted) {
@@ -185,246 +186,145 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
     }
   }
 
-  void _toggleOutletOverlay(BuildContext targetContext) {
-    if (_isOutletOverlayOpen) {
-      _removeOutletOverlay();
-    } else {
-      _overlayEntry = _createOutletOverlayEntry(targetContext);
-      Overlay.of(context).insert(_overlayEntry!);
-      setState(() {
-        _isOutletOverlayOpen = true;
-      });
-    }
-  }
-
-  void _removeOutletOverlay() {
-    _overlayEntry?.remove();
-    _overlayEntry = null;
-    if (mounted) {
-      setState(() {
-        _isOutletOverlayOpen = false;
-      });
-    }
-  }
-
-  OverlayEntry _createOutletOverlayEntry(BuildContext targetContext) {
-    final RenderBox renderBox = targetContext.findRenderObject() as RenderBox;
-    final size = renderBox.size;
-
-    return OverlayEntry(
-      builder: (context) => Positioned(
-        width: size.width,
-        child: CompositedTransformFollower(
-          link: _layerLink,
-          showWhenUnlinked: false,
-          offset: Offset(0, size.height + 4),
-          child: Material(
-            elevation: 4.0,
-            color: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-              side: BorderSide(color: Colors.grey[300]!),
-            ),
-            child: StatefulBuilder(
-              builder: (context, setDialogState) {
-                final isAllSelected =
-                    _selectedOutlets.length == _outletOptions.length;
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_outletOptions.length > 1)
-                      CheckboxListTile(
-                        title: const Text('Pilih Semua'),
-                        value: isAllSelected,
-                        onChanged: (bool? value) {
-                          setDialogState(() {
-                            if (value == true) {
-                              _selectedOutlets = List.from(_outletOptions);
-                            } else {
-                              _selectedOutlets.clear();
-                            }
-                            setState(() {});
-                          });
-                        },
-                        controlAffinity: ListTileControlAffinity.leading,
-                        activeColor: const Color(0xFF00A3A3),
-                      ),
-                    ..._outletOptions.map((outlet) {
-                      final isSelected = _selectedOutlets
-                          .any((item) => item['id'] == outlet['id']);
-                      return CheckboxListTile(
-                        title: Text(outlet['name']),
-                        value: isSelected,
-                        onChanged: (bool? value) {
-                          setDialogState(() {
-                            if (value == true) {
-                              _selectedOutlets.add(outlet);
-                            } else {
-                              _selectedOutlets.removeWhere(
-                                      (item) => item['id'] == outlet['id']);
-                            }
-                            setState(() {});
-                          });
-                        },
-                        controlAffinity: ListTileControlAffinity.leading,
-                        activeColor: const Color(0xFF00A3A3),
-                      );
-                    }).toList(),
-                  ],
-                );
-              },
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: _removeOutletOverlay,
-      child: Scaffold(
-        backgroundColor: Colors.grey[200],
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 1,
-          centerTitle: true,
-          automaticallyImplyLeading: false,
-          title: Text(
-            _isEditMode ? 'Edit Produk' : 'Tambahkan Produk',
-            style: const TextStyle(
-              color: Color(0xFF333333),
-              fontWeight: FontWeight.bold,
-            ),
+    // Hapus GestureDetector
+    return Scaffold(
+      backgroundColor: Colors.grey[200],
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 1,
+        centerTitle: true,
+        automaticallyImplyLeading: false,
+        title: Text(
+          _isEditMode ? 'Edit Produk' : 'Tambahkan Produk',
+          style: const TextStyle(
+            color: Color(0xFF333333),
+            fontWeight: FontWeight.bold,
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.close, color: Colors.black87),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
         ),
-        body: _isFetchingData
-            ? const Center(child: CircularProgressIndicator())
-            : Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 700),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildSectionCard(
-                      title: 'Informasi Produk',
-                      child: Column(
-                        children: [
-                          // *** LOGIC TO HIDE/SHOW DROPDOWN ***
-                          if (_isEditMode) ...[
-                            _buildMultiSelectOutletField(),
-                          ] else ...[
-                            _buildActiveOutletDisplay(),
-                          ],
-                          // ********************************
-                          const SizedBox(height: 16),
-                          _buildTextField(
-                            controller: _namaProdukController,
-                            label: 'Nama Produk',
-                            hint: 'Contoh: Kopi Susu Gula Aren',
-                            isRequired: true,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildTextField(
-                            controller: _deskripsiController,
-                            label: 'Deskripsi Produk',
-                            hint:
-                            'Contoh: Perpaduan kopi, susu, dan gula aren',
-                            maxLines: 3,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildImagePicker(),
-                          const SizedBox(height: 16),
-                          _buildCategoryDropdownField(
-                            label: 'Kategori Produk',
-                            value: _selectedKategoriId,
-                            items: _kategoriOptions,
-                            hint: 'Pilih kategori',
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedKategoriId = value;
-                              });
-                            },
-                            isRequired: true,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    _buildSectionCard(
-                      title: 'Harga dan SKU',
-                      child: Column(
-                        children: [
-                          _buildTextField(
-                            controller: _skuController,
-                            label: 'SKU (Stock Keeping Unit)',
-                            hint: 'Contoh: KS-001',
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildTextField(
-                                  controller: _hargaBeliController,
-                                  label: 'Harga Beli',
-                                  hint: '0',
-                                  keyboardType: TextInputType.number,
-                                  prefixText: 'Rp ',
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: _buildTextField(
-                                  controller: _hargaJualController,
-                                  label: 'Harga Jual',
-                                  hint: '0',
-                                  isRequired: true,
-                                  keyboardType: TextInputType.number,
-                                  prefixText: 'Rp ',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.black87),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+      body: _isFetchingData
+          ? const Center(child: CircularProgressIndicator())
+          : Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 700),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildSectionCard(
+                    title: 'Informasi Produk',
+                    child: Column(
                       children: [
-                        ElevatedButton(
-                          onPressed: _isLoading ? null : _saveProduct,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF00A3A3),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 32, vertical: 16),
-                            disabledBackgroundColor: Colors.grey,
-                          ),
-                          child: _isLoading
-                              ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2))
-                              : const Text('Simpan'),
+                        // Selalu tampilkan _buildActiveOutletDisplay
+                        _buildActiveOutletDisplay(),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _namaProdukController,
+                          label: 'Nama Produk',
+                          hint: 'Contoh: Kopi Susu Gula Aren',
+                          isRequired: true,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _deskripsiController,
+                          label: 'Deskripsi Produk',
+                          hint:
+                          'Contoh: Perpaduan kopi, susu, dan gula aren',
+                          maxLines: 3,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildImagePicker(),
+                        const SizedBox(height: 16),
+                        _buildCategoryDropdownField(
+                          label: 'Kategori Produk',
+                          value: _selectedKategoriId,
+                          items: _kategoriOptions,
+                          hint: 'Pilih kategori',
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedKategoriId = value;
+                            });
+                          },
+                          isRequired: true,
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSectionCard(
+                    title: 'Harga dan SKU',
+                    child: Column(
+                      children: [
+                        _buildTextField(
+                          controller: _skuController,
+                          label: 'SKU (Stock Keeping Unit)',
+                          hint: 'Contoh: KS-001',
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _hargaBeliController,
+                                label: 'Harga Beli',
+                                hint: '0',
+                                keyboardType: TextInputType.number,
+                                prefixText: 'Rp ',
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _hargaJualController,
+                                label: 'Harga Jual',
+                                hint: '0',
+                                isRequired: true,
+                                keyboardType: TextInputType.number,
+                                prefixText: 'Rp ',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      ElevatedButton(
+                        onPressed: _isLoading ? null : _saveProduct,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF00A3A3),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 32, vertical: 16),
+                          disabledBackgroundColor: Colors.grey,
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2))
+                            : const Text('Simpan'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
@@ -433,46 +333,42 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
     );
   }
 
-  // ADDED: This widget displays the active outlet in "Add Mode"
+  // Widget ini sekarang hanya menampilkan nama outlet aktif
   Widget _buildActiveOutletDisplay() {
-    String outletName = '...';
-    if (_selectedOutlets.isNotEmpty) {
-      outletName = _selectedOutlets.first['name'];
-    } else if (_isFetchingData) {
-      outletName = 'Memuat outlet...';
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: const [
-            Text('Atur Outlet', style: TextStyle(fontWeight: FontWeight.w600)),
+            Text('Outlet', style: TextStyle(fontWeight: FontWeight.w600)),
             Text(' *', style: TextStyle(color: Colors.red)),
           ],
         ),
         const SizedBox(height: 8),
         Container(
-          padding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           width: double.infinity,
           decoration: BoxDecoration(
-            color: Colors.grey[200], // Make it look disabled
+            color: Colors.grey[200], // Buat terlihat non-aktif
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: Colors.grey[300]!),
           ),
           child: Text(
-            outletName,
+            _isFetchingData ? 'Memuat outlet...' : _activeOutletName,
             style: const TextStyle(
               color: Colors.black54,
               fontSize: 16,
             ),
           ),
         ),
+        const SizedBox(height: 4),
+        Text(
+          'Produk akan diatur untuk outlet yang sedang aktif.',
+          style: TextStyle(color: Colors.grey[600], fontSize: 12),
+        )
       ],
     );
   }
-
 
   Widget _buildSectionCard({required String title, required Widget child}) {
     return Card(
@@ -610,79 +506,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
     );
   }
 
-  Widget _buildMultiSelectOutletField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: const [
-            Text('Atur Outlet', style: TextStyle(fontWeight: FontWeight.w600)),
-            Text(' *', style: TextStyle(color: Colors.red)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Builder(
-          builder: (context) {
-            return CompositedTransformTarget(
-              link: _layerLink,
-              child: GestureDetector(
-                onTap: () => _toggleOutletOverlay(context),
-                child: Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                        color: _isOutletOverlayOpen
-                            ? const Color(0xFF00A3A3)
-                            : Colors.grey[300]!),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _selectedOutlets.isEmpty
-                          ? Text('Pilih',
-                          style: TextStyle(
-                              color: Colors.grey[600], fontSize: 16))
-                          : Expanded(
-                        child: Wrap(
-                          spacing: 6.0,
-                          runSpacing: 6.0,
-                          children: _selectedOutlets
-                              .map((outlet) => Chip(
-                            label: Text(outlet['name']),
-                            onDeleted: () {
-                              setState(() {
-                                _selectedOutlets.removeWhere(
-                                        (item) =>
-                                    item['id'] ==
-                                        outlet['id']);
-                              });
-                            },
-                            deleteIconColor: Colors.grey[700],
-                            backgroundColor: Colors.grey[200],
-                          ))
-                              .toList(),
-                        ),
-                      ),
-                      Icon(
-                        _isOutletOverlayOpen
-                            ? Icons.arrow_drop_up
-                            : Icons.arrow_drop_down,
-                        color: Colors.grey[700],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
+  // Hapus _buildMultiSelectOutletField
 
   Widget _buildImagePicker() {
     return Column(

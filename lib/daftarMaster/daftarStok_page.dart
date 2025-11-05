@@ -70,8 +70,7 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
         final name = stock['name']?.toLowerCase() ?? '';
         final sku = stock['sku']?.toLowerCase() ?? '';
 
-        final matchesSearch =
-            name.contains(query) || sku.contains(query);
+        final matchesSearch = name.contains(query) || sku.contains(query);
 
         return matchesSearch;
       }).toList();
@@ -79,15 +78,75 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
   }
 
   Future<void> _navigateToAddStock() async {
-    // UPDATED: Use MaterialPageRoute to pass outletId
     await Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute(
         builder: (context) => TambahStokPage(outletId: widget.outletId),
       ),
     );
-
-    // Muat ulang data setelah kembali
     _fetchStock();
+  }
+
+  void _navigateToEditProduct(Map<String, dynamic> productStock) {
+    Navigator.of(context, rootNavigator: true)
+        .push(
+      MaterialPageRoute(
+        builder: (context) => TambahStokPage(
+          s: productStock,
+          outletId: widget.outletId,
+        ),
+      ),
+    )
+        .then((success) {
+      if (success == true) {
+        _fetchStock();
+      }
+    });
+  }
+
+  Future<void> _showDeleteConfirmationDialog(
+      BuildContext context, Map<String, dynamic> stock) async {
+    return showDialog<void>(
+        context: context,
+        builder: (BuildContext dialogContext) {
+          return AlertDialog(
+            shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: const Text('Konfirmasi Hapus'),
+            content: Text(
+                'Apakah Anda yakin ingin menghapus produk "${stock['name']}"? Ini akan menghapus produk dari semua outlet.'),
+            actions: <Widget>[
+              TextButton(
+                  child: const Text('Batal'),
+                  onPressed: () => Navigator.of(dialogContext).pop()),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red, foregroundColor: Colors.white),
+                child: const Text('Hapus'),
+                onPressed: () async {
+                  try {
+                    // Gunakan 'id' dari stok (yang merupakan productId)
+                    await _apiService.deleteProduct(stock['id']);
+                    Navigator.of(dialogContext).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content:
+                          Text('Produk "${stock['name']}" berhasil dihapus'),
+                          backgroundColor: Colors.green),
+                    );
+                    _fetchStock();
+                  } catch (e) {
+                    Navigator.of(dialogContext).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text('Gagal menghapus produk: $e'),
+                          backgroundColor: Colors.red),
+                    );
+                  }
+                },
+              ),
+            ],
+          );
+        });
   }
 
   @override
@@ -231,6 +290,7 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
           Expanded(flex: 3, child: Text('NAMA PRODUK', style: headerStyle)),
           Expanded(flex: 2, child: Text('KATEGORI', style: headerStyle)),
           Expanded(flex: 1, child: Text('STOK', style: headerStyle)),
+          const SizedBox(width: 48), // RUANG UNTUK TOMBOL AKSI
         ],
       ),
     );
@@ -255,6 +315,54 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
           Expanded(
               flex: 1,
               child: Text(stock['stok']?.toString() ?? '0', style: cellStyle)),
+          _buildPopupMenuButton(stock),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPopupMenuButton(Map<String, dynamic> stock) {
+    return SizedBox(
+      width: 48,
+      child: PopupMenuButton<String>(
+        color: Colors.white,
+        shape:
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+        icon: const Icon(Icons.more_horiz),
+        onSelected: (String value) {
+          if (value == 'hapus') {
+            _showDeleteConfirmationDialog(context, stock);
+          } else if (value == 'ubah') {
+            _navigateToEditProduct(stock);
+          }
+        },
+        itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+          _buildPopupMenuItem(
+              value: 'ubah', text: 'Ubah', icon: Icons.edit_outlined),
+          _buildPopupMenuItem(
+              value: 'hapus',
+              text: 'Hapus',
+              icon: Icons.delete_outline,
+              isDestructive: true),
+        ],
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _buildPopupMenuItem(
+      {required String value,
+        required String text,
+        required IconData icon,
+        bool isDestructive = false}) {
+    return PopupMenuItem<String>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon,
+              size: 20, color: isDestructive ? Colors.red : Colors.black54),
+          const SizedBox(width: 12),
+          Text(text,
+              style: TextStyle(color: isDestructive ? Colors.red : null)),
         ],
       ),
     );
