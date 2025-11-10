@@ -6,8 +6,7 @@ class ApiService {
   final String _baseUrl = 'http://localhost:3000/api';
 
   Future<String> _getAuthToken() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
+    final user = FirebaseAuth.instance.currentUser;    if (user == null) {
       throw Exception('Pengguna tidak login.');
     }
     final String? token = await user.getIdToken();
