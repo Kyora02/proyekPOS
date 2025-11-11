@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 class ApiService {
   final String _baseUrl = 'http://localhost:3000/api';
+  // final String _baseUrl = 'http://192.168.0.170:3000/api';
 
   Future<String> _getAuthToken() async {
     final user = FirebaseAuth.instance.currentUser;    if (user == null) {

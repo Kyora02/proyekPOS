@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:proyekpos2/crud/tambahKategori_page.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:math' as math;
 
 class DaftarKategoriPage extends StatefulWidget {
   final String outletId;
@@ -18,19 +19,28 @@ class DaftarKategoriPage extends StatefulWidget {
 
 class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
   final String _baseUrl = 'http://localhost:3000';
+  final ScrollController _horizontalScrollController = ScrollController();
 
   List<Map<String, dynamic>> _allCategories = [];
   bool _isLoading = true;
   String? _error;
 
+  int? _sortColumnIndex;
+  bool _sortAscending = true;
   String _searchQuery = '';
   int _currentPage = 1;
-  final int _itemsPerPage = 10;
+  int _itemsPerPage = 10;
 
   @override
   void initState() {
     super.initState();
     _fetchCategories();
+  }
+
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    super.dispose();
   }
 
   Future<String?> _getAuthToken() async {
@@ -54,7 +64,6 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
         throw Exception('Not authenticated');
       }
 
-      // Use the outletId passed from the widget
       final String? outletId = widget.outletId;
 
       if (outletId == null) {
@@ -94,6 +103,48 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
     }
   }
 
+  void _sortData(List<Map<String, dynamic>> categories) {
+    if (_sortColumnIndex == null) {
+      return;
+    }
+    categories.sort((a, b) {
+      dynamic aValue;
+      dynamic bValue;
+      switch (_sortColumnIndex) {
+        case 0:
+          aValue = a['name'] ?? '';
+          bValue = b['name'] ?? '';
+          break;
+        case 1:
+          aValue = a['order'] ?? 0;
+          bValue = b['order'] ?? 0;
+          break;
+        case 2:
+          aValue = 0;
+          bValue = 0;
+          break;
+        default:
+          return 0;
+      }
+      int compare;
+      if (aValue is num && bValue is num) {
+        compare = aValue.compareTo(bValue);
+      } else if (aValue is String && bValue is String) {
+        compare = aValue.compareTo(bValue);
+      } else {
+        compare = 0;
+      }
+      return _sortAscending ? compare : -compare;
+    });
+  }
+
+  void _onSort(int columnIndex, bool ascending) {
+    setState(() {
+      _sortColumnIndex = columnIndex;
+      _sortAscending = ascending;
+    });
+  }
+
   List<Map<String, dynamic>> get _filteredCategories {
     List<Map<String, dynamic>> categories = _allCategories;
 
@@ -109,7 +160,6 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
   }
 
   void _navigateToAddCategory() {
-    // FIX: Use MaterialPageRoute to pass the outletId
     Navigator.of(context, rootNavigator: true)
         .push(MaterialPageRoute(
       builder: (_) => TambahKategoriPage(outletId: widget.outletId),
@@ -120,7 +170,6 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
   }
 
   void _navigateToEditCategory(Map<String, dynamic> category) {
-    // FIX: Use MaterialPageRoute to pass outletId and category data
     Navigator.of(context, rootNavigator: true)
         .push(MaterialPageRoute(
       builder: (_) => TambahKategoriPage(
@@ -204,12 +253,14 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
 
   @override
   Widget build(BuildContext context) {
-    final int totalItems = _filteredCategories.length;
+    final categories = _filteredCategories;
+    _sortData(categories);
+    final int totalItems = categories.length;
     final int totalPages = (totalItems / _itemsPerPage).ceil();
     final int startIndex = (_currentPage - 1) * _itemsPerPage;
     final int endIndex = (startIndex + _itemsPerPage).clamp(0, totalItems);
     final List<Map<String, dynamic>> categoriesOnCurrentPage =
-    _filteredCategories.sublist(startIndex, endIndex);
+    categories.sublist(startIndex, endIndex);
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -437,6 +488,12 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
   }
 
   Widget _buildCategoryTable(List<Map<String, dynamic>> categories) {
+    if (categories.isEmpty) {
+      return const Padding(
+          padding: EdgeInsets.all(24.0),
+          child: Center(child: Text('Tidak ada kategori ditemukan.')));
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -448,92 +505,81 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
               blurRadius: 10)
         ],
       ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            child: Row(children: [
-              const SizedBox(width: 8),
-              Expanded(
-                  flex: 4,
-                  child: Text('NAMA KATEGORI', style: _tableHeaderStyle())),
-              Expanded(
-                  flex: 2, child: Text('URUTAN', style: _tableHeaderStyle())),
-              Expanded(
-                  flex: 2,
-                  child: Text('JUMLAH PRODUK', style: _tableHeaderStyle())),
-              const SizedBox(width: 48),
-            ]),
-          ),
-          const Divider(height: 1, color: Colors.grey),
-          if (categories.isEmpty)
-            const Padding(
-                padding: EdgeInsets.all(24.0),
-                child: Text('Tidak ada kategori ditemukan.'))
-          else
-            ...categories
-                .map((category) => _buildCategoryTableRow(category))
-                .toList(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCategoryTableRow(Map<String, dynamic> category) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const SizedBox(width: 8),
-              Expanded(
-                  flex: 4,
-                  child: Text(category['name'] ?? 'N/A',
-                      style: _tableBodyStyle())),
-              Expanded(
-                  flex: 2,
-                  child: Text(category['order']?.toString() ?? 'N/A',
-                      style: _tableBodyStyle())),
-              Expanded(
-                  flex: 2,
-                  child: Text('0', style: _tableBodyStyle())),
-              SizedBox(
-                width: 48,
-                child: PopupMenuButton<String>(
-                  color: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.0)),
-                  icon: const Icon(Icons.more_horiz),
-                  onSelected: (String value) {
-                    if (value == 'ubah') {
-                      _navigateToEditCategory(category);
-                    } else if (value == 'hapus') {
-                      _showDeleteConfirmationDialog(
-                          context, category['name'], category['id']);
-                    }
-                  },
-                  itemBuilder: (BuildContext context) =>
-                  <PopupMenuEntry<String>>[
-                    _buildPopupMenuItem(
-                        value: 'ubah',
-                        text: 'Ubah',
-                        icon: Icons.edit_outlined),
-                    _buildPopupMenuItem(
-                        value: 'hapus',
-                        text: 'Hapus',
-                        icon: Icons.delete_outline,
-                        isDestructive: true),
-                  ],
+      child: Scrollbar(
+        thumbVisibility: true,
+        controller: _horizontalScrollController,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: SingleChildScrollView(
+            controller: _horizontalScrollController,
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columnSpacing: 230.0,
+              sortColumnIndex: _sortColumnIndex,
+              sortAscending: _sortAscending,
+              headingTextStyle: _tableHeaderStyle(),
+              dataTextStyle: _tableBodyStyle(),
+              columns: [
+                DataColumn(
+                  label: const Text('NAMA KATEGORI'),
+                  onSort: _onSort,
                 ),
-              ),
-            ],
+                DataColumn(
+                  label: Center(child: const Text('URUTAN')),
+                  onSort: _onSort,
+                ),
+                DataColumn(
+                  label: Center(child: const Text('JUMLAH PRODUK')),
+                  onSort: _onSort,
+                ),
+                const DataColumn(
+                  label: Text('AKSI'),
+                ),
+              ],
+              rows: categories.map((category) {
+                final String categoryName = category['name'] ?? 'N/A';
+                final String categoryId = category['id'];
+                return DataRow(
+                  cells: [
+                    DataCell(Text(categoryName)),
+                    DataCell(Center(
+                        child: Text(category['order']?.toString() ?? 'N/A'))),
+                    DataCell(Center(child: Text('0'))),
+                    DataCell(
+                      PopupMenuButton<String>(
+                        color: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8.0)),
+                        icon: const Icon(Icons.more_horiz),
+                        onSelected: (String value) {
+                          if (value == 'ubah') {
+                            _navigateToEditCategory(category);
+                          } else if (value == 'hapus') {
+                            _showDeleteConfirmationDialog(
+                                context, categoryName, categoryId);
+                          }
+                        },
+                        itemBuilder: (BuildContext context) =>
+                        <PopupMenuEntry<String>>[
+                          _buildPopupMenuItem(
+                              value: 'ubah',
+                              text: 'Ubah',
+                              icon: Icons.edit_outlined),
+                          _buildPopupMenuItem(
+                              value: 'hapus',
+                              text: 'Hapus',
+                              icon: Icons.delete_outline,
+                              isDestructive: true),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
           ),
         ),
-        const Divider(
-            height: 1, indent: 24, endIndent: 24, color: Color(0xFFEEEEEE)),
-      ],
+      ),
     );
   }
 
@@ -569,32 +615,69 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
     if (totalItems == 0) return const SizedBox.shrink();
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          'Ditampilkan ${((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems)} - ${(_currentPage * _itemsPerPage).clamp(1, totalItems)} dari $totalItems data',
-          style: const TextStyle(color: Colors.grey),
+        Row(
+          children: [
+            const Text('Tampilkan:', style: TextStyle(color: Colors.grey)),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<int>(
+                  value: _itemsPerPage,
+                  onChanged: (int? newValue) {
+                    setState(() {
+                      _itemsPerPage = newValue!;
+                      _currentPage = 1;
+                    });
+                  },
+                  items: <int>[10, 20, 50]
+                      .map<DropdownMenuItem<int>>((int value) {
+                    return DropdownMenuItem<int>(
+                      value: value,
+                      child: Text(value.toString()),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Text(
+              'Ditampilkan ${((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems)} - ${math.min(_currentPage * _itemsPerPage, totalItems)} dari $totalItems data',
+              style: const TextStyle(color: Colors.grey),
+            ),
+          ],
         ),
-        const SizedBox(width: 24),
-        IconButton(
-          icon: const Icon(Icons.arrow_back_ios, size: 16),
-          onPressed:
-          _currentPage > 1 ? () => setState(() => _currentPage--) : null,
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-              color: const Color(0xFF279E9E),
-              borderRadius: BorderRadius.circular(8)),
-          child: Text('$_currentPage',
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.bold)),
-        ),
-        IconButton(
-          icon: const Icon(Icons.arrow_forward_ios, size: 16),
-          onPressed: _currentPage < totalPages
-              ? () => setState(() => _currentPage++)
-              : null,
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back_ios, size: 16),
+              onPressed: _currentPage > 1
+                  ? () => setState(() => _currentPage--)
+                  : null,
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                  color: const Color(0xFF279E9E),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Text('$_currentPage',
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+            IconButton(
+              icon: const Icon(Icons.arrow_forward_ios, size: 16),
+              onPressed: _currentPage < totalPages
+                  ? () => setState(() => _currentPage++)
+                  : null,
+            ),
+          ],
         ),
       ],
     );

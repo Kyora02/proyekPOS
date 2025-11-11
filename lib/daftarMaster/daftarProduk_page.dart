@@ -16,11 +16,13 @@ class DaftarProdukPage extends StatefulWidget {
 
 class _DaftarProdukPageState extends State<DaftarProdukPage> {
   final _apiService = ApiService();
+  final ScrollController _horizontalScrollController = ScrollController();
   List<Map<String, dynamic>> _allProducts = [];
   List<Map<String, dynamic>> _kategoriOptions = [];
   bool _isLoading = true;
   String? _error;
-
+  int? _sortColumnIndex;
+  bool _sortAscending = true;
   String _searchQuery = '';
   String? _selectedCategoryId;
   int _currentPage = 1;
@@ -32,6 +34,12 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
     _fetchProductsAndCategoriesForOutlet(widget.outletId);
   }
 
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    super.dispose();
+  }
+
   Future<void> _fetchProductsAndCategoriesForOutlet(String outletId) async {
     if (!mounted) return;
     setState(() {
@@ -41,14 +49,12 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
     });
 
     try {
-      // Fetch categories based on the active outlet
       final categories = await _apiService.getCategories(outletId: outletId);
       _kategoriOptions = [
         {'id': 'semua', 'name': 'Semua Kategori'},
         ...categories
       ];
 
-      // Fetch products based on the active outlet
       final products = await _apiService.getProducts(outletId: outletId);
 
       if (mounted) {
@@ -67,6 +73,60 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
         });
       }
     }
+  }
+
+  void _sortData(List<Map<String, dynamic>> products) {
+    if (_sortColumnIndex == null) {
+      return;
+    }
+
+    products.sort((a, b) {
+      dynamic aValue;
+      dynamic bValue;
+
+      switch (_sortColumnIndex) {
+        case 0:
+          aValue = a['name'] ?? '';
+          bValue = b['name'] ?? '';
+          break;
+        case 1:
+          aValue = a['sku'] ?? '';
+          bValue = b['sku'] ?? '';
+          break;
+        case 2:
+          aValue = _getCategoryName(a['categoryId'] ?? '');
+          bValue = _getCategoryName(b['categoryId'] ?? '');
+          break;
+        case 3:
+          aValue = a['costPrice'] ?? 0;
+          bValue = b['costPrice'] ?? 0;
+          break;
+        case 4:
+          aValue = a['sellingPrice'] ?? 0;
+          bValue = b['sellingPrice'] ?? 0;
+          break;
+        default:
+          return 0;
+      }
+
+      int compare;
+      if (aValue is num && bValue is num) {
+        compare = aValue.compareTo(bValue);
+      } else if (aValue is String && bValue is String) {
+        compare = aValue.compareTo(bValue);
+      } else {
+        compare = 0;
+      }
+
+      return _sortAscending ? compare : -compare;
+    });
+  }
+
+  void _onSort(int columnIndex, bool ascending) {
+    setState(() {
+      _sortColumnIndex = columnIndex;
+      _sortAscending = ascending;
+    });
   }
 
   List<Map<String, dynamic>> get _filteredProducts {
@@ -216,6 +276,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
     }
 
     final products = _filteredProducts;
+    _sortData(products);
     final totalItems = products.length;
     final totalPages = (totalItems / _itemsPerPage).ceil();
 
@@ -292,7 +353,6 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
       alignment: WrapAlignment.start,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        // REMOVED: Outlet Dropdown is no longer needed here
         SizedBox(
           width: 250,
           child: TextField(
@@ -366,135 +426,110 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
           ),
         ],
       ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            child: Row(
-              children: [
-                const SizedBox(width: 8),
-                Expanded(
-                    flex: 3,
-                    child: Text('NAMA PRODUK', style: _tableHeaderStyle())),
-                Expanded(
-                    flex: 2, child: Text('SKU', style: _tableHeaderStyle())),
-                Expanded(
-                    flex: 2,
-                    child: Text('KATEGORI', style: _tableHeaderStyle())),
-                Expanded(
-                    flex: 2,
-                    child: Text('HARGA BELI', style: _tableHeaderStyle())),
-                Expanded(
-                    flex: 2,
-                    child: Text('HARGA JUAL', style: _tableHeaderStyle())),
-                const SizedBox(width: 48),
+      child: Scrollbar(
+        thumbVisibility: true,
+        controller: _horizontalScrollController,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: SingleChildScrollView(
+            controller: _horizontalScrollController,
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columnSpacing: 130.0,
+              sortColumnIndex: _sortColumnIndex,
+              sortAscending: _sortAscending,
+              headingTextStyle: _tableHeaderStyle(),
+              dataTextStyle: _tableBodyStyle(),
+              columns: [
+                DataColumn(
+                  label: const Text('NAMA PRODUK'),
+                  onSort: _onSort,
+                ),
+                DataColumn(
+                  label: const Text('SKU'),
+                  onSort: _onSort,
+                ),
+                DataColumn(
+                  label: const Text('KATEGORI'),
+                  onSort: _onSort,
+                ),
+                DataColumn(
+                  label: const Text('HARGA BELI'),
+                  numeric: true,
+                  onSort: _onSort,
+                ),
+                DataColumn(
+                  label: const Text('HARGA JUAL'),
+                  numeric: true,
+                  onSort: _onSort,
+                ),
+                const DataColumn(
+                  label: Text('AKSI'),
+                ),
               ],
-            ),
-          ),
-          const Divider(height: 1, color: Colors.grey),
-          if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.all(48.0),
-              child: CircularProgressIndicator(),
-            )
-          else if (productsOnCurrentPage.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24.0),
-              child: Text('Tidak ada produk ditemukan.'),
-            )
-          else
-            ...productsOnCurrentPage
-                .map((product) => _buildProductTableRowWeb(product))
-                .toList(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProductTableRowWeb(Map<String, dynamic> product) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 3,
-                child: Text(product['name'] ?? 'N/A', style: _tableBodyStyle()),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(product['sku'] ?? 'N/A', style: _tableBodyStyle()),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(_getCategoryName(product['categoryId'] ?? ''),
-                    style: _tableBodyStyle()),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(_formatCurrency(product['costPrice'] ?? 0),
-                    style: _tableBodyStyle()),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(_formatCurrency(product['sellingPrice'] ?? 0),
-                    style: _tableBodyStyle()),
-              ),
-              SizedBox(
-                width: 48,
-                child: PopupMenuButton<String>(
-                  color: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8.0),
-                  ),
-                  icon: const Icon(Icons.more_horiz),
-                  onSelected: (String value) {
-                    switch (value) {
-                      case 'ubah':
-                        _navigateToEditProduct(product);
-                        break;
-                      case 'hapus':
-                        _showDeleteConfirmationDialog(
-                            context, product['id'], product['name']);
-                        break;
-                    }
-                  },
-                  itemBuilder: (BuildContext context) =>
-                  <PopupMenuEntry<String>>[
-                    const PopupMenuItem<String>(
-                      value: 'ubah',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit_outlined,
-                              size: 20, color: Colors.black54),
-                          SizedBox(width: 12),
-                          Text('Ubah'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem<String>(
-                      value: 'hapus',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete_outline,
-                              size: 20, color: Colors.red),
-                          SizedBox(width: 12),
-                          Text('Hapus', style: TextStyle(color: Colors.red)),
+              rows: productsOnCurrentPage.map((product) {
+                return DataRow(
+                  cells: [
+                    DataCell(Text(product['name'] ?? 'N/A')),
+                    DataCell(Text(product['sku'] ?? 'N/A')),
+                    DataCell(
+                        Text(_getCategoryName(product['categoryId'] ?? ''))),
+                    DataCell(Text(_formatCurrency(product['costPrice'] ?? 0))),
+                    DataCell(
+                        Text(_formatCurrency(product['sellingPrice'] ?? 0))),
+                    DataCell(
+                      PopupMenuButton<String>(
+                        color: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8.0),
+                        ),
+                        icon: const Icon(Icons.more_horiz),
+                        onSelected: (String value) {
+                          switch (value) {
+                            case 'ubah':
+                              _navigateToEditProduct(product);
+                              break;
+                            case 'hapus':
+                              _showDeleteConfirmationDialog(
+                                  context, product['id'], product['name']);
+                              break;
+                          }
+                        },
+                        itemBuilder: (BuildContext context) =>
+                        <PopupMenuEntry<String>>[
+                          const PopupMenuItem<String>(
+                            value: 'ubah',
+                            child: Row(
+                              children: [
+                                Icon(Icons.edit_outlined,
+                                    size: 20, color: Colors.black54),
+                                SizedBox(width: 12),
+                                Text('Ubah'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'hapus',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete_outline,
+                                    size: 20, color: Colors.red),
+                                SizedBox(width: 12),
+                                Text('Hapus',
+                                    style: TextStyle(color: Colors.red)),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
                   ],
-                ),
-              ),
-            ],
+                );
+              }).toList(),
+            ),
           ),
         ),
-        const Divider(
-            height: 1, indent: 24, endIndent: 24, color: Color(0xFFEEEEEE)),
-      ],
+      ),
     );
   }
 
@@ -533,7 +568,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
                       _currentPage = 1;
                     });
                   },
-                  items: <int>[10, 20, 50, 100]
+                  items: <int>[10, 20, 50]
                       .map<DropdownMenuItem<int>>((int value) {
                     return DropdownMenuItem<int>(
                       value: value,
@@ -649,7 +684,6 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
       padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
       child: Column(
         children: [
-          // REMOVED: Outlet Dropdown
           TextField(
             decoration: InputDecoration(
               hintText: 'Cari produk (nama atau SKU)...',
@@ -810,7 +844,8 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
                             Icon(Icons.delete_outline,
                                 size: 20, color: Colors.red),
                             SizedBox(width: 12),
-                            Text('Hapus', style: TextStyle(color: Colors.red)),
+                            Text('Hapus',
+                                style: TextStyle(color: Colors.red)),
                           ],
                         ),
                       ),

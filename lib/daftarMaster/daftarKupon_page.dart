@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:proyekpos2/service/api_service.dart';
 import 'package:proyekpos2/crud/tambahkupon_page.dart';
+import 'dart:math' as math;
 
 class DaftarKuponPage extends StatefulWidget {
   final String outletId;
@@ -17,6 +18,7 @@ class DaftarKuponPage extends StatefulWidget {
 
 class _DaftarKuponPageState extends State<DaftarKuponPage> {
   final ApiService _apiService = ApiService();
+  final ScrollController _horizontalScrollController = ScrollController();
   List<Map<String, dynamic>> _kuponList = [];
   bool _isLoading = true;
 
@@ -26,7 +28,9 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
   final List<String> _statusOptions = ['Semua Status', 'Aktif', 'Tidak Aktif'];
 
   int _currentPage = 1;
-  final int _itemsPerPage = 10;
+  int _itemsPerPage = 10;
+  int? _sortColumnIndex;
+  bool _sortAscending = true;
 
   @override
   void initState() {
@@ -34,11 +38,16 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
     _fetchData();
   }
 
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    super.dispose();
+  }
+
   Future<void> _fetchData() async {
     setState(() => _isLoading = true);
     try {
       final kupons = await _apiService.getKupon(outletId: widget.outletId);
-
 
       if (mounted) {
         setState(() {
@@ -126,6 +135,56 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
     return coupons;
   }
 
+  void _sortData(List<Map<String, dynamic>> items) {
+    if (_sortColumnIndex == null) {
+      return;
+    }
+    items.sort((a, b) {
+      dynamic aValue;
+      dynamic bValue;
+      switch (_sortColumnIndex) {
+        case 0:
+          aValue = a['nama'] ?? '';
+          bValue = b['nama'] ?? '';
+          break;
+        case 1:
+          aValue = a['nilai'] ?? 0;
+          bValue = b['nilai'] ?? 0;
+          break;
+        case 2:
+          aValue = _parseFirestoreDate(a['tanggalMulai']);
+          bValue = _parseFirestoreDate(b['tanggalMulai']);
+          break;
+        case 3:
+          aValue = a['status'] ?? false;
+          bValue = b['status'] ?? false;
+          break;
+        default:
+          return 0;
+      }
+      int compare;
+      if (aValue is num && bValue is num) {
+        compare = aValue.compareTo(bValue);
+      } else if (aValue is String && bValue is String) {
+        compare = aValue.compareTo(bValue);
+      } else if (aValue is DateTime && bValue is DateTime) {
+        compare = aValue.compareTo(bValue);
+      } else if (aValue is bool && bValue is bool) {
+        compare = (aValue ? 1 : 0).compareTo(bValue ? 1 : 0);
+      } else {
+        compare = 0;
+      }
+      return _sortAscending ? compare : -compare;
+    });
+  }
+
+  void _onSort(int columnIndex, bool ascending) {
+    setState(() {
+      _sortColumnIndex = columnIndex;
+      _sortAscending = ascending;
+    });
+  }
+
   void _navigateToAddKupon() {
     Navigator.of(context, rootNavigator: true)
         .push(
@@ -206,7 +265,10 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final int totalItems = _filteredCoupons.length;
+        final List<Map<String, dynamic>> coupons = _filteredCoupons;
+        _sortData(coupons);
+
+        final int totalItems = coupons.length;
         final int totalPages =
         (totalItems / _itemsPerPage).ceil().clamp(1, double.infinity).toInt();
 
@@ -224,7 +286,7 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
         final int startIndex = (_currentPage - 1) * _itemsPerPage;
         final int endIndex = (startIndex + _itemsPerPage).clamp(0, totalItems);
         final List<Map<String, dynamic>> couponsOnCurrentPage =
-        (totalItems > 0) ? _filteredCoupons.sublist(startIndex, endIndex) : [];
+        (totalItems > 0) ? coupons.sublist(startIndex, endIndex) : [];
 
         final isMobile = constraints.maxWidth <= 850;
         final pagePadding = isMobile ? 16.0 : 32.0;
@@ -245,7 +307,8 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
                     const SizedBox(height: 24),
                     _buildFilterActions(),
                     const SizedBox(height: 24),
-                    _buildCouponTable(couponsOnCurrentPage, constraints),
+                    _buildCouponTable(
+                        couponsOnCurrentPage, constraints),
                     const SizedBox(height: 24),
                     if (totalItems > 0)
                       _buildPagination(totalItems, totalPages),
@@ -330,11 +393,6 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
             _currentPage = 1;
           }),
         ),
-        // 12. HAPUS WIDGET DROPDOWN OUTLET
-        // _buildDropdownFilter(
-        //   value: _selectedOutlet,
-        //   ...
-        // ),
       ],
     );
   }
@@ -397,24 +455,49 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
         );
       }
     } else {
-      content = Column(
-        children: [
-          _buildDesktopTableHeader(),
-          const Divider(height: 1, color: Colors.grey),
-          if (coupons.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24.0),
-              child: Center(
-                child: Text('Tidak ada kupon ditemukan.',
-                    style: TextStyle(fontSize: 16, color: Colors.grey)),
-              ),
-            )
-          else
-            ...coupons
-                .map((coupon) => _buildDesktopCouponTableRow(coupon))
-                .toList(),
-        ],
-      );
+      if (coupons.isEmpty) {
+        content = const Padding(
+          padding: EdgeInsets.all(24.0),
+          child: Center(
+            child: Text('Tidak ada kupon ditemukan.',
+                style: TextStyle(fontSize: 16, color: Colors.grey)),
+          ),
+        );
+      } else {
+        content = Scrollbar(
+          thumbVisibility: true,
+          controller: _horizontalScrollController,
+          child: SingleChildScrollView(
+            controller: _horizontalScrollController,
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columnSpacing: 115.0,
+              sortColumnIndex: _sortColumnIndex,
+              sortAscending: _sortAscending,
+              headingTextStyle: _tableHeaderStyle(),
+              dataTextStyle: _tableBodyStyle(),
+              columns: [
+                DataColumn(label: const Text('NAMA KUPON'), onSort: _onSort),
+                DataColumn(label: const Text('BESARAN'), onSort: _onSort),
+                DataColumn(label: const Text('DURASI'), onSort: _onSort),
+                DataColumn(label: const Text('STATUS'), onSort: _onSort),
+                DataColumn(label: const Text('AKSI')),
+              ],
+              rows: coupons.map((coupon) {
+                return DataRow(
+                  cells: [
+                    DataCell(Text(coupon['nama'] ?? 'N/A')),
+                    DataCell(Text(_formatBesaran(coupon))),
+                    DataCell(Text(_formatDurasi(coupon))),
+                    DataCell(_buildStatusChip(coupon['status'] ?? false)),
+                    DataCell(_buildPopupMenuButton(coupon)),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        );
+      }
     }
 
     return Container(
@@ -500,58 +583,6 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
     );
   }
 
-  Widget _buildDesktopTableHeader() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      child: Row(
-        children: [
-          Expanded(
-              flex: 3, child: Text('NAMA KUPON', style: _tableHeaderStyle())),
-          Expanded(flex: 2, child: Text('BESARAN', style: _tableHeaderStyle())),
-          Expanded(flex: 4, child: Text('DURASI', style: _tableHeaderStyle())),
-          Expanded(flex: 3, child: Text('OUTLET', style: _tableHeaderStyle())),
-          Expanded(flex: 2, child: Text('STATUS', style: _tableHeaderStyle())),
-          const SizedBox(width: 48),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDesktopCouponTableRow(Map<String, dynamic> coupon) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                  flex: 3,
-                  child:
-                  Text(coupon['nama'] ?? 'N/A', style: _tableBodyStyle())),
-              Expanded(
-                  flex: 2,
-                  child:
-                  Text(_formatBesaran(coupon), style: _tableBodyStyle())),
-              Expanded(
-                  flex: 4,
-                  child: Text(_formatDurasi(coupon), style: _tableBodyStyle())),
-              Expanded(
-                  flex: 3,
-                  child: Text(coupon['outletName'] ?? 'N/A',
-                      style: _tableBodyStyle())),
-              Expanded(
-                  flex: 2, child: _buildStatusChip(coupon['status'] ?? false)),
-              _buildPopupMenuButton(coupon),
-            ],
-          ),
-        ),
-        const Divider(
-            height: 1, indent: 24, endIndent: 24, color: Color(0xFFEEEEEE)),
-      ],
-    );
-  }
-
   Widget _buildStatusChip(bool isActive) {
     Color chipColor = isActive ? Colors.green : Colors.red;
     String text = isActive ? 'Aktif' : 'Tidak Aktif';
@@ -620,27 +651,68 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
 
   Widget _buildPagination(int totalItems, int totalPages) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        IconButton(
-            icon: const Icon(Icons.arrow_back_ios, size: 16),
-            onPressed: _currentPage > 1
-                ? () => setState(() => _currentPage--)
-                : null),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-              color: const Color(0xFF279E9E),
-              borderRadius: BorderRadius.circular(8)),
-          child: Text('$_currentPage',
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.bold)),
+        Row(
+          children: [
+            const Text('Tampilkan:', style: TextStyle(color: Colors.grey)),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<int>(
+                  value: _itemsPerPage,
+                  onChanged: (int? newValue) {
+                    setState(() {
+                      _itemsPerPage = newValue!;
+                      _currentPage = 1;
+                    });
+                  },
+                  items: <int>[10, 20, 50, 100]
+                      .map<DropdownMenuItem<int>>((int value) {
+                    return DropdownMenuItem<int>(
+                      value: value,
+                      child: Text(value.toString()),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Text(
+              'Ditampilkan ${((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems)} - ${math.min(_currentPage * _itemsPerPage, totalItems)} dari $totalItems data',
+              style: const TextStyle(color: Colors.grey),
+            ),
+          ],
         ),
-        IconButton(
-            icon: const Icon(Icons.arrow_forward_ios, size: 16),
-            onPressed: _currentPage < totalPages
-                ? () => setState(() => _currentPage++)
-                : null),
+        Row(
+          children: [
+            IconButton(
+                icon: const Icon(Icons.arrow_back_ios, size: 16),
+                onPressed: _currentPage > 1
+                    ? () => setState(() => _currentPage--)
+                    : null),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                  color: const Color(0xFF279E9E),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Text('$_currentPage',
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+            IconButton(
+                icon: const Icon(Icons.arrow_forward_ios, size: 16),
+                onPressed: _currentPage < totalPages
+                    ? () => setState(() => _currentPage++)
+                    : null),
+          ],
+        ),
       ],
     );
   }

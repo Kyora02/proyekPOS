@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:proyekpos2/crud/tambahPelanggan_page.dart';
 import 'package:proyekpos2/service/api_service.dart';
+import 'dart:math' as math;
 
 class DaftarPelangganPage extends StatefulWidget {
   final String outletId;
@@ -16,18 +17,27 @@ class DaftarPelangganPage extends StatefulWidget {
 
 class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
   final _apiService = ApiService();
+  final ScrollController _horizontalScrollController = ScrollController();
   List<Map<String, dynamic>> _allPelanggan = [];
   bool _isLoading = true;
   String? _error;
 
   String _searchQuery = '';
   int _currentPage = 1;
-  final int _itemsPerPage = 10;
+  int _itemsPerPage = 10;
+  int? _sortColumnIndex;
+  bool _sortAscending = true;
 
   @override
   void initState() {
     super.initState();
     _fetchPelanggan();
+  }
+
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchPelanggan() async {
@@ -38,7 +48,8 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
     });
 
     try {
-      final pelanggan = await _apiService.getPelanggan(outletId: widget.outletId);
+      final pelanggan =
+      await _apiService.getPelanggan(outletId: widget.outletId);
       if (mounted) {
         setState(() {
           _allPelanggan = pelanggan;
@@ -71,6 +82,54 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
     }
 
     return items;
+  }
+
+  void _sortData(List<Map<String, dynamic>> items) {
+    if (_sortColumnIndex == null) {
+      return;
+    }
+    items.sort((a, b) {
+      dynamic aValue;
+      dynamic bValue;
+      switch (_sortColumnIndex) {
+        case 0:
+          aValue = a['name'] ?? '';
+          bValue = b['name'] ?? '';
+          break;
+        case 1:
+          aValue = a['email'] ?? '';
+          bValue = b['email'] ?? '';
+          break;
+        case 2:
+          aValue = a['address'] ?? '';
+          bValue = b['address'] ?? '';
+          break;
+        case 3:
+          aValue = a['phone'] ?? '';
+          bValue = b['phone'] ?? '';
+          break;
+        case 4:
+          aValue = a['gender'] ?? '';
+          bValue = b['gender'] ?? '';
+          break;
+        default:
+          return 0;
+      }
+      int compare;
+      if (aValue is String && bValue is String) {
+        compare = aValue.compareTo(bValue);
+      } else {
+        compare = 0;
+      }
+      return _sortAscending ? compare : -compare;
+    });
+  }
+
+  void _onSort(int columnIndex, bool ascending) {
+    setState(() {
+      _sortColumnIndex = columnIndex;
+      _sortAscending = ascending;
+    });
   }
 
   void _navigateToAddPelanggan() {
@@ -157,12 +216,15 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
 
   @override
   Widget build(BuildContext context) {
-    final int totalItems = _filteredPelanggan.length;
+    final List<Map<String, dynamic>> items = _filteredPelanggan;
+    _sortData(items);
+    final int totalItems = items.length;
+
     final int totalPages = (totalItems / _itemsPerPage).ceil();
     final int startIndex = (_currentPage - 1) * _itemsPerPage;
     final int endIndex = (startIndex + _itemsPerPage).clamp(0, totalItems);
     final List<Map<String, dynamic>> itemsOnCurrentPage =
-    _filteredPelanggan.sublist(startIndex, endIndex);
+    items.sublist(startIndex, endIndex);
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -275,6 +337,23 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
   }
 
   Widget _buildPelangganTable(List<Map<String, dynamic>> items) {
+    if (items.isEmpty) {
+      return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 10)
+            ],
+          ),
+          child: const Padding(
+              padding: EdgeInsets.all(24.0),
+              child: Center(child: Text('Tidak ada pelanggan ditemukan.'))));
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -286,105 +365,72 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
               blurRadius: 10)
         ],
       ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            child: Row(children: [
-              const SizedBox(width: 8),
-              Expanded(
-                  flex: 3,
-                  child: Text('NAMA', style: _tableHeaderStyle())),
-              Expanded(
-                  flex: 3,
-                  child: Text('EMAIL', style: _tableHeaderStyle())),
-              Expanded(
-                  flex: 4,
-                  child: Text('ALAMAT', style: _tableHeaderStyle())),
-              Expanded(
-                  flex: 3,
-                  child: Text('NOMOR TELEPON', style: _tableHeaderStyle())),
-              Expanded(
-                  flex: 2,
-                  child: Text('JENIS KELAMIN', style: _tableHeaderStyle())),
-              const SizedBox(width: 48),
-            ]),
-          ),
-          const Divider(height: 1, color: Colors.grey),
-          if (items.isEmpty)
-            const Padding(
-                padding: EdgeInsets.all(24.0),
-                child: Text('Tidak ada pelanggan ditemukan.'))
-          else
-            ...items.map((item) => _buildPelangganTableRow(item)).toList(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPelangganTableRow(Map<String, dynamic> item) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const SizedBox(width: 8),
-              Expanded(
-                  flex: 3,
-                  child: Text(item['name'] ?? 'N/A', style: _tableBodyStyle())),
-              Expanded(
-                  flex: 3,
-                  child: Text(item['email'] ?? 'N/A', style: _tableBodyStyle())),
-              Expanded(
-                  flex: 4,
-                  child: Text(item['address'] ?? 'N/A', style: _tableBodyStyle())),
-              Expanded(
-                  flex: 3,
-                  child: Text(item['phone'] ?? 'N/A', style: _tableBodyStyle())),
-              Expanded(
-                  flex: 2,
-                  child: Text(item['gender'] ?? 'N/A', style: _tableBodyStyle())),
-              SizedBox(
-                width: 48,
-                child: PopupMenuButton<String>(
-                  color: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.0)),
-                  icon: const Icon(Icons.more_horiz),
-                  onSelected: (String value) {
-                    if (value == 'ubah') {
-                      _navigateToEditPelanggan(item);
-                    } else if (value == 'hapus') {
-                      _showDeleteConfirmationDialog(
-                          context, item['name'], item['id']);
-                    }
-                  },
-                  itemBuilder: (BuildContext context) =>
-                  <PopupMenuEntry<String>>[
-                    _buildPopupMenuItem(
-                        value: 'ubah',
-                        text: 'Ubah',
-                        icon: Icons.edit_outlined),
-                    _buildPopupMenuItem(
-                        value: 'detail',
-                        text: 'detail',
-                        icon: Icons.details_outlined),
-                    _buildPopupMenuItem(
-                        value: 'hapus',
-                        text: 'Hapus',
-                        icon: Icons.delete_outline,
-                        isDestructive: true),
-                  ],
-                ),
-              ),
+      child: Scrollbar(
+        thumbVisibility: true,
+        controller: _horizontalScrollController,
+        child: SingleChildScrollView(
+          controller: _horizontalScrollController,
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            columnSpacing: 120.0,
+            sortColumnIndex: _sortColumnIndex,
+            sortAscending: _sortAscending,
+            headingTextStyle: _tableHeaderStyle(),
+            dataTextStyle: _tableBodyStyle(),
+            columns: [
+              DataColumn(label: const Text('NAMA'), onSort: _onSort),
+              DataColumn(label: const Text('EMAIL'), onSort: _onSort),
+              DataColumn(label: const Text('ALAMAT'), onSort: _onSort),
+              DataColumn(label: const Text('NOMOR TELEPON'), onSort: _onSort),
+              DataColumn(label: const Text('JENIS KELAMIN'), onSort: _onSort),
+              DataColumn(label: const Text('AKSI')),
             ],
+            rows: items.map((item) {
+              return DataRow(
+                cells: [
+                  DataCell(Text(item['name'] ?? 'N/A')),
+                  DataCell(Text(item['email'] ?? 'N/A')),
+                  DataCell(Text(item['address'] ?? 'N/A')),
+                  DataCell(Text(item['phone'] ?? 'N/A')),
+                  DataCell(Text(item['gender'] ?? 'N/A')),
+                  DataCell(
+                    PopupMenuButton<String>(
+                      color: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8.0)),
+                      icon: const Icon(Icons.more_horiz),
+                      onSelected: (String value) {
+                        if (value == 'ubah') {
+                          _navigateToEditPelanggan(item);
+                        } else if (value == 'hapus') {
+                          _showDeleteConfirmationDialog(
+                              context, item['name'], item['id']);
+                        }
+                      },
+                      itemBuilder: (BuildContext context) =>
+                      <PopupMenuEntry<String>>[
+                        _buildPopupMenuItem(
+                            value: 'ubah',
+                            text: 'Ubah',
+                            icon: Icons.edit_outlined),
+                        _buildPopupMenuItem(
+                            value: 'detail',
+                            text: 'detail',
+                            icon: Icons.details_outlined),
+                        _buildPopupMenuItem(
+                            value: 'hapus',
+                            text: 'Hapus',
+                            icon: Icons.delete_outline,
+                            isDestructive: true),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
           ),
         ),
-        const Divider(
-            height: 1, indent: 24, endIndent: 24, color: Color(0xFFEEEEEE)),
-      ],
+      ),
     );
   }
 
@@ -420,32 +466,69 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
     if (totalItems == 0) return const SizedBox.shrink();
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          'Ditampilkan ${((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems)} - ${(_currentPage * _itemsPerPage).clamp(1, totalItems)} dari $totalItems data',
-          style: const TextStyle(color: Colors.grey),
+        Row(
+          children: [
+            const Text('Tampilkan:', style: TextStyle(color: Colors.grey)),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<int>(
+                  value: _itemsPerPage,
+                  onChanged: (int? newValue) {
+                    setState(() {
+                      _itemsPerPage = newValue!;
+                      _currentPage = 1;
+                    });
+                  },
+                  items: <int>[10, 20, 50, 100]
+                      .map<DropdownMenuItem<int>>((int value) {
+                    return DropdownMenuItem<int>(
+                      value: value,
+                      child: Text(value.toString()),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Text(
+              'Ditampilkan ${((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems)} - ${math.min(_currentPage * _itemsPerPage, totalItems)} dari $totalItems data',
+              style: const TextStyle(color: Colors.grey),
+            ),
+          ],
         ),
-        const SizedBox(width: 24),
-        IconButton(
-          icon: const Icon(Icons.arrow_back_ios, size: 16),
-          onPressed:
-          _currentPage > 1 ? () => setState(() => _currentPage--) : null,
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-              color: const Color(0xFF279E9E),
-              borderRadius: BorderRadius.circular(8)),
-          child: Text('$_currentPage',
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.bold)),
-        ),
-        IconButton(
-          icon: const Icon(Icons.arrow_forward_ios, size: 16),
-          onPressed: _currentPage < totalPages
-              ? () => setState(() => _currentPage++)
-              : null,
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back_ios, size: 16),
+              onPressed: _currentPage > 1
+                  ? () => setState(() => _currentPage--)
+                  : null,
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                  color: const Color(0xFF279E9E),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Text('$_currentPage',
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+            IconButton(
+              icon: const Icon(Icons.arrow_forward_ios, size: 16),
+              onPressed: _currentPage < totalPages
+                  ? () => setState(() => _currentPage++)
+                  : null,
+            ),
+          ],
         ),
       ],
     );

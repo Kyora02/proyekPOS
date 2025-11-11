@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:proyekpos2/crud/tambahStok_page.dart';
 import 'package:proyekpos2/service/api_service.dart';
+import 'dart:math' as math;
 
 class DaftarStokPage extends StatefulWidget {
   final String outletId;
@@ -15,12 +16,18 @@ class DaftarStokPage extends StatefulWidget {
 
 class _DaftarStokPageState extends State<DaftarStokPage> {
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _horizontalScrollController = ScrollController();
 
   final ApiService _apiService = ApiService();
   List<Map<String, dynamic>> _allStockFromServer = [];
   List<Map<String, dynamic>> _filteredStockList = [];
   bool _isLoading = true;
   String? _error;
+
+  int? _sortColumnIndex;
+  bool _sortAscending = true;
+  int _currentPage = 1;
+  int _itemsPerPage = 10;
 
   @override
   void initState() {
@@ -33,6 +40,7 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
   void dispose() {
     _searchController.removeListener(_filterStock);
     _searchController.dispose();
+    _horizontalScrollController.dispose();
     super.dispose();
   }
 
@@ -74,6 +82,53 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
 
         return matchesSearch;
       }).toList();
+      _currentPage = 1;
+    });
+  }
+
+  void _sortData(List<Map<String, dynamic>> stock) {
+    if (_sortColumnIndex == null) {
+      return;
+    }
+    stock.sort((a, b) {
+      dynamic aValue;
+      dynamic bValue;
+      switch (_sortColumnIndex) {
+        case 0:
+          aValue = a['sku'] ?? '';
+          bValue = b['sku'] ?? '';
+          break;
+        case 1:
+          aValue = a['name'] ?? '';
+          bValue = b['name'] ?? '';
+          break;
+        case 2:
+          aValue = a['kategori'] ?? '';
+          bValue = b['kategori'] ?? '';
+          break;
+        case 3:
+          aValue = a['stok'] ?? 0;
+          bValue = b['stok'] ?? 0;
+          break;
+        default:
+          return 0;
+      }
+      int compare;
+      if (aValue is num && bValue is num) {
+        compare = aValue.compareTo(bValue);
+      } else if (aValue is String && bValue is String) {
+        compare = aValue.compareTo(bValue);
+      } else {
+        compare = 0;
+      }
+      return _sortAscending ? compare : -compare;
+    });
+  }
+
+  void _onSort(int columnIndex, bool ascending) {
+    setState(() {
+      _sortColumnIndex = columnIndex;
+      _sortAscending = ascending;
     });
   }
 
@@ -124,7 +179,6 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
                 child: const Text('Hapus'),
                 onPressed: () async {
                   try {
-                    // Gunakan 'id' dari stok (yang merupakan productId)
                     await _apiService.deleteProduct(stock['id']);
                     Navigator.of(dialogContext).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -151,6 +205,15 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
 
   @override
   Widget build(BuildContext context) {
+    final List<Map<String, dynamic>> currentStockList = _filteredStockList;
+    _sortData(currentStockList);
+    final int totalItems = currentStockList.length;
+    final int totalPages = (totalItems / _itemsPerPage).ceil();
+    final int startIndex = (_currentPage - 1) * _itemsPerPage;
+    final int endIndex = (startIndex + _itemsPerPage).clamp(0, totalItems);
+    final List<Map<String, dynamic>> stockOnCurrentPage =
+    currentStockList.sublist(startIndex, endIndex);
+
     return SingleChildScrollView(
       child: Center(
         child: ConstrainedBox(
@@ -190,7 +253,10 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
                 const SizedBox(height: 24),
                 _buildSearchbar(),
                 const SizedBox(height: 24),
-                _buildStockList(),
+                _buildStockList(stockOnCurrentPage),
+                const SizedBox(height: 24),
+                if (!_isLoading && _error == null)
+                  _buildPagination(totalItems, totalPages),
               ],
             ),
           ),
@@ -220,7 +286,7 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
     );
   }
 
-  Widget _buildStockList() {
+  Widget _buildStockList(List<Map<String, dynamic>> stockOnCurrentPage) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -234,89 +300,88 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Column(
-          children: [
-            _buildStockTableHeader(),
-            if (_isLoading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 48.0),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_error != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 48.0),
-                child: Center(
-                  child: Text(
-                    _error!,
-                    style: const TextStyle(fontSize: 16, color: Colors.red),
-                  ),
+      child: Scrollbar(
+        thumbVisibility: true,
+        controller: _horizontalScrollController,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: _isLoading
+              ? const Padding(
+            padding: EdgeInsets.symmetric(vertical: 48.0),
+            child: Center(child: CircularProgressIndicator()),
+          )
+              : _error != null
+              ? Padding(
+            padding: const EdgeInsets.symmetric(vertical: 48.0),
+            child: Center(
+              child: Text(
+                _error!,
+                style:
+                const TextStyle(fontSize: 16, color: Colors.red),
+              ),
+            ),
+          )
+              : stockOnCurrentPage.isEmpty
+              ? const Padding(
+            padding: EdgeInsets.symmetric(vertical: 48.0),
+            child: Center(
+              child: Text(
+                'Tidak ada stok ditemukan.',
+                style:
+                TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+            ),
+          )
+              : SingleChildScrollView(
+            controller: _horizontalScrollController,
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columnSpacing: 100.0,
+              sortColumnIndex: _sortColumnIndex,
+              sortAscending: _sortAscending,
+              headingTextStyle: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: Colors.grey[600]),
+              dataTextStyle: const TextStyle(
+                  fontSize: 14, color: Colors.black87),
+              columns: [
+                DataColumn(
+                  label: const Text('SKU'),
+                  onSort: _onSort,
                 ),
-              )
-            else if (_filteredStockList.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 48.0),
-                  child: Center(
-                    child: Text(
-                      'Tidak ada stok ditemukan.',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                  ),
-                )
-              else
-                ..._filteredStockList
-                    .map((stock) => _buildStockItem(stock))
-                    .toList(),
-          ],
+                DataColumn(
+                  label: const Text('NAMA PRODUK'),
+                  onSort: _onSort,
+                ),
+                DataColumn(
+                  label: const Text('KATEGORI'),
+                  onSort: _onSort,
+                ),
+                DataColumn(
+                  label: const Text('STOK'),
+                  numeric: true,
+                  onSort: _onSort,
+                ),
+                const DataColumn(
+                  label: Text('AKSI'),
+                ),
+              ],
+              rows: stockOnCurrentPage.map((stock) {
+                return DataRow(
+                  cells: [
+                    DataCell(Text(stock['sku'] ?? 'N/A')),
+                    DataCell(Text(stock['name'] ?? 'N/A')),
+                    DataCell(Text(stock['kategori'] ?? 'N/A')),
+                    DataCell(
+                        Text(stock['stok']?.toString() ?? '0')),
+                    DataCell(_buildPopupMenuButton(stock)),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildStockTableHeader() {
-    TextStyle headerStyle = TextStyle(
-        fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey[600]);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-      ),
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-      child: Row(
-        children: [
-          Expanded(flex: 2, child: Text('SKU', style: headerStyle)),
-          Expanded(flex: 3, child: Text('NAMA PRODUK', style: headerStyle)),
-          Expanded(flex: 2, child: Text('KATEGORI', style: headerStyle)),
-          Expanded(flex: 1, child: Text('STOK', style: headerStyle)),
-          const SizedBox(width: 48), // RUANG UNTUK TOMBOL AKSI
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStockItem(Map<String, dynamic> stock) {
-    TextStyle cellStyle = const TextStyle(fontSize: 14, color: Colors.black87);
-
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
-      ),
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-      child: Row(
-        children: [
-          Expanded(flex: 2, child: Text(stock['sku'] ?? 'N/A', style: cellStyle)),
-          Expanded(
-              flex: 3, child: Text(stock['name'] ?? 'N/A', style: cellStyle)),
-          Expanded(
-              flex: 2,
-              child: Text(stock['kategori'] ?? 'N/A', style: cellStyle)),
-          Expanded(
-              flex: 1,
-              child: Text(stock['stok']?.toString() ?? '0', style: cellStyle)),
-          _buildPopupMenuButton(stock),
-        ],
       ),
     );
   }
@@ -365,6 +430,78 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
               style: TextStyle(color: isDestructive ? Colors.red : null)),
         ],
       ),
+    );
+  }
+
+  Widget _buildPagination(int totalItems, int totalPages) {
+    if (totalItems == 0) return const SizedBox.shrink();
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            const Text('Tampilkan:', style: TextStyle(color: Colors.grey)),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<int>(
+                  value: _itemsPerPage,
+                  onChanged: (int? newValue) {
+                    setState(() {
+                      _itemsPerPage = newValue!;
+                      _currentPage = 1;
+                    });
+                  },
+                  items: <int>[10, 20, 50, 100]
+                      .map<DropdownMenuItem<int>>((int value) {
+                    return DropdownMenuItem<int>(
+                      value: value,
+                      child: Text(value.toString()),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Text(
+              'Ditampilkan ${((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems)} - ${math.min(_currentPage * _itemsPerPage, totalItems)} dari $totalItems data',
+              style: const TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back_ios, size: 16),
+              onPressed: _currentPage > 1
+                  ? () => setState(() => _currentPage--)
+                  : null,
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                  color: const Color(0xFF279E9E),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Text('$_currentPage',
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+            IconButton(
+              icon: const Icon(Icons.arrow_forward_ios, size: 16),
+              onPressed: _currentPage < totalPages
+                  ? () => setState(() => _currentPage++)
+                  : null,
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

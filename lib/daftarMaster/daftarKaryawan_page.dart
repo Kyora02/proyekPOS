@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:proyekpos2/crud/tambahKaryawan_page.dart';
 import 'package:proyekpos2/service/api_service.dart';
+import 'dart:math' as math;
 
 class DaftarKaryawanPage extends StatefulWidget {
   final String outletId;
@@ -22,7 +23,9 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
 
   String _searchQuery = '';
   int _currentPage = 1;
-  final int _itemsPerPage = 10;
+  int _itemsPerPage = 10;
+  int? _sortColumnIndex;
+  bool _sortAscending = true;
 
   @override
   void initState() {
@@ -38,7 +41,8 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
     });
 
     try {
-      final karyawanList = await _apiService.getKaryawan(outletId: widget.outletId);
+      final karyawanList =
+      await _apiService.getKaryawan(outletId: widget.outletId);
 
       if (karyawanList.isNotEmpty) {
         _activeOutletName = karyawanList.first['outlet'] ?? 'Outlet';
@@ -79,6 +83,58 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
       }).toList();
     }
     return karyawanList;
+  }
+
+  void _sortData(List<Map<String, dynamic>> items) {
+    if (_sortColumnIndex == null) {
+      return;
+    }
+    items.sort((a, b) {
+      dynamic aValue;
+      dynamic bValue;
+      switch (_sortColumnIndex) {
+        case 0:
+          aValue = a['nama'] ?? '';
+          bValue = b['nama'] ?? '';
+          break;
+        case 1:
+          aValue = a['nip'] ?? '';
+          bValue = b['nip'] ?? '';
+          break;
+        case 2:
+          aValue = a['email'] ?? '';
+          bValue = b['email'] ?? '';
+          break;
+        case 3:
+          aValue = a['notelp'] ?? '';
+          bValue = b['notelp'] ?? '';
+          break;
+        case 4:
+          aValue = a['outlet'] ?? '';
+          bValue = b['outlet'] ?? '';
+          break;
+        case 5:
+          aValue = a['status'] ?? '';
+          bValue = b['status'] ?? '';
+          break;
+        default:
+          return 0;
+      }
+      int compare;
+      if (aValue is String && bValue is String) {
+        compare = aValue.compareTo(bValue);
+      } else {
+        compare = 0;
+      }
+      return _sortAscending ? compare : -compare;
+    });
+  }
+
+  void _onSort(int columnIndex, bool ascending) {
+    setState(() {
+      _sortColumnIndex = columnIndex;
+      _sortAscending = ascending;
+    });
   }
 
   void _navigateToAddKaryawan() {
@@ -130,7 +186,8 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal menghapus: $e'), backgroundColor: Colors.red),
+          SnackBar(
+              content: Text('Gagal menghapus: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -167,16 +224,15 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     final filteredList = _filteredKaryawan;
+    _sortData(filteredList);
     final totalItems = filteredList.length;
     final totalPages = (totalItems / _itemsPerPage).ceil();
     final startIndex = (_currentPage - 1) * _itemsPerPage;
     final endIndex = (startIndex + _itemsPerPage).clamp(0, totalItems);
-    final karyawanOnCurrentPage =
-    filteredList.sublist(startIndex, endIndex);
+    final karyawanOnCurrentPage = filteredList.sublist(startIndex, endIndex);
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -214,8 +270,8 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
                       isMobile
                           ? _buildMobileKaryawanList(karyawanOnCurrentPage)
                           : _buildDesktopKaryawanTable(karyawanOnCurrentPage),
-                    if (!_isLoading && _error == null && totalItems > 0) ...[
-                      const Divider(height: 32),
+                    if (!_isLoading && _error == null) ...[
+                      const SizedBox(height: 24),
                       _buildPaginationFooter(
                           totalItems, totalPages, startIndex, endIndex),
                     ]
@@ -308,66 +364,66 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
   }
 
   Widget _buildDesktopKaryawanTable(List<Map<String, dynamic>> karyawanList) {
+    if (karyawanList.isEmpty) {
+      return Container(
+          decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey[200]!)),
+          child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 48),
+              child: Center(child: Text('Tidak ada karyawan ditemukan.'))));
+    }
+
     return Container(
       decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.grey[200]!)),
-      child: Column(
-        children: [
-          _buildDesktopTableHeader(),
-          const Divider(height: 1, color: Colors.grey),
-          if (karyawanList.isEmpty)
-            const Padding(
-                padding: EdgeInsets.symmetric(vertical: 48),
-                child: Text('Tidak ada karyawan ditemukan.'))
-          else
-            ...karyawanList
-                .map((karyawan) => _buildTableRow(karyawan))
-                .toList(),
-        ],
+      child: Scrollbar(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            columnSpacing: 100.0,
+            sortColumnIndex: _sortColumnIndex,
+            sortAscending: _sortAscending,
+            headingTextStyle: _tableHeaderStyle(),
+            dataTextStyle: _tableBodyStyle(),
+            columns: [
+              DataColumn(label: const Text('NAMA'), onSort: _onSort),
+              DataColumn(label: const Text('NIP'), onSort: _onSort),
+              DataColumn(label: const Text('EMAIL'), onSort: _onSort),
+              DataColumn(label: const Text('NOTELP'), onSort: _onSort),
+              DataColumn(label: const Text('OUTLET'), onSort: _onSort),
+              DataColumn(label: const Text('STATUS'), onSort: _onSort),
+              DataColumn(label: const Text('AKSI')),
+            ],
+            rows: karyawanList.map((karyawan) {
+              return DataRow(
+                cells: [
+                  DataCell(Text(karyawan['nama'] ?? 'N/A')),
+                  DataCell(Text(karyawan['nip'] ?? 'N/A')),
+                  DataCell(Text(karyawan['email'] ?? 'N/A')),
+                  DataCell(Text(karyawan['notelp'] ?? 'N/A')),
+                  DataCell(Text(karyawan['outlet'] ?? 'N/A')),
+                  DataCell(_buildStatusWidget(karyawan['status'])),
+                  DataCell(_buildPopupMenuButton(karyawan)),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildDesktopTableHeader() {
-    TextStyle headerStyle =
-    TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey[600]);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-      child: Row(children: [
-        Expanded(flex: 3, child: Text('NAMA', style: headerStyle)),
-        Expanded(flex: 2, child: Text('NIP', style: headerStyle)),
-        Expanded(flex: 3, child: Text('EMAIL', style: headerStyle)),
-        Expanded(flex: 2, child: Text('NOTELP', style: headerStyle)),
-        Expanded(flex: 2, child: Text('OUTLET', style: headerStyle)),
-        Expanded(flex: 1, child: Text('STATUS', style: headerStyle)),
-        const SizedBox(width: 48),
-      ]),
-    );
+  TextStyle _tableHeaderStyle() {
+    return TextStyle(
+        fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey[600]);
   }
 
-  Widget _buildTableRow(Map<String, dynamic> karyawan) {
-    TextStyle cellStyle = const TextStyle(fontSize: 14, color: Colors.black87);
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 24),
-      decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE)))),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-        Expanded(
-            flex: 3, child: Text(karyawan['nama'] ?? 'N/A', style: cellStyle)),
-        Expanded(
-            flex: 2, child: Text(karyawan['nip'] ?? 'N/A', style: cellStyle)),
-        Expanded(
-            flex: 3, child: Text(karyawan['email'] ?? 'N/A', style: cellStyle)),
-        Expanded(
-            flex: 2, child: Text(karyawan['notelp'] ?? 'N/A', style: cellStyle)),
-        Expanded(
-            flex: 2, child: Text(karyawan['outlet'] ?? 'N/A', style: cellStyle)),
-        Expanded(flex: 1, child: _buildStatusWidget(karyawan['status'])),
-        _buildPopupMenuButton(karyawan),
-      ]),
-    );
+  TextStyle _tableBodyStyle() {
+    return const TextStyle(fontSize: 14, color: Colors.black87);
   }
 
   Widget _buildMobileKaryawanList(List<Map<String, dynamic>> karyawanList) {
@@ -499,7 +555,8 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
           if (value == 'ubah') {
             _navigateToEditKaryawan(karyawan);
           } else if (value == 'hapus') {
-            _showDeleteConfirmationDialog(context, karyawan['nama'], karyawan['id']);
+            _showDeleteConfirmationDialog(
+                context, karyawan['nama'], karyawan['id']);
           }
         },
         itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -533,34 +590,74 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
 
   Widget _buildPaginationFooter(
       int totalItems, int totalPages, int startIndex, int endIndex) {
-    return Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-      Text(
-        'Ditampilkan ${totalItems == 0 ? 0 : startIndex + 1} - $endIndex dari $totalItems data',
-        style: TextStyle(color: Colors.grey[600], fontSize: 14),
-      ),
-      const Spacer(),
-      IconButton(
-        icon: const Icon(Icons.arrow_back_ios, size: 16),
-        onPressed: _currentPage > 1 ? () => setState(() => _currentPage--) : null,
-        color: _currentPage > 1 ? Colors.black87 : Colors.grey,
-      ),
-      Container(
-        width: 36,
-        height: 36,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-            color: const Color(0xFF279E9E),
-            borderRadius: BorderRadius.circular(8)),
-        child: Text('$_currentPage',
-            style: const TextStyle(
-                color: Colors.white, fontWeight: FontWeight.bold)),
-      ),
-      IconButton(
-        icon: const Icon(Icons.arrow_forward_ios, size: 16),
-        onPressed:
-        _currentPage < totalPages ? () => setState(() => _currentPage++) : null,
-        color: _currentPage < totalPages ? Colors.black87 : Colors.grey,
-      ),
-    ]);
+    if (totalItems == 0) return const SizedBox.shrink();
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            const Text('Tampilkan:', style: TextStyle(color: Colors.grey)),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<int>(
+                  value: _itemsPerPage,
+                  onChanged: (int? newValue) {
+                    setState(() {
+                      _itemsPerPage = newValue!;
+                      _currentPage = 1;
+                    });
+                  },
+                  items: <int>[10, 20, 50, 100]
+                      .map<DropdownMenuItem<int>>((int value) {
+                    return DropdownMenuItem<int>(
+                      value: value,
+                      child: Text(value.toString()),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Text(
+              'Ditampilkan ${((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems)} - ${math.min(_currentPage * _itemsPerPage, totalItems)} dari $totalItems data',
+              style: const TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back_ios, size: 16),
+              onPressed: _currentPage > 1
+                  ? () => setState(() => _currentPage--)
+                  : null,
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                  color: const Color(0xFF279E9E),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Text('$_currentPage',
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+            IconButton(
+              icon: const Icon(Icons.arrow_forward_ios, size: 16),
+              onPressed: _currentPage < totalPages
+                  ? () => setState(() => _currentPage++)
+                  : null,
+            ),
+          ],
+        ),
+      ],
+    );
   }
 }

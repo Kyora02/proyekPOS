@@ -42,7 +42,6 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
       _deskripsiC.text = kupon['deskripsi'] ?? '';
       _nilaiKuponC.text = (kupon['nilai'] ?? 0).toString();
 
-
       _tipeNilaiKupon = kupon['tipeNilai'] ?? 'percent';
       _kuponStatus = kupon['status'] ?? true;
 
@@ -70,7 +69,6 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
     }
     return null;
   }
-
 
   @override
   void dispose() {
@@ -267,27 +265,6 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // REPLACED: The dropdown with a simple text
-            const Text('Outlet',
-                style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16)),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade300)
-              ),
-              child: Text(
-                'Kupon akan ditambahkan ke outlet Anda saat ini.',
-                style: TextStyle(
-                    fontSize: 14,
-                    fontStyle: FontStyle.italic,
-                    color: Colors.grey[700]),
-              ),
-            ),
-            const SizedBox(height: 16),
             _buildTextField(
               label: 'Nama Kupon',
               controller: _namaKuponC,

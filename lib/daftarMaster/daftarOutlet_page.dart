@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:proyekpos2/crud/tambahOutlet_page.dart';
 import 'package:proyekpos2/service/api_service.dart';
+import 'dart:math' as math;
 
 class DaftarOutletPage extends StatefulWidget {
   const DaftarOutletPage({super.key});
@@ -11,17 +12,26 @@ class DaftarOutletPage extends StatefulWidget {
 
 class _DaftarOutletPageState extends State<DaftarOutletPage> {
   final ApiService _apiService = ApiService();
+  final ScrollController _horizontalScrollController = ScrollController();
   List<Map<String, dynamic>> _allOutlets = [];
   bool _isLoading = true;
 
   String _searchQuery = '';
   int _currentPage = 1;
-  final int _itemsPerPage = 10;
+  int _itemsPerPage = 10;
+  int? _sortColumnIndex;
+  bool _sortAscending = true;
 
   @override
   void initState() {
     super.initState();
     _fetchData();
+  }
+
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchData() async {
@@ -62,6 +72,50 @@ class _DaftarOutletPageState extends State<DaftarOutletPage> {
       }).toList();
     }
     return outlets;
+  }
+
+  void _sortData(List<Map<String, dynamic>> outlets) {
+    if (_sortColumnIndex == null) {
+      return;
+    }
+    outlets.sort((a, b) {
+      dynamic aValue;
+      dynamic bValue;
+      switch (_sortColumnIndex) {
+        case 0:
+          aValue = a['name'] ?? '';
+          bValue = b['name'] ?? '';
+          break;
+        case 1:
+          aValue = a['alamat'] ?? '';
+          bValue = b['alamat'] ?? '';
+          break;
+        case 2:
+          aValue = a['city'] ?? '';
+          bValue = b['city'] ?? '';
+          break;
+        case 3:
+          aValue = a['ownerName'] ?? '';
+          bValue = b['ownerName'] ?? '';
+          break;
+        default:
+          return 0;
+      }
+      int compare;
+      if (aValue is String && bValue is String) {
+        compare = aValue.compareTo(bValue);
+      } else {
+        compare = 0;
+      }
+      return _sortAscending ? compare : -compare;
+    });
+  }
+
+  void _onSort(int columnIndex, bool ascending) {
+    setState(() {
+      _sortColumnIndex = columnIndex;
+      _sortAscending = ascending;
+    });
   }
 
   void _navigateToAddOutlet() {
@@ -141,8 +195,11 @@ class _DaftarOutletPageState extends State<DaftarOutletPage> {
       );
     }
 
-    final totalItems = _filteredOutlets.length;
-    final totalPages = (totalItems / _itemsPerPage).ceil().clamp(1, double.infinity).toInt();
+    final outlets = _filteredOutlets;
+    _sortData(outlets);
+    final totalItems = outlets.length;
+    final totalPages =
+    (totalItems / _itemsPerPage).ceil().clamp(1, double.infinity).toInt();
 
     if (_currentPage > totalPages) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -161,7 +218,7 @@ class _DaftarOutletPageState extends State<DaftarOutletPage> {
 
     final startIndex = (_currentPage - 1) * _itemsPerPage;
     final endIndex = (startIndex + _itemsPerPage).clamp(0, totalItems);
-    final outletsOnCurrentPage = _filteredOutlets.sublist(startIndex, endIndex);
+    final outletsOnCurrentPage = outlets.sublist(startIndex, endIndex);
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -183,9 +240,9 @@ class _DaftarOutletPageState extends State<DaftarOutletPage> {
                     isMobile
                         ? _buildMobileOutletList(outletsOnCurrentPage)
                         : _buildDesktopOutletTable(outletsOnCurrentPage),
-                    if (totalItems > 0 && !isMobile) ...[
-                      const Divider(height: 32),
-                      _buildPaginationFooter(totalItems, totalPages),
+                    if (!_isLoading && !isMobile) ...[
+                      const SizedBox(height: 24),
+                      _buildPagination(totalItems, totalPages),
                     ]
                   ],
                 ),
@@ -276,62 +333,68 @@ class _DaftarOutletPageState extends State<DaftarOutletPage> {
   }
 
   Widget _buildDesktopOutletTable(List<Map<String, dynamic>> outlets) {
+    if (outlets.isEmpty) {
+      return Container(
+          decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey[200]!)),
+          child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 48),
+              child: Center(child: Text('Tidak ada outlet ditemukan.'))));
+    }
+
     return Container(
       decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.grey[200]!)),
-      child: Column(
-        children: [
-          _buildDesktopTableHeader(),
-          const Divider(height: 1, color: Colors.grey),
-          if (outlets.isEmpty)
-            const Padding(
-                padding: EdgeInsets.symmetric(vertical: 48),
-                child: Text('Tidak ada outlet ditemukan.'))
-          else
-            ...outlets.map((outlet) => _buildTableRow(outlet)).toList(),
-        ],
+      child: Scrollbar(
+        thumbVisibility: true,
+        controller: _horizontalScrollController,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: SingleChildScrollView(
+            controller: _horizontalScrollController,
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columnSpacing: 160.0,
+              sortColumnIndex: _sortColumnIndex,
+              sortAscending: _sortAscending,
+              headingTextStyle: _tableHeaderStyle(),
+              dataTextStyle: _tableBodyStyle(),
+              columns: [
+                DataColumn(label: const Text('NAMA'), onSort: _onSort),
+                DataColumn(label: const Text('ALAMAT'), onSort: _onSort),
+                DataColumn(label: const Text('KOTA'), onSort: _onSort),
+                DataColumn(label: const Text('OWNER'), onSort: _onSort),
+                DataColumn(label: const Text('AKSI')),
+              ],
+              rows: outlets.map((outlet) {
+                return DataRow(
+                  cells: [
+                    DataCell(Text(outlet['name'] ?? 'N/A')),
+                    DataCell(Text(outlet['alamat'] ?? 'N/A')),
+                    DataCell(Text(outlet['city'] ?? 'N/A')),
+                    DataCell(Text(outlet['ownerName'] ?? 'N/A')),
+                    DataCell(_buildPopupMenuButton(outlet)),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildDesktopTableHeader() {
-    TextStyle headerStyle = TextStyle(
+  TextStyle _tableHeaderStyle() {
+    return TextStyle(
         fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey[600]);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      child: Row(children: [
-        const SizedBox(width: 8),
-        Expanded(flex: 3, child: Text('NAMA', style: headerStyle)),
-        Expanded(flex: 4, child: Text('ALAMAT', style: headerStyle)),
-        Expanded(flex: 2, child: Text('KOTA', style: headerStyle)),
-        Expanded(flex: 2, child: Text('OWNER', style: headerStyle)),
-        const SizedBox(width: 48),
-      ]),
-    );
   }
 
-  Widget _buildTableRow(Map<String, dynamic> outlet) {
-    TextStyle cellStyle = const TextStyle(fontSize: 14, color: Colors.black87);
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE)))),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-        const SizedBox(width: 8),
-        Expanded(
-            flex: 3, child: Text(outlet['name'] ?? 'N/A', style: cellStyle)),
-        Expanded(
-            flex: 4, child: Text(outlet['alamat'] ?? 'N/A', style: cellStyle)),
-        Expanded(
-            flex: 2, child: Text(outlet['city'] ?? 'N/A', style: cellStyle)),
-        Expanded(
-            flex: 2,
-            child: Text(outlet['ownerName'] ?? 'N/A', style: cellStyle)),
-        _buildPopupMenuButton(outlet),
-      ]),
-    );
+  TextStyle _tableBodyStyle() {
+    return const TextStyle(fontSize: 14, color: Colors.black87);
   }
 
   Widget _buildMobileOutletList(List<Map<String, dynamic>> outlets) {
@@ -457,31 +520,75 @@ class _DaftarOutletPageState extends State<DaftarOutletPage> {
     );
   }
 
-  Widget _buildPaginationFooter(int totalItems, int totalPages) {
-    return Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-      IconButton(
-        icon: const Icon(Icons.arrow_back_ios, size: 16),
-        onPressed: _currentPage > 1 ? () => setState(() => _currentPage--) : null,
-        color: _currentPage > 1 ? Colors.black87 : Colors.grey,
-      ),
-      Container(
-        width: 36,
-        height: 36,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-            color: const Color(0xFF279E9E),
-            borderRadius: BorderRadius.circular(8)),
-        child: Text('$_currentPage',
-            style:
-            const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-      ),
-      IconButton(
-        icon: const Icon(Icons.arrow_forward_ios, size: 16),
-        onPressed: _currentPage < totalPages
-            ? () => setState(() => _currentPage++)
-            : null,
-        color: _currentPage < totalPages ? Colors.black87 : Colors.grey,
-      ),
-    ]);
+  Widget _buildPagination(int totalItems, int totalPages) {
+    if (totalItems == 0) return const SizedBox.shrink();
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            const Text('Tampilkan:', style: TextStyle(color: Colors.grey)),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<int>(
+                  value: _itemsPerPage,
+                  onChanged: (int? newValue) {
+                    setState(() {
+                      _itemsPerPage = newValue!;
+                      _currentPage = 1;
+                    });
+                  },
+                  items: <int>[10, 20, 50, 100]
+                      .map<DropdownMenuItem<int>>((int value) {
+                    return DropdownMenuItem<int>(
+                      value: value,
+                      child: Text(value.toString()),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Text(
+              'Ditampilkan ${((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems)} - ${math.min(_currentPage * _itemsPerPage, totalItems)} dari $totalItems data',
+              style: const TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back_ios, size: 16),
+              onPressed: _currentPage > 1
+                  ? () => setState(() => _currentPage--)
+                  : null,
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                  color: const Color(0xFF279E9E),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Text('$_currentPage',
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+            IconButton(
+              icon: const Icon(Icons.arrow_forward_ios, size: 16),
+              onPressed: _currentPage < totalPages
+                  ? () => setState(() => _currentPage++)
+                  : null,
+            ),
+          ],
+        ),
+      ],
+    );
   }
 }
