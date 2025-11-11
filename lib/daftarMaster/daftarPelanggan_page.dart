@@ -50,6 +50,7 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
     try {
       final pelanggan =
       await _apiService.getPelanggan(outletId: widget.outletId);
+
       if (mounted) {
         setState(() {
           _allPelanggan = pelanggan;

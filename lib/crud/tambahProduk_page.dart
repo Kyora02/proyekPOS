@@ -27,7 +27,6 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
   final _hargaJualController = TextEditingController();
   final _hargaBeliController = TextEditingController();
 
-  // Hapus semua state yang berhubungan dengan multi-select
   List<Map<String, dynamic>> _outletOptions = [];
   List<Map<String, dynamic>> _kategoriOptions = [];
   String? _selectedKategoriId;

@@ -336,7 +336,7 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
             controller: _horizontalScrollController,
             scrollDirection: Axis.horizontal,
             child: DataTable(
-              columnSpacing: 100.0,
+              columnSpacing: 130.0,
               sortColumnIndex: _sortColumnIndex,
               sortAscending: _sortAscending,
               headingTextStyle: TextStyle(
