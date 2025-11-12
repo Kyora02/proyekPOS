@@ -120,8 +120,8 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
           bValue = b['order'] ?? 0;
           break;
         case 2:
-          aValue = 0;
-          bValue = 0;
+          aValue = a['productQty'] ?? 0;
+          bValue = b['productQty'] ?? 0;
           break;
         default:
           return 0;
@@ -257,104 +257,84 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
     _sortData(categories);
     final int totalItems = categories.length;
     final int totalPages = (totalItems / _itemsPerPage).ceil();
-    final int startIndex = (_currentPage - 1) * _itemsPerPage;
-    final int endIndex = (startIndex + _itemsPerPage).clamp(0, totalItems);
-    final List<Map<String, dynamic>> categoriesOnCurrentPage =
-    categories.sublist(startIndex, endIndex);
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      body: SingleChildScrollView(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isMobile = constraints.maxWidth < 600;
-            return Padding(
-              padding: EdgeInsets.all(isMobile ? 16.0 : 32.0),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(isMobile),
-                      const SizedBox(height: 24),
-                      _buildFilterActions(isMobile),
-                      const SizedBox(height: 24),
-                      if (_isLoading)
-                        const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(48.0),
-                            child: CircularProgressIndicator(),
-                          ),
-                        )
-                      else if (_error != null)
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(48.0),
-                            child: Text('Gagal memuat data: $_error',
-                                style: const TextStyle(color: Colors.red)),
-                          ),
-                        )
-                      else if (isMobile)
-                          _buildCategoryListMobile(categoriesOnCurrentPage)
-                        else
-                          _buildCategoryTable(categoriesOnCurrentPage),
-                      const SizedBox(height: 24),
-                      if (!_isLoading && _error == null && !isMobile)
-                        _buildPagination(totalItems, totalPages),
-                    ],
-                  ),
-                ),
+      body: RefreshIndicator(
+        onRefresh: _fetchCategories,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16.0, 40.0, 16.0, 16.0),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildTitleHeader(),
+                  const SizedBox(height: 24),
+                  _buildSearchBar(),
+                  const SizedBox(height: 24),
+                  if (_isLoading)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(48.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  else if (_error != null)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(48.0),
+                        child: Text('Gagal memuat data: $_error',
+                            style: const TextStyle(color: Colors.red)),
+                      ),
+                    )
+                  else
+                    _buildCategoryTable(categories),
+                  const SizedBox(height: 24),
+                  if (!_isLoading && _error == null)
+                    _buildPagination(totalItems, totalPages),
+                ],
               ),
-            );
-          },
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader(bool isMobile) {
-    final title = const Text(
-      'Daftar Kategori',
-      style: TextStyle(
-          fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+  Widget _buildTitleHeader() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const Text(
+          'Daftar Kategori',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF333333),
+          ),
+        ),
+        const Spacer(),
+        ElevatedButton.icon(
+          onPressed: _navigateToAddCategory,
+          icon: const Icon(Icons.add_rounded, size: 20),
+          label: const Text('Tambah Kategori', style: TextStyle(fontSize: 15)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF279E9E),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+      ],
     );
-
-    final button = ElevatedButton.icon(
-      onPressed: _navigateToAddCategory,
-      icon: const Icon(Icons.add_rounded, size: 20),
-      label: const Text('Tambah Kategori', style: TextStyle(fontSize: 15)),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF279E9E),
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
-
-    if (isMobile) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          title,
-          const SizedBox(height: 16),
-          SizedBox(width: double.infinity, child: button),
-        ],
-      );
-    } else {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          title,
-          button,
-        ],
-      );
-    }
   }
 
-  Widget _buildFilterActions(bool isMobile) {
+  Widget _buildSearchBar() {
     return SizedBox(
-      width: isMobile ? double.infinity : 250,
+      width: 250,
       child: TextField(
         decoration: InputDecoration(
           hintText: 'Cari kategori...',
@@ -374,124 +354,23 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
     );
   }
 
-  Widget _buildCategoryListMobile(List<Map<String, dynamic>> categories) {
-    if (categories.isEmpty) {
+  Widget _buildCategoryTable(List<Map<String, dynamic>> categories) {
+    final int totalItems = categories.length;
+    final int startIndex = (_currentPage - 1) * _itemsPerPage;
+    final int endIndex = (startIndex + _itemsPerPage).clamp(0, totalItems);
+    final List<Map<String, dynamic>> categoriesOnCurrentPage =
+    categories.sublist(startIndex, endIndex);
+
+    if (categoriesOnCurrentPage.isEmpty && _searchQuery.isNotEmpty) {
       return const Padding(
           padding: EdgeInsets.all(24.0),
           child: Center(child: Text('Tidak ada kategori ditemukan.')));
     }
 
-    return ListView.separated(
-      itemCount: categories.length,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final category = categories[index];
-        return _buildCategoryCardMobile(category);
-      },
-    );
-  }
-
-  Widget _buildCategoryCardMobile(Map<String, dynamic> category) {
-    final String categoryName = category['name'] ?? 'N/A';
-    final String categoryId = category['id'];
-    final String urutan = category['order']?.toString() ?? 'N/A';
-    final String jumlahProduk = '0';
-
-    return Card(
-      elevation: 1,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        categoryName,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Urutan: $urutan',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(
-                  width: 48,
-                  height: 24,
-                  child: PopupMenuButton<String>(
-                    color: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8.0)),
-                    icon: const Icon(Icons.more_horiz),
-                    onSelected: (String value) {
-                      if (value == 'ubah') {
-                        _navigateToEditCategory(category);
-                      } else if (value == 'hapus') {
-                        _showDeleteConfirmationDialog(
-                            context, categoryName, categoryId);
-                      }
-                    },
-                    itemBuilder: (BuildContext context) =>
-                    <PopupMenuEntry<String>>[
-                      _buildPopupMenuItem(
-                          value: 'ubah',
-                          text: 'Ubah',
-                          icon: Icons.edit_outlined),
-                      _buildPopupMenuItem(
-                          value: 'hapus',
-                          text: 'Hapus',
-                          icon: Icons.delete_outline,
-                          isDestructive: true),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const Divider(),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(Icons.inventory_2_outlined,
-                    color: Colors.grey[700], size: 20),
-                const SizedBox(width: 12),
-                Text('Jumlah Produk:',
-                    style: TextStyle(color: Colors.grey[700])),
-                const Spacer(),
-                Text(jumlahProduk,
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryTable(List<Map<String, dynamic>> categories) {
-    if (categories.isEmpty) {
+    if (categoriesOnCurrentPage.isEmpty && _searchQuery.isEmpty) {
       return const Padding(
           padding: EdgeInsets.all(24.0),
-          child: Center(child: Text('Tidak ada kategori ditemukan.')));
+          child: Center(child: Text('Belum ada kategori.')));
     }
 
     return Container(
@@ -536,7 +415,7 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
                   label: Text('AKSI'),
                 ),
               ],
-              rows: categories.map((category) {
+              rows: categoriesOnCurrentPage.map((category) {
                 final String categoryName = category['name'] ?? 'N/A';
                 final String categoryId = category['id'];
                 return DataRow(
@@ -544,7 +423,8 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
                     DataCell(Text(categoryName)),
                     DataCell(Center(
                         child: Text(category['order']?.toString() ?? 'N/A'))),
-                    DataCell(Center(child: Text('0'))),
+                    DataCell(Center(
+                        child: Text(category['productQty']?.toString() ?? '0'))),
                     DataCell(
                       PopupMenuButton<String>(
                         color: Colors.white,
@@ -614,71 +494,78 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
   Widget _buildPagination(int totalItems, int totalPages) {
     if (totalItems == 0) return const SizedBox.shrink();
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    final Widget leftSide = Wrap(
+      spacing: 8.0,
+      runSpacing: 8.0,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Row(
-          children: [
-            const Text('Tampilkan:', style: TextStyle(color: Colors.grey)),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<int>(
-                  value: _itemsPerPage,
-                  onChanged: (int? newValue) {
-                    setState(() {
-                      _itemsPerPage = newValue!;
-                      _currentPage = 1;
-                    });
-                  },
-                  items: <int>[10, 20, 50]
-                      .map<DropdownMenuItem<int>>((int value) {
-                    return DropdownMenuItem<int>(
-                      value: value,
-                      child: Text(value.toString()),
-                    );
-                  }).toList(),
-                ),
-              ),
+        const Text('Tampilkan:', style: TextStyle(color: Colors.grey)),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey[300]!),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: _itemsPerPage,
+              onChanged: (int? newValue) {
+                setState(() {
+                  _itemsPerPage = newValue!;
+                  _currentPage = 1;
+                });
+              },
+              items: <int>[10, 20, 50]
+                  .map<DropdownMenuItem<int>>((int value) {
+                return DropdownMenuItem<int>(
+                  value: value,
+                  child: Text(value.toString()),
+                );
+              }).toList(),
             ),
-            const SizedBox(width: 16),
-            Text(
-              'Ditampilkan ${((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems)} - ${math.min(_currentPage * _itemsPerPage, totalItems)} dari $totalItems data',
-              style: const TextStyle(color: Colors.grey),
-            ),
-          ],
+          ),
         ),
-        Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.arrow_back_ios, size: 16),
-              onPressed: _currentPage > 1
-                  ? () => setState(() => _currentPage--)
-                  : null,
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                  color: const Color(0xFF279E9E),
-                  borderRadius: BorderRadius.circular(8)),
-              child: Text('$_currentPage',
-                  style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-            IconButton(
-              icon: const Icon(Icons.arrow_forward_ios, size: 16),
-              onPressed: _currentPage < totalPages
-                  ? () => setState(() => _currentPage++)
-                  : null,
-            ),
-          ],
+        const SizedBox(width: 16),
+        Text(
+          'Ditampilkan ${((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems)} - ${math.min(_currentPage * _itemsPerPage, totalItems)} dari $totalItems data',
+          style: const TextStyle(color: Colors.grey),
         ),
+      ],
+    );
+
+    final Widget rightSide = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.arrow_back_ios, size: 16),
+          onPressed:
+          _currentPage > 1 ? () => setState(() => _currentPage--) : null,
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+              color: const Color(0xFF279E9E),
+              borderRadius: BorderRadius.circular(8)),
+          child: Text('$_currentPage',
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.bold)),
+        ),
+        IconButton(
+          icon: const Icon(Icons.arrow_forward_ios, size: 16),
+          onPressed: _currentPage < totalPages
+              ? () => setState(() => _currentPage++)
+              : null,
+        ),
+      ],
+    );
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(child: leftSide),
+        rightSide,
       ],
     );
   }

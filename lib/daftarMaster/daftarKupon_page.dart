@@ -288,27 +288,24 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
         final List<Map<String, dynamic>> couponsOnCurrentPage =
         (totalItems > 0) ? coupons.sublist(startIndex, endIndex) : [];
 
-        final isMobile = constraints.maxWidth <= 850;
-        final pagePadding = isMobile ? 16.0 : 32.0;
-
         return Scaffold(
-          backgroundColor: isMobile ? Colors.grey[100] : Colors.grey[50],
+          backgroundColor: Colors.grey[100],
           body: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : SingleChildScrollView(
-            padding: EdgeInsets.all(pagePadding),
+            padding:
+            const EdgeInsets.fromLTRB(16.0, 40.0, 16.0, 16.0),
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1200),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildHeader(isMobile),
+                    _buildHeader(),
                     const SizedBox(height: 24),
                     _buildFilterActions(),
                     const SizedBox(height: 24),
-                    _buildCouponTable(
-                        couponsOnCurrentPage, constraints),
+                    _buildCouponTable(couponsOnCurrentPage),
                     const SizedBox(height: 24),
                     if (totalItems > 0)
                       _buildPagination(totalItems, totalPages),
@@ -322,7 +319,7 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
     );
   }
 
-  Widget _buildHeader(bool isMobile) {
+  Widget _buildHeader() {
     final title = const Text(
       'Daftar Kupon',
       style: TextStyle(
@@ -341,24 +338,13 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
       ),
     );
 
-    if (isMobile) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          title,
-          const SizedBox(height: 16),
-          SizedBox(width: double.infinity, child: button),
-        ],
-      );
-    } else {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          title,
-          button,
-        ],
-      );
-    }
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        title,
+        button,
+      ],
+    );
   }
 
   Widget _buildFilterActions() {
@@ -429,84 +415,58 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
     );
   }
 
-  Widget _buildCouponTable(
-      List<Map<String, dynamic>> coupons, BoxConstraints constraints) {
-    final bool isMobile = constraints.maxWidth <= 850;
-
+  Widget _buildCouponTable(List<Map<String, dynamic>> coupons) {
     Widget content;
 
-    if (isMobile) {
-      if (coupons.isEmpty) {
-        content = const Center(
-          child: Padding(
-            padding: EdgeInsets.symmetric(vertical: 48.0),
-            child: Text('Tidak ada kupon ditemukan.',
-                style: TextStyle(fontSize: 16, color: Colors.grey)),
-          ),
-        );
-      } else {
-        content = ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: coupons.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 12),
-          itemBuilder: (context, index) =>
-              _buildMobileCouponCard(coupons[index]),
-        );
-      }
+    if (coupons.isEmpty) {
+      content = const Padding(
+        padding: EdgeInsets.all(24.0),
+        child: Center(
+          child: Text('Tidak ada kupon ditemukan.',
+              style: TextStyle(fontSize: 16, color: Colors.grey)),
+        ),
+      );
     } else {
-      if (coupons.isEmpty) {
-        content = const Padding(
-          padding: EdgeInsets.all(24.0),
-          child: Center(
-            child: Text('Tidak ada kupon ditemukan.',
-                style: TextStyle(fontSize: 16, color: Colors.grey)),
-          ),
-        );
-      } else {
-        content = Scrollbar(
-          thumbVisibility: true,
+      content = Scrollbar(
+        thumbVisibility: true,
+        controller: _horizontalScrollController,
+        child: SingleChildScrollView(
           controller: _horizontalScrollController,
-          child: SingleChildScrollView(
-            controller: _horizontalScrollController,
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              columnSpacing: 115.0,
-              sortColumnIndex: _sortColumnIndex,
-              sortAscending: _sortAscending,
-              headingTextStyle: _tableHeaderStyle(),
-              dataTextStyle: _tableBodyStyle(),
-              columns: [
-                DataColumn(label: const Text('NAMA KUPON'), onSort: _onSort),
-                DataColumn(label: const Text('BESARAN'), onSort: _onSort),
-                DataColumn(label: const Text('DURASI'), onSort: _onSort),
-                DataColumn(label: const Text('STATUS'), onSort: _onSort),
-                DataColumn(label: const Text('AKSI')),
-              ],
-              rows: coupons.map((coupon) {
-                return DataRow(
-                  cells: [
-                    DataCell(Text(coupon['nama'] ?? 'N/A')),
-                    DataCell(Text(_formatBesaran(coupon))),
-                    DataCell(Text(_formatDurasi(coupon))),
-                    DataCell(_buildStatusChip(coupon['status'] ?? false)),
-                    DataCell(_buildPopupMenuButton(coupon)),
-                  ],
-                );
-              }).toList(),
-            ),
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            columnSpacing: 115.0,
+            sortColumnIndex: _sortColumnIndex,
+            sortAscending: _sortAscending,
+            headingTextStyle: _tableHeaderStyle(),
+            dataTextStyle: _tableBodyStyle(),
+            columns: [
+              DataColumn(label: const Text('NAMA KUPON'), onSort: _onSort),
+              DataColumn(label: const Text('BESARAN'), onSort: _onSort),
+              DataColumn(label: const Text('DURASI'), onSort: _onSort),
+              DataColumn(label: const Text('STATUS'), onSort: _onSort),
+              DataColumn(label: const Text('AKSI')),
+            ],
+            rows: coupons.map((coupon) {
+              return DataRow(
+                cells: [
+                  DataCell(Text(coupon['nama'] ?? 'N/A')),
+                  DataCell(Text(_formatBesaran(coupon))),
+                  DataCell(Text(_formatDurasi(coupon))),
+                  DataCell(_buildStatusChip(coupon['status'] ?? false)),
+                  DataCell(_buildPopupMenuButton(coupon)),
+                ],
+              );
+            }).toList(),
           ),
-        );
-      }
+        ),
+      );
     }
 
     return Container(
       decoration: BoxDecoration(
-        color: isMobile ? Colors.transparent : Colors.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: isMobile
-            ? []
-            : [
+        boxShadow: [
           BoxShadow(
               color: Colors.grey.withOpacity(0.1),
               spreadRadius: 1,
@@ -514,72 +474,6 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
         ],
       ),
       child: content,
-    );
-  }
-
-  Widget _buildMobileCouponCard(Map<String, dynamic> coupon) {
-    return Card(
-      color: Colors.white,
-      elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.1),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(coupon['nama'] ?? 'N/A',
-                          style: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 4),
-                    ],
-                  ),
-                ),
-                _buildPopupMenuButton(coupon),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const Divider(),
-            const SizedBox(height: 12),
-            _buildInfoRow(
-                Icons.sell_outlined, 'Besaran: ${_formatBesaran(coupon)}'),
-            const SizedBox(height: 8),
-            _buildInfoRow(Icons.date_range_outlined, _formatDurasi(coupon)),
-            const SizedBox(height: 8),
-            _buildInfoRow(
-                Icons.storefront_outlined, coupon['outletName'] ?? 'N/A'),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.check_circle_outline,
-                    size: 16, color: Colors.grey[600]),
-                const SizedBox(width: 8),
-                _buildStatusChip(coupon['status'] ?? false),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: Colors.grey[600]),
-        const SizedBox(width: 8),
-        Expanded(
-            child: Text(text,
-                style: TextStyle(fontSize: 14, color: Colors.grey[800]))),
-      ],
     );
   }
 

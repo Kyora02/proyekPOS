@@ -56,7 +56,8 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                         isDesktop: true,
                         userData: widget.userData,
                         isLoading: widget.isLoading,
-                        onProfileSettingsTap: () => widget.onNavigate('Profile'),
+                        onProfileSettingsTap: () =>
+                            widget.onNavigate('Profile'),
                         onBusinessSettingsTap: () =>
                             widget.onNavigate('Pengaturan Bisnis'),
                       ),
@@ -130,7 +131,12 @@ class TopAppBar extends StatelessWidget implements PreferredSizeWidget {
           children: [
             Positioned(
               top: offset.dy + size.height + 5,
-              left: offset.dx + size.width - 300,
+              right: isDesktop
+                  ? (MediaQuery.of(context).size.width -
+                  offset.dx -
+                  size.width)
+                  : 5.0,
+              left: isDesktop ? (offset.dx + size.width - 300) : null,
               child: FadeTransition(
                 opacity: anim1,
                 child: Material(
@@ -224,7 +230,21 @@ class TopAppBar extends StatelessWidget implements PreferredSizeWidget {
         iconTheme: const IconThemeData(color: Color(0xFF279E9E)),
         backgroundColor: Colors.white,
         elevation: 1,
-        actions: const [],
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_none_outlined),
+            color: Colors.grey[600],
+            onPressed: () {
+              // TODO: Implement notification logic
+            },
+          ),
+          IconButton(
+            key: _profileMenuKey,
+            icon: Icon(Icons.more_vert, color: Colors.grey[600]),
+            onPressed: () => _showProfileMenu(context),
+          ),
+          const SizedBox(width: 8),
+        ],
       );
     }
   }
@@ -649,24 +669,17 @@ class _SideNavBarState extends State<SideNavBar> {
         title: 'Pelanggan',
         icon: Icons.people_alt_rounded,
         children: [NavItem(title: 'Daftar Pelanggan', icon: Icons.people)]),
-    NavItem(
-        title: 'Kupon',
-        icon: Icons.sell_rounded,
-        children: [
-          NavItem(title: 'Daftar Kupon', icon: Icons.local_offer_rounded),
-        ]),
-    NavItem(
-        title: 'Outlet',
-        icon: Icons.storefront_rounded,
-        children: [NavItem(title: 'Daftar Outlet', icon: Icons.store)]),
-    NavItem(
-        title: 'Karyawan',
-        icon: Icons.person_outline,
-        children: [
-          NavItem(title: 'Daftar Karyawan', icon: Icons.person_outline),
-          NavItem(title: 'Daftar Absensi', icon: Icons.how_to_reg),
-          NavItem(title: 'Manajemen Gaji', icon: Icons.monetization_on)
-        ])
+    NavItem(title: 'Kupon', icon: Icons.sell_rounded, children: [
+      NavItem(title: 'Daftar Kupon', icon: Icons.local_offer_rounded),
+    ]),
+    NavItem(title: 'Outlet', icon: Icons.storefront_rounded, children: [
+      NavItem(title: 'Daftar Outlet', icon: Icons.store)
+    ]),
+    NavItem(title: 'Karyawan', icon: Icons.person_outline, children: [
+      NavItem(title: 'Daftar Karyawan', icon: Icons.person_outline),
+      NavItem(title: 'Daftar Absensi', icon: Icons.how_to_reg),
+      NavItem(title: 'Manajemen Gaji', icon: Icons.monetization_on)
+    ])
   ];
 
   void _showOutletMenu(BuildContext context) {
@@ -954,8 +967,10 @@ class _OutletSelectionDialogState extends State<OutletSelectionDialog> {
                           final user = FirebaseAuth.instance.currentUser;
                           if (user == null) throw Exception("No user logged in");
 
-                          final outletDoc = _outlets.firstWhere((doc) => doc.id == value);
-                          final outletData = outletDoc.data() as Map<String, dynamic>;
+                          final outletDoc =
+                          _outlets.firstWhere((doc) => doc.id == value);
+                          final outletData =
+                          outletDoc.data() as Map<String, dynamic>;
                           final newBusinessName = outletData['name'];
                           final String newOutletId = outletDoc.id;
 

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 
 class ApiService {
   final String _baseUrl = 'http://localhost:3000/api';
@@ -697,6 +698,48 @@ class ApiService {
       }
     } catch (e) {
       print('Error di updateStock: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getSalesReports({
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+
+      final String start = DateFormat('yyyy-MM-dd').format(startDate);
+      final String end = DateFormat('yyyy-MM-dd').format(endDate);
+
+      final url =
+      Uri.parse('$_baseUrl/reports/sales?startDate=$start&endDate=$end');
+
+      final response = await http.get(url, headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      });
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((dynamic item) {
+          final Map<String, dynamic> map = item as Map<String, dynamic>;
+
+          return {
+            'noTransaksi': map['noTransaksi'],
+            'outlet': map['namaOutlet'],
+            'totalPenjualan': map['total_bayar'],
+            'metodePembayaran': map['metodePembayaran'],
+            'timestamp': DateTime.parse(map['waktuTransaksi']),
+            'customer': map['namaCustomer'],
+            'karyawan': map['namaKaryawan'],
+          };
+        }).toList();
+      } else {
+        throw Exception('Gagal memuat laporan penjualan: ${response.body}');
+      }
+    } catch (e) {
+      print('Error di getSalesReports: $e');
       rethrow;
     }
   }

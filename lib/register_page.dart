@@ -44,6 +44,12 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
     try {
       UserCredential userCredential =
       await FirebaseAuth.instance.createUserWithEmailAndPassword(
@@ -52,6 +58,7 @@ class _RegisterPageState extends State<RegisterPage> {
       );
 
       User? user = userCredential.user;
+
       if (user != null) {
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'uid': user.uid,
@@ -66,18 +73,24 @@ class _RegisterPageState extends State<RegisterPage> {
         await user.reload();
       }
 
+      await FirebaseAuth.instance.signOut();
+
+      if (mounted) Navigator.pop(context);
+
       if (mounted) {
         _showSuccessSnackBar('Registrasi berhasil! Silahkan login.');
+      }
+
+      if (mounted) {
         _nameController.clear();
         _emailController.clear();
         _passwordController.clear();
         _phoneController.clear();
-
-        await Future.delayed(const Duration(seconds: 2));
       }
-      await FirebaseAuth.instance.signOut();
 
     } on FirebaseAuthException catch (e) {
+      if (mounted) Navigator.pop(context);
+
       String message;
       if (e.code == 'weak-password') {
         message = 'Password yang diberikan terlalu lemah.';
@@ -87,6 +100,9 @@ class _RegisterPageState extends State<RegisterPage> {
         message = 'Terjadi kesalahan. Silahkan coba lagi.';
       }
       _showErrorSnackBar(message);
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+      _showErrorSnackBar('Terjadi kesalahan: ${e.toString()}');
     }
   }
 
@@ -320,4 +336,3 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 }
-

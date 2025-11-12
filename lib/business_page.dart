@@ -246,6 +246,8 @@ class _BusinessPageState extends State<BusinessPage> {
           DropdownButtonFormField<String>(
             value: value,
             decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.white,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8.0),
               ),

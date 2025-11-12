@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:proyekpos2/service/api_service.dart';
 
 class DetailPenjualanPage extends StatefulWidget {
   const DetailPenjualanPage({super.key});
@@ -13,52 +14,67 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
   DateTime _endDate = DateTime.now();
   final TextEditingController _searchController = TextEditingController();
 
+  final ApiService _apiService = ApiService();
+  List<Map<String, dynamic>> _allData = [];
+  List<Map<String, dynamic>> _filteredData = [];
+  bool _isLoading = true;
+
   final NumberFormat _currencyFormatter =
   NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
   final DateFormat _dateFormatter = DateFormat('dd MMM yyyy, HH:mm');
 
-  final List<Map<String, dynamic>> _dummyData = [
-    {
-      'noTransaksi': 'TRX-001',
-      'outlet': 'Cabang Pusat',
-      'totalPenjualan': 150000,
-      'metodePembayaran': 'QRIS',
-      'timestamp': DateTime(2025, 10, 30, 14, 30),
-      'customer': 'John Doe',
-    },
-    {
-      'noTransaksi': 'TRX-002',
-      'outlet': 'Cabang Selatan',
-      'totalPenjualan': 75000,
-      'metodePembayaran': 'Tunai',
-      'timestamp': DateTime(2025, 10, 30, 12, 15),
-      'customer': 'Walk-in',
-    },
-    {
-      'noTransaksi': 'TRX-003',
-      'outlet': 'Cabang Pusat',
-      'totalPenjualan': 220000,
-      'metodePembayaran': 'Debit',
-      'timestamp': DateTime(2025, 10, 29, 11, 05),
-      'customer': 'Jane Smith',
-    },
-    {
-      'noTransaksi': 'TRX-004',
-      'outlet': 'Cabang Utara',
-      'totalPenjualan': 510000,
-      'metodePembayaran': 'Transfer',
-      'timestamp': DateTime(2025, 10, 28, 18, 45),
-      'customer': 'Robert Brown',
-    },
-    {
-      'noTransaksi': 'TRX-005',
-      'outlet': 'Cabang Timur',
-      'totalPenjualan': 90000,
-      'metodePembayaran': 'QRIS',
-      'timestamp': DateTime(2025, 10, 27, 09, 00),
-      'customer': 'Alice Wonderland',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      final data = await _apiService.getSalesReports(
+        startDate: _startDate,
+        endDate: _endDate,
+      );
+      setState(() {
+        _allData = data;
+        _filterData();
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memuat data: $e')),
+      );
+    }
+  }
+
+  void _filterData() {
+    final query = _searchController.text.toLowerCase();
+    final filtered = _allData.where((item) {
+      final noTransaksi = item['noTransaksi'].toString().toLowerCase();
+      final outlet = item['outlet'].toString().toLowerCase();
+      final metodePembayaran =
+      item['metodePembayaran'].toString().toLowerCase();
+      final customer = item['customer'].toString().toLowerCase();
+
+      final matchesQuery = query.isEmpty ||
+          noTransaksi.contains(query) ||
+          outlet.contains(query) ||
+          metodePembayaran.contains(query) ||
+          customer.contains(query);
+
+      return matchesQuery;
+    }).toList();
+
+    setState(() {
+      _filteredData = filtered;
+    });
+  }
 
   Future<void> _selectDateRange(BuildContext context) async {
     final DateTime? newStartDate = await showDatePicker(
@@ -89,7 +105,7 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
     final DateTime? newEndDate = await showDatePicker(
       context: context,
       initialDate: _endDate.isAfter(newStartDate) ? _endDate : newStartDate,
-      firstDate: newStartDate, // Tanggal akhir tidak bisa sebelum tanggal mulai
+      firstDate: newStartDate,
       lastDate: DateTime(2030),
       builder: (context, child) {
         return Theme(
@@ -115,6 +131,8 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
       _startDate = newStartDate;
       _endDate = newEndDate;
     });
+
+    _fetchData();
   }
 
   @override
@@ -125,27 +143,6 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredData = _dummyData.where((item) {
-      final query = _searchController.text.toLowerCase();
-      final noTransaksi = item['noTransaksi'].toString().toLowerCase();
-      final outlet = item['outlet'].toString().toLowerCase();
-      final metodePembayaran = item['metodePembayaran'].toString().toLowerCase();
-      final customer = item['customer'].toString().toLowerCase();
-      final date = item['timestamp'] as DateTime;
-
-      final matchesQuery = query.isEmpty ||
-          noTransaksi.contains(query) ||
-          outlet.contains(query) ||
-          metodePembayaran.contains(query) ||
-          customer.contains(query);
-
-      final matchesDate =
-          date.isAfter(_startDate.subtract(const Duration(days: 1))) &&
-              date.isBefore(_endDate.add(const Duration(days: 1)));
-
-      return matchesQuery && matchesDate;
-    }).toList();
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       body: SingleChildScrollView(
@@ -163,12 +160,20 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
                     const SizedBox(height: 24),
                     _buildFilterActions(context, isMobile),
                     const SizedBox(height: 24),
-                    if (isMobile)
-                      _buildMobileList(filteredData)
-                    else
-                      _buildWebTable(filteredData),
+                    _isLoading
+                        ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32.0),
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF279E9E),
+                        ),
+                      ),
+                    )
+                        : (isMobile
+                        ? _buildMobileList(_filteredData)
+                        : _buildWebTable(_filteredData)),
                     const SizedBox(height: 24),
-                    if (!isMobile) _buildPagination(),
+                    if (!_isLoading && !isMobile) _buildPagination(),
                   ],
                 ),
               ),
@@ -236,7 +241,7 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
       width: isMobile ? double.infinity : 280,
       child: TextField(
         controller: _searchController,
-        onChanged: (value) => setState(() {}),
+        onChanged: (value) => _filterData(),
         decoration: InputDecoration(
           hintText: 'Cari No. Transaksi, Outlet, Pelanggan...',
           prefixIcon: const Icon(Icons.search, color: Color(0xFF279E9E)),
@@ -426,7 +431,7 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
                   itemBuilder: (context) => [
                     const PopupMenuItem(
                       value: 'lihat_detail',
-                      child: Text('Lihat Detail'),
+                      child: Text('Liat Detail'),
                     ),
                   ],
                 ),
@@ -487,9 +492,9 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        const Text(
-          'Ditampilkan 1 - 5 dari 5 data',
-          style: TextStyle(color: Colors.grey),
+        Text(
+          'Ditampilkan 1 - ${_filteredData.length} dari ${_allData.length} data',
+          style: const TextStyle(color: Colors.grey),
         ),
         const SizedBox(width: 24),
         IconButton(
