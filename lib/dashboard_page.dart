@@ -223,12 +223,12 @@ class _DashboardHostState extends State<DashboardHost> {
           break;
         case 'Detail Penjualan':
           _currentPage = (activeOutletId != null)
-              ? const DetailPenjualanPage()
+              ? DetailPenjualanPage(outletId: activeOutletId)
               : noOutletSelected;
           break;
         case 'Penjualan Produk':
           _currentPage = (activeOutletId != null)
-              ? const PenjualanProdukPage()
+              ? PenjualanProdukPage(outletId: activeOutletId)
               : noOutletSelected;
           break;
         case 'Penjualan Kategori':

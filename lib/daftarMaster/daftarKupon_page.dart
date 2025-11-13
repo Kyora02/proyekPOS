@@ -434,7 +434,7 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
           controller: _horizontalScrollController,
           scrollDirection: Axis.horizontal,
           child: DataTable(
-            columnSpacing: 115.0,
+            columnSpacing: 130.0,
             sortColumnIndex: _sortColumnIndex,
             sortAscending: _sortAscending,
             headingTextStyle: _tableHeaderStyle(),

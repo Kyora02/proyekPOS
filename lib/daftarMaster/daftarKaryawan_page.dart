@@ -14,8 +14,11 @@ class DaftarKaryawanPage extends StatefulWidget {
   State<DaftarKaryawanPage> createState() => _DaftarKaryawanPageState();
 }
 
+
+
 class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
   final _apiService = ApiService();
+  final ScrollController _horizontalScrollController = ScrollController();
   List<Map<String, dynamic>> _allKaryawan = [];
   bool _isLoading = true;
   String? _error;
@@ -31,6 +34,12 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
   void initState() {
     super.initState();
     _fetchKaryawan();
+  }
+
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchKaryawan() async {
@@ -236,81 +245,50 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isMobile = constraints.maxWidth < 950;
-          return SingleChildScrollView(
-            padding: EdgeInsets.all(isMobile ? 16.0 : 32.0),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: isMobile ? 600 : 1200),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(isMobile),
-                    const SizedBox(height: 24),
-                    _buildFilterBar(),
-                    const SizedBox(height: 24),
-                    if (_isLoading)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(48.0),
-                          child: CircularProgressIndicator(),
-                        ),
-                      )
-                    else if (_error != null)
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(48.0),
-                          child: Text('Gagal memuat data: $_error',
-                              style: const TextStyle(color: Colors.red)),
-                        ),
-                      )
-                    else
-                      isMobile
-                          ? _buildMobileKaryawanList(karyawanOnCurrentPage)
-                          : _buildDesktopKaryawanTable(karyawanOnCurrentPage),
-                    if (!_isLoading && _error == null) ...[
-                      const SizedBox(height: 24),
-                      _buildPaginationFooter(
-                          totalItems, totalPages, startIndex, endIndex),
-                    ]
-                  ],
-                ),
-              ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16.0, 40.0, 16.0, 16.0),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1200),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(),
+                const SizedBox(height: 24),
+                _buildFilterBar(),
+                const SizedBox(height: 24),
+                if (_isLoading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(48.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else if (_error != null)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(48.0),
+                      child: Text('Gagal memuat data: $_error',
+                          style: const TextStyle(color: Colors.red)),
+                    ),
+                  )
+                else
+                  _buildDesktopKaryawanTable(karyawanOnCurrentPage),
+                if (!_isLoading && _error == null) ...[
+                  const SizedBox(height: 24),
+                  _buildPaginationFooter(
+                      totalItems, totalPages, startIndex, endIndex),
+                ]
+              ],
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildHeader(bool isMobile) {
-    return isMobile
-        ? Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Daftar Karyawan',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: _navigateToAddKaryawan,
-            icon: const Icon(Icons.add, size: 20),
-            label: const Text('Tambah Karyawan'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF279E9E),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-            ),
-          ),
-        ),
-      ],
-    )
-        : Row(
+  Widget _buildHeader() {
+    return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         const Text('Daftar Karyawan',
@@ -322,10 +300,9 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF279E9E),
             foregroundColor: Colors.white,
-            padding:
-            const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8)),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         ),
       ],
@@ -381,7 +358,10 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.grey[200]!)),
       child: Scrollbar(
+        controller: _horizontalScrollController,
+        thumbVisibility: true,
         child: SingleChildScrollView(
+          controller: _horizontalScrollController,
           scrollDirection: Axis.horizontal,
           child: DataTable(
             columnSpacing: 100.0,
@@ -426,69 +406,6 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
     return const TextStyle(fontSize: 14, color: Colors.black87);
   }
 
-  Widget _buildMobileKaryawanList(List<Map<String, dynamic>> karyawanList) {
-    if (karyawanList.isEmpty) {
-      return const Padding(
-          padding: EdgeInsets.symmetric(vertical: 48),
-          child: Center(child: Text('Tidak ada karyawan ditemukan.')));
-    }
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: karyawanList.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (_, index) => _buildMobileCard(karyawanList[index]),
-    );
-  }
-
-  Widget _buildMobileCard(Map<String, dynamic> karyawan) {
-    return Card(
-      elevation: 1,
-      shadowColor: Colors.black.withAlpha(20),
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey[200]!),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(karyawan['nama'] ?? 'N/A',
-                              style: const TextStyle(
-                                  fontSize: 18, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 4),
-                          Text('NIP: ${karyawan['nip'] ?? 'N/A'}',
-                              style: TextStyle(
-                                  fontSize: 14, color: Colors.grey[600])),
-                        ]),
-                  ),
-                  _buildPopupMenuButton(karyawan),
-                ]),
-            const Divider(height: 24),
-            _buildInfoRow(Icons.email_outlined, 'Email',
-                text: karyawan['email'] ?? 'N/A'),
-            _buildInfoRow(Icons.phone_outlined, 'Notelp',
-                text: karyawan['notelp'] ?? 'N/A'),
-            _buildInfoRow(Icons.store_outlined, 'Outlet',
-                text: karyawan['outlet'] ?? 'N/A'),
-            _buildInfoRow(Icons.toggle_on_outlined, 'Status',
-                valueWidget: _buildStatusWidget(karyawan['status'])),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildStatusWidget(String? status) {
     final bool isActive = status == 'Aktif';
     final Color bgColor = isActive ? Colors.green.shade50 : Colors.red.shade50;
@@ -511,35 +428,6 @@ class _DaftarKaryawanPageState extends State<DaftarKaryawanPage> {
           fontSize: 12,
         ),
         textAlign: TextAlign.center,
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String label,
-      {String? text, Widget? valueWidget}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Icon(icon, size: 16, color: Colors.grey[600]),
-          const SizedBox(width: 12),
-          Text('$label:',
-              style: const TextStyle(
-                  fontWeight: FontWeight.w500, color: Colors.black54)),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: valueWidget ??
-                  Text(
-                    text ?? 'N/A',
-                    style: const TextStyle(fontSize: 14, color: Colors.black87),
-                    textAlign: TextAlign.end,
-                  ),
-            ),
-          ),
-        ],
       ),
     );
   }

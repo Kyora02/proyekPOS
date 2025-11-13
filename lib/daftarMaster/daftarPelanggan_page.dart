@@ -340,19 +340,16 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
   Widget _buildPelangganTable(List<Map<String, dynamic>> items) {
     if (items.isEmpty) {
       return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 10)
-            ],
-          ),
-          child: const Padding(
-              padding: EdgeInsets.all(24.0),
-              child: Center(child: Text('Tidak ada pelanggan ditemukan.'))));
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey[200]!),
+        ),
+        child: const Padding(
+          padding: EdgeInsets.symmetric(vertical: 48.0),
+          child: Center(child: Text('Tidak ada pelanggan ditemukan.')),
+        ),
+      );
     }
 
     return Container(

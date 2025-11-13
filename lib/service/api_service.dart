@@ -5,7 +5,8 @@ import 'package:intl/intl.dart';
 
 class ApiService {
   final String _baseUrl = 'http://localhost:3000/api';
-  // final String _baseUrl = 'http://192.168.0.170:3000/api';
+  // final String _baseUrl = 'http://172.20.10.3:3000/api';
+  // final String _baseUrl = 'http://localhost:3000/api';
 
   Future<String> _getAuthToken() async {
     final user = FirebaseAuth.instance.currentUser;    if (user == null) {
@@ -705,6 +706,7 @@ class ApiService {
   Future<List<Map<String, dynamic>>> getSalesReports({
     required DateTime startDate,
     required DateTime endDate,
+    required String outletId,
   }) async {
     try {
       final token = await _getAuthToken();
@@ -712,8 +714,8 @@ class ApiService {
       final String start = DateFormat('yyyy-MM-dd').format(startDate);
       final String end = DateFormat('yyyy-MM-dd').format(endDate);
 
-      final url =
-      Uri.parse('$_baseUrl/reports/sales?startDate=$start&endDate=$end');
+      final url = Uri.parse(
+          '$_baseUrl/reports/sales?startDate=$start&endDate=$end&outletId=$outletId');
 
       final response = await http.get(url, headers: {
         'Content-Type': 'application/json',
@@ -740,6 +742,32 @@ class ApiService {
       }
     } catch (e) {
       print('Error di getSalesReports: $e');
+      rethrow;
+    }
+  }
+  Future<List<Map<String, dynamic>>> getProductSalesReports({
+    required String outletId,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+
+      final url = Uri.parse(
+          '$_baseUrl/reports/product-sales?outletId=$outletId');
+
+      final response = await http.get(url, headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      });
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw Exception(
+            'Gagal memuat laporan penjualan produk: ${response.body}');
+      }
+    } catch (e) {
+      print('Error di getProductSalesReports: $e');
       rethrow;
     }
   }

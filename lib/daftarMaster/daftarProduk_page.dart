@@ -408,29 +408,33 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
     final List<Map<String, dynamic>> productsOnCurrentPage =
     products.sublist(startIndex, endIndex);
 
-    if (productsOnCurrentPage.isEmpty && _searchQuery.isNotEmpty) {
-      return const Padding(
-          padding: EdgeInsets.all(24.0),
-          child: Center(child: Text('Tidak ada produk ditemukan.')));
+    // --- PERUBAHAN DI SINI ---
+    // Logika untuk menampilkan kotak kosong yang konsisten
+    if (productsOnCurrentPage.isEmpty) {
+      final String message = _searchQuery.isNotEmpty
+          ? 'Tidak ada produk ditemukan.'
+          : 'Belum ada produk.';
+
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16), // Disesuaikan
+          border: Border.all(color: Colors.grey[200]!), // Disesuaikan
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 48.0), // Disesuaikan
+          child: Center(child: Text(message)),
+        ),
+      );
     }
 
-    if (productsOnCurrentPage.isEmpty && _searchQuery.isEmpty) {
-      return const Padding(
-          padding: EdgeInsets.all(24.0),
-          child: Center(child: Text('Belum ada produk.')));
-    }
-
+    // --- PERUBAHAN DI SINI ---
+    // Menyesuaikan gaya container tabel (border, BUKAN shadow)
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 10,
-          ),
-        ],
+        borderRadius: BorderRadius.circular(16), // Disesuaikan
+        border: Border.all(color: Colors.grey[200]!), // Disesuaikan
       ),
       child: Scrollbar(
         thumbVisibility: true,
@@ -629,4 +633,6 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
       ],
     );
   }
+
+
 }

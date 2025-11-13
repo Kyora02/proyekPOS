@@ -3,7 +3,11 @@ import 'package:intl/intl.dart';
 import 'package:proyekpos2/service/api_service.dart';
 
 class DetailPenjualanPage extends StatefulWidget {
-  const DetailPenjualanPage({super.key});
+  final String outletId;
+  const DetailPenjualanPage({
+    super.key,
+    required this.outletId
+  });
 
   @override
   State<DetailPenjualanPage> createState() => _DetailPenjualanPageState();
@@ -37,6 +41,7 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
       final data = await _apiService.getSalesReports(
         startDate: _startDate,
         endDate: _endDate,
+        outletId: widget.outletId,
       );
       setState(() {
         _allData = data;
