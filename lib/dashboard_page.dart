@@ -57,16 +57,16 @@ class _DashboardHostState extends State<DashboardHost> {
 
   Future<void> _checkAndSetInitialOutlet(
       DocumentReference userRef, Map<String, dynamic> data, String userId) async {
-    String? activeId = data['activeOutletId'] as String?;
+    try {
+      String? activeId = data['activeOutletId'] as String?;
 
-    if (activeId == null || activeId.isEmpty) {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('outlets')
-          .where('userId', isEqualTo: userId)
-          .get();
+      if (activeId == null || activeId.isEmpty) {
+        final querySnapshot = await FirebaseFirestore.instance
+            .collection('outlets')
+            .where('userId', isEqualTo: userId)
+            .get();
 
-      if (querySnapshot.docs.length == 1) {
-        try {
+        if (querySnapshot.docs.length == 1) {
           final firstOutletDoc = querySnapshot.docs.first;
           final firstOutletData =
           firstOutletDoc.data() as Map<String, dynamic>;
@@ -83,10 +83,11 @@ class _DashboardHostState extends State<DashboardHost> {
             data['activeOutletId'] = firstOutletId;
             data['businessName'] = firstOutletName;
           }
-        } catch (e) {
-          debugPrint("Error auto-setting active outlet: $e");
         }
       }
+    } catch (e) {
+      debugPrint("Error auto-setting active outlet: $e");
+      // Don't rethrow - allow the app to continue even if this fails
     }
   }
 
@@ -101,18 +102,40 @@ class _DashboardHostState extends State<DashboardHost> {
         final userRef =
         FirebaseFirestore.instance.collection('users').doc(user.uid);
         final doc = await userRef.get();
+
         if (doc.exists && mounted) {
           Map<String, dynamic> data = doc.data()!;
-
           await _checkAndSetInitialOutlet(userRef, data, user.uid);
 
+          if (mounted) {
+            setState(() {
+              _userData = data;
+            });
+          }
+        } else {
+          // User document doesn't exist
+          if (mounted) {
+            setState(() {
+              _userData = {};
+            });
+          }
+        }
+      } else {
+        // No user logged in
+        if (mounted) {
           setState(() {
-            _userData = data;
+            _userData = null;
           });
         }
       }
     } catch (e) {
       debugPrint("Error fetching user data: $e");
+      // Set empty user data to allow UI to render
+      if (mounted) {
+        setState(() {
+          _userData = {};
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -134,18 +157,31 @@ class _DashboardHostState extends State<DashboardHost> {
         final userRef =
         FirebaseFirestore.instance.collection('users').doc(user.uid);
         final doc = await userRef.get();
+
         if (doc.exists && mounted) {
           Map<String, dynamic> data = doc.data()!;
-
           await _checkAndSetInitialOutlet(userRef, data, user.uid);
 
-          setState(() {
-            _userData = data;
-          });
+          if (mounted) {
+            setState(() {
+              _userData = data;
+            });
+          }
+        } else {
+          if (mounted) {
+            setState(() {
+              _userData = {};
+            });
+          }
         }
       }
     } catch (e) {
       debugPrint("Error fetching user data: $e");
+      if (mounted) {
+        setState(() {
+          _userData = {};
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {

@@ -1,6 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'register_page.dart';
+import 'karyawan_dashboard_page.dart';
+import 'dashboard_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -14,43 +17,149 @@ class _LoginPageState extends State<LoginPage> {
   final _emailTxt = TextEditingController();
   final _passwordTxt = TextEditingController();
   bool _isPasswordObscured = true;
+  bool _isLoading = false;
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    try {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
-      );
+    if (_isLoading) return;
 
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailTxt.text.trim(),
         password: _passwordTxt.text.trim(),
       );
 
-      if (mounted) Navigator.of(context).pop();
+      final userId = userCredential.user!.uid;
+
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      if (userDoc.exists) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const DashboardPage()),
+          );
+        }
+        return;
+      }
+
+      final karyawanQuery = await FirebaseFirestore.instance
+          .collection('karyawan')
+          .where('authUid', isEqualTo: userId)
+          .limit(1)
+          .get();
+
+      if (karyawanQuery.docs.isEmpty) {
+        await FirebaseAuth.instance.signOut();
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Akun tidak terdaftar sebagai karyawan.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      final karyawanDoc = karyawanQuery.docs.first;
+      final karyawanData = karyawanDoc.data();
+
+
+      if (karyawanData['status'] != 'Aktif') {
+        await FirebaseAuth.instance.signOut();
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Akun Anda tidak aktif.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // 5. Cek Outlet ID
+      final outletId = karyawanData['outletId'] as String?;
+      if (outletId == null || outletId.isEmpty) {
+        await FirebaseAuth.instance.signOut();
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Anda belum ditugaskan ke outlet manapun.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => KaryawanDashboardPage(
+              karyawanData: karyawanData,
+              karyawanId: karyawanDoc.id,
+            ),
+          ),
+        );
+      }
     } on FirebaseAuthException catch (e) {
-      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
 
       String message;
-      if (e.code == 'user-not-found') {
-        message = 'Tidak ada pengguna yang ditemukan untuk email tersebut.';
-      } else if (e.code == 'wrong-password') {
-        message = 'Password yang dimasukkan salah.';
-      } else if (e.code == 'invalid-credential') {
-        message =
-        'Kredensial tidak valid. Silakan periksa kembali email dan password Anda.';
+      if (e.code == 'user-not-found' || e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        message = 'Email atau password yang Anda masukkan salah.';
       } else {
         message = 'Terjadi kesalahan. Silahkan coba lagi.';
       }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Terjadi kesalahan: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -156,6 +265,7 @@ class _LoginPageState extends State<LoginPage> {
                             decoration: const InputDecoration(
                                 hintText: 'Masukkan Alamat Email'),
                             keyboardType: TextInputType.emailAddress,
+                            enabled: !_isLoading,
                             validator: (value) {
                               if (value == null || value.isEmpty) {
                                 return 'Email tidak boleh kosong.';
@@ -179,7 +289,7 @@ class _LoginPageState extends State<LoginPage> {
                                     color: Colors.black87),
                               ),
                               TextButton(
-                                onPressed: () {},
+                                onPressed: _isLoading ? null : () {},
                                 style: TextButton.styleFrom(
                                   padding: EdgeInsets.zero,
                                   minimumSize: const Size(50, 20),
@@ -201,6 +311,7 @@ class _LoginPageState extends State<LoginPage> {
                           TextFormField(
                             controller: _passwordTxt,
                             obscureText: _isPasswordObscured,
+                            enabled: !_isLoading,
                             decoration: InputDecoration(
                               hintText: 'Masukkan Password',
                               suffixIcon: IconButton(
@@ -209,7 +320,9 @@ class _LoginPageState extends State<LoginPage> {
                                       ? Icons.visibility_off_outlined
                                       : Icons.visibility_outlined,
                                 ),
-                                onPressed: () {
+                                onPressed: _isLoading
+                                    ? null
+                                    : () {
                                   setState(() {
                                     _isPasswordObscured =
                                     !_isPasswordObscured;
@@ -228,8 +341,19 @@ class _LoginPageState extends State<LoginPage> {
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
-                              onPressed: _login,
-                              child: const Text('Login Sekarang!'),
+                              onPressed: _isLoading ? null : _login,
+                              child: _isLoading
+                                  ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor:
+                                  AlwaysStoppedAnimation<Color>(
+                                      Colors.white),
+                                ),
+                              )
+                                  : const Text('Login Sekarang!'),
                             ),
                           ),
                           const SizedBox(height: 20),
@@ -239,7 +363,9 @@ class _LoginPageState extends State<LoginPage> {
                               const Text("Belum Punya Akun ?",
                                   style: TextStyle(fontSize: 13)),
                               TextButton(
-                                onPressed: () {
+                                onPressed: _isLoading
+                                    ? null
+                                    : () {
                                   Navigator.push(
                                       context,
                                       MaterialPageRoute(
@@ -267,4 +393,3 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
-

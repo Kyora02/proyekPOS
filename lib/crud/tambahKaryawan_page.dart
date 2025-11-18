@@ -27,7 +27,6 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
   final _passwordController = TextEditingController();
   final _notelpController = TextEditingController();
 
-  final _outletController = TextEditingController();
   bool _statusAktif = true;
   bool _isPasswordVisible = false;
 
@@ -38,7 +37,6 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
   @override
   void initState() {
     super.initState();
-    _outletController.text = widget.outletName;
 
     if (widget.karyawan != null) {
       _isEditMode = true;
@@ -50,6 +48,7 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
       _statusAktif = widget.karyawan!['status'] == 'Aktif';
     }
   }
+
   @override
   void dispose() {
     _namaController.dispose();
@@ -57,7 +56,6 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
     _emailController.dispose();
     _passwordController.dispose();
     _notelpController.dispose();
-    _outletController.dispose();
     super.dispose();
   }
 
@@ -246,12 +244,6 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
                           hintText: 'Contoh: 08123456789',
                           keyboardType: TextInputType.phone,
                         ),
-                        _buildLabel('Outlet *'),
-                        _buildTextField(
-                          controller: _outletController,
-                          hintText: 'Outlet Karyawan',
-                          readOnly: true,
-                        ),
                         _buildLabel('Status'),
                         _buildStatusToggle(),
                         const SizedBox(height: 32),
@@ -344,8 +336,6 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
       validator: validator,
     );
   }
-
-  // REMOVED: _buildOutletDropdown()
 
   Widget _buildStatusToggle() {
     return Container(

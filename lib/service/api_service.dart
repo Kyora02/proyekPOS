@@ -2,11 +2,12 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/foundation.dart';
 
 class ApiService {
-  final String _baseUrl = 'http://localhost:3000/api';
-  // final String _baseUrl = 'http://172.20.10.3:3000/api';
-  // final String _baseUrl = 'http://localhost:3000/api';
+  final String _baseUrl = kIsWeb
+      ? 'http://localhost:3000/api'
+      : 'http://10.0.2.2:3000/api';
 
   Future<String> _getAuthToken() async {
     final user = FirebaseAuth.instance.currentUser;    if (user == null) {

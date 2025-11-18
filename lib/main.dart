@@ -8,6 +8,7 @@ import 'dashboard_page.dart';
 import 'service/firebase_options.dart';
 import 'login_page.dart';
 import 'register_page.dart';
+import 'karyawan_dashboard_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -83,8 +84,104 @@ class MyApp extends StatelessWidget {
   }
 }
 
+// class AuthWrapper extends StatelessWidget {
+//   const AuthWrapper({super.key});
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return StreamBuilder<User?>(
+//       stream: FirebaseAuth.instance.authStateChanges(),
+//       builder: (context, authSnapshot) {
+//         if (authSnapshot.connectionState == ConnectionState.waiting) {
+//           return const Scaffold(
+//             body: Center(child: CircularProgressIndicator()),
+//           );
+//         }
+//
+//         if (authSnapshot.hasData) {
+//           final user = authSnapshot.data!;
+//
+//           return FutureBuilder<DocumentSnapshot>(
+//             future: FirebaseFirestore.instance
+//                 .collection('users')
+//                 .doc(user.uid)
+//                 .get(),
+//             builder: (context, userDocSnapshot) {
+//               if (userDocSnapshot.connectionState == ConnectionState.waiting) {
+//                 return const Scaffold(
+//                   body: Center(child: CircularProgressIndicator()),
+//                 );
+//               }
+//
+//               if (userDocSnapshot.hasError || !userDocSnapshot.data!.exists) {
+//                 FirebaseAuth.instance.signOut();
+//                 return const LoginPage();
+//               }
+//
+//               final userData =
+//               userDocSnapshot.data!.data() as Map<String, dynamic>;
+//               final bool hasBusinessInfo = userData['hasBusinessInfo'] ?? false;
+//
+//               if (hasBusinessInfo) {
+//                 return const DashboardPage();
+//               } else {
+//                 return const BusinessPage();
+//               }
+//             },
+//           );
+//         }
+//
+//         return const LoginPage();
+//       },
+//     );
+//   }
+// }
+// Di file main.dart
+
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
+
+  Future<Widget> _getRedirectPage(User user) async {
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    if (userDoc.exists) {
+      final userData = userDoc.data() as Map<String, dynamic>;
+      final bool hasBusinessInfo = userData['hasBusinessInfo'] ?? false;
+
+      if (hasBusinessInfo) {
+        return const DashboardPage();
+      } else {
+        return const BusinessPage();
+      }
+    }
+
+    final karyawanQuery = await FirebaseFirestore.instance
+        .collection('karyawan')
+        .where('authUid', isEqualTo: user.uid)
+        .limit(1)
+        .get();
+
+    if (karyawanQuery.docs.isNotEmpty) {
+      final karyawanDoc = karyawanQuery.docs.first;
+      final karyawanData = karyawanDoc.data();
+
+      if (karyawanData['status'] == 'Aktif') {
+        return KaryawanDashboardPage(
+          karyawanData: karyawanData,
+          karyawanId: karyawanDoc.id,
+        );
+      } else {
+        await FirebaseAuth.instance.signOut();
+        return const LoginPage();
+      }
+    }
+
+    await FirebaseAuth.instance.signOut();
+    return const LoginPage();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -96,36 +193,28 @@ class AuthWrapper extends StatelessWidget {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-
         if (authSnapshot.hasData) {
           final user = authSnapshot.data!;
 
-          return FutureBuilder<DocumentSnapshot>(
-            future: FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .get(),
-            builder: (context, userDocSnapshot) {
-              if (userDocSnapshot.connectionState == ConnectionState.waiting) {
+          return FutureBuilder<Widget>(
+            future: _getRedirectPage(user),
+            builder: (context, redirectSnapshot) {
+              if (redirectSnapshot.connectionState == ConnectionState.waiting) {
                 return const Scaffold(
                   body: Center(child: CircularProgressIndicator()),
                 );
               }
 
-              if (userDocSnapshot.hasError || !userDocSnapshot.data!.exists) {
+              if (redirectSnapshot.hasError) {
                 FirebaseAuth.instance.signOut();
                 return const LoginPage();
               }
 
-              final userData =
-              userDocSnapshot.data!.data() as Map<String, dynamic>;
-              final bool hasBusinessInfo = userData['hasBusinessInfo'] ?? false;
-
-              if (hasBusinessInfo) {
-                return const DashboardPage();
-              } else {
-                return const BusinessPage();
+              if (redirectSnapshot.hasData) {
+                return redirectSnapshot.data!;
               }
+
+              return const LoginPage();
             },
           );
         }
