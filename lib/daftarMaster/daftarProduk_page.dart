@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:proyekpos2/crud/tambahProduk_page.dart';
+import 'package:proyekpos2/detail/detailProduk_page.dart';
 import 'package:proyekpos2/service/api_service.dart';
 import 'dart:math' as math;
 
@@ -408,8 +409,6 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
     final List<Map<String, dynamic>> productsOnCurrentPage =
     products.sublist(startIndex, endIndex);
 
-    // --- PERUBAHAN DI SINI ---
-    // Logika untuk menampilkan kotak kosong yang konsisten
     if (productsOnCurrentPage.isEmpty) {
       final String message = _searchQuery.isNotEmpty
           ? 'Tidak ada produk ditemukan.'
@@ -418,23 +417,21 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
       return Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16), // Disesuaikan
-          border: Border.all(color: Colors.grey[200]!), // Disesuaikan
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey[200]!),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 48.0), // Disesuaikan
+          padding: const EdgeInsets.symmetric(vertical: 48.0),
           child: Center(child: Text(message)),
         ),
       );
     }
 
-    // --- PERUBAHAN DI SINI ---
-    // Menyesuaikan gaya container tabel (border, BUKAN shadow)
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16), // Disesuaikan
-        border: Border.all(color: Colors.grey[200]!), // Disesuaikan
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey[200]!),
       ),
       child: Scrollbar(
         thumbVisibility: true,
@@ -499,6 +496,16 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
                             case 'ubah':
                               _navigateToEditProduct(product);
                               break;
+                            case 'Detail':
+                              Navigator.of(context, rootNavigator: true).push(
+                                MaterialPageRoute(
+                                  builder: (_) => DetailProdukPage(
+                                    product: product,
+                                    categoryName: _getCategoryName(product['categoryId'] ?? ''),
+                                  ),
+                                ),
+                              );
+                              break;
                             case 'hapus':
                               _showDeleteConfirmationDialog(
                                   context, product['id'], product['name']);
@@ -517,6 +524,16 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
                                 Text('Ubah'),
                               ],
                             ),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'Detail',
+                            child: Row(
+                              children: [
+                                Icon(Icons.info_outline, size: 20, color: Colors.black54),
+                                SizedBox(width: 12),
+                                Text('Detail'),
+                              ],
+                            )
                           ),
                           const PopupMenuItem<String>(
                             value: 'hapus',

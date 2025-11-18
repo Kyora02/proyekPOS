@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:proyekpos2/crud/tambahPelanggan_page.dart';
+import 'package:proyekpos2/detail/detailPelanggan_page.dart';
 import 'package:proyekpos2/service/api_service.dart';
 import 'dart:math' as math;
 
@@ -400,7 +401,18 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
                       onSelected: (String value) {
                         if (value == 'ubah') {
                           _navigateToEditPelanggan(item);
-                        } else if (value == 'hapus') {
+                        }
+                        else if (value == 'etail') {
+                          Navigator.of(context, rootNavigator: true).push(
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  DetailPelangganPage(
+                                    pelanggan: item,
+                                  ),
+                            ),
+                          );
+                        }
+                        else if (value == 'hapus') {
                           _showDeleteConfirmationDialog(
                               context, item['name'], item['id']);
                         }
@@ -413,7 +425,7 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
                             icon: Icons.edit_outlined),
                         _buildPopupMenuItem(
                             value: 'detail',
-                            text: 'detail',
+                            text: 'Detail',
                             icon: Icons.details_outlined),
                         _buildPopupMenuItem(
                             value: 'hapus',
