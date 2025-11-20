@@ -172,15 +172,13 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
       return;
     }
 
-    Navigator.pop(context); // Close dialog
+    Navigator.pop(context);
     setState(() => _isLoading = true);
 
     try {
       String apiPaymentMethod = 'Midtrans';
       if (_selectedPaymentMethod == 'EDC') apiPaymentMethod = 'EDC';
       if (_selectedPaymentMethod == 'Tunai') apiPaymentMethod = 'Tunai';
-
-      print('Creating transaction with payment method: $apiPaymentMethod');
 
       final result = await _apiService.createTransaction(
         amount: _total,
@@ -190,8 +188,6 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
         karyawanId: widget.karyawanId,
         outletId: widget.karyawanData['outletId'] ?? '',
       );
-
-      print('Transaction result: $result');
 
       if (_selectedPaymentMethod == 'EDC' || _selectedPaymentMethod == 'Tunai') {
         await _apiService.updateTransactionStatus(result['orderId'], 'success');
@@ -208,9 +204,6 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
         String url = result['redirect_url'];
         String orderId = result['orderId'];
 
-        print('Opening payment URL: $url');
-        print('Order ID: $orderId');
-
         if (kIsWeb) {
           _currentOrderId = orderId;
           setState(() => _isLoading = false);
@@ -226,7 +219,6 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
             throw Exception("Tidak bisa membuka link pembayaran");
           }
         } else {
-          // For mobile platform - use webview
           setState(() => _isLoading = false);
 
           if (mounted) {
@@ -239,8 +231,6 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                 ),
               ),
             );
-
-            print('Payment webview returned: $paymentSuccess');
 
             if (paymentSuccess == true) {
               setState(() => _isLoading = true);
@@ -269,7 +259,6 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
       }
     } catch (e) {
       setState(() => _isLoading = false);
-      print('Payment error: $e');
 
       String errorMessage = 'Error: $e';
 
@@ -300,7 +289,6 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
     }
   }
 
-  // New method for web payment status checker
   void _showWebPaymentStatusDialog(String orderId) {
     showDialog(
       context: context,
@@ -309,11 +297,11 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
         orderId: orderId,
         apiService: _apiService,
         onSuccess: () {
-          Navigator.pop(context); // Close status dialog
+          Navigator.pop(context);
           _finishTransaction();
         },
         onFailed: () {
-          Navigator.pop(context); // Close status dialog
+          Navigator.pop(context);
           _showRetryDialog(orderId);
         },
       ),
@@ -322,37 +310,23 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
 
   Future<void> _checkFinalPaymentStatus(String orderId) async {
     try {
-      print('Checking final payment status for: $orderId');
-
       final status = await _apiService.checkTransactionStatus(orderId);
 
       if (status != null) {
-        print('Final payment status: ${status['status']}');
-        print('Payment method used: ${status['paymentMethod']}');
-        print('Transaction status: ${status['transactionStatus']}');
-
-        // Check if payment was successful
         if (status['status'] == 'success' ||
             status['transactionStatus'] == 'settlement' ||
             status['transactionStatus'] == 'capture') {
-          print('✅ Payment confirmed as successful');
         } else if (status['status'] == 'pending') {
-          print('⏳ Payment still pending');
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Pembayaran masih diproses. Silakan cek kembali nanti.'),
               duration: Duration(seconds: 5),
             ),
           );
-        } else {
-          print('❌ Payment failed or cancelled');
         }
-      } else {
-        print('⚠️ Could not get payment status');
       }
     } catch (e) {
       print('Error checking final status: $e');
-      // Don't show error to user - just log it
     }
   }
 
@@ -368,14 +342,12 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              // User cancels - do nothing
             },
             child: const Text('Batalkan'),
           ),
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              // Check status first
               setState(() => _isLoading = true);
               await _checkFinalPaymentStatus(orderId);
               setState(() => _isLoading = false);
@@ -1095,7 +1067,6 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
   }
 }
 
-// New widget for web payment status checker
 class WebPaymentStatusDialog extends StatefulWidget {
   final String orderId;
   final ApiService apiService;
@@ -1118,52 +1089,122 @@ class _WebPaymentStatusDialogState extends State<WebPaymentStatusDialog> {
   bool _isChecking = false;
   String _statusMessage = 'Menunggu pembayaran...';
   bool _hasResult = false;
+  bool _isSuccess = false;
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Status Pembayaran'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (!_hasResult) ...[
-            const CircularProgressIndicator(),
-            const SizedBox(height: 16),
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(16),
+      child: Container(
+        width: double.infinity,
+        constraints: const BoxConstraints(maxWidth: 500),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(5),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Status Pembayaran",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 40),
+            Center(
+              child: Column(
+                children: [
+                  if (_isSuccess)
+                    const Icon(Icons.check_circle, color: Colors.green, size: 50)
+                  else if (_hasResult && !_isSuccess)
+                    const Icon(Icons.error, color: Colors.red, size: 50)
+                  else
+                    const SizedBox(
+                      height: 40,
+                      width: 40,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00A3A3)),
+                      ),
+                    ),
+                  const SizedBox(height: 24),
+                  Text(
+                    _statusMessage,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: _isSuccess ? FontWeight.bold : FontWeight.normal,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  if (!_hasResult) ...[
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Setelah selesai membayar di tab baru, klik tombol "Cek Status" di bawah.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: Colors.grey),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 40),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (!_isSuccess)
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      widget.onFailed();
+                    },
+                    child: const Text(
+                      'Batalkan',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00A3A3),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
+                  onPressed: (_isChecking || _isSuccess) ? null : _checkStatus,
+                  child: _isChecking
+                      ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                      : const Text(
+                    'Cek Status',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
-          Text(
-            _statusMessage,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 14),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Setelah selesai membayar di tab baru, klik tombol "Cek Status" di bawah.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: Colors.grey),
-          ),
-        ],
+        ),
       ),
-      actions: [
-        if (!_hasResult) ...[
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              widget.onFailed();
-            },
-            child: const Text('Batalkan'),
-          ),
-          ElevatedButton(
-            onPressed: _isChecking ? null : _checkStatus,
-            child: _isChecking
-                ? const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-                : const Text('Cek Status'),
-          ),
-        ],
-      ],
     );
   }
 
@@ -1183,8 +1224,10 @@ class _WebPaymentStatusDialogState extends State<WebPaymentStatusDialog> {
             status['transactionStatus'] == 'settlement' ||
             status['transactionStatus'] == 'capture') {
           setState(() {
-            _statusMessage = '✅ Pembayaran Berhasil!';
+            _statusMessage = 'Pembayaran Berhasil';
             _hasResult = true;
+            _isSuccess = true;
+            _isChecking = false;
           });
 
           await Future.delayed(const Duration(seconds: 1));
@@ -1196,8 +1239,10 @@ class _WebPaymentStatusDialogState extends State<WebPaymentStatusDialog> {
           });
         } else {
           setState(() {
-            _statusMessage = '❌ Pembayaran Gagal atau Dibatalkan';
+            _statusMessage = 'Pembayaran Gagal atau Dibatalkan';
             _hasResult = true;
+            _isSuccess = false;
+            _isChecking = false;
           });
 
           await Future.delayed(const Duration(seconds: 2));

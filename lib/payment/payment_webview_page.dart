@@ -99,31 +99,23 @@ class _PaymentWebviewPageState extends State<PaymentWebviewPage> {
 
     print('Checking URL: $lowerUrl');
 
-    // More comprehensive success detection
     bool isSuccess =
-    // Direct status codes
     lowerUrl.contains('status_code=200') ||
-        // Transaction status indicators
         lowerUrl.contains('transaction_status=settlement') ||
         lowerUrl.contains('transaction_status=capture') ||
         lowerUrl.contains('transaction_status=success') ||
-        // Success page indicators
         lowerUrl.contains('/success') ||
         lowerUrl.contains('payment_successful') ||
         lowerUrl.contains('payment-successful') ||
         lowerUrl.contains('payment_success') ||
-        // Order confirmation with success
         (lowerUrl.contains('order_id=${widget.orderId.toLowerCase()}') &&
             (lowerUrl.contains('settlement') ||
                 lowerUrl.contains('success') ||
                 lowerUrl.contains('status_code=200'))) ||
-        // Midtrans specific success URLs
         (lowerUrl.contains('finish') && !lowerUrl.contains('unfinish')) ||
-        // Check if URL contains success indicators in path
         lowerUrl.contains('/payment/success') ||
         lowerUrl.contains('/transaction/success');
 
-    // Check for failure indicators
     bool isFailed =
         lowerUrl.contains('status_code=201') ||
             lowerUrl.contains('status_code=202') ||
@@ -149,7 +141,6 @@ class _PaymentWebviewPageState extends State<PaymentWebviewPage> {
     if (_hasReturnedResult) return;
     _hasReturnedResult = true;
 
-    // Show success dialog
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -190,11 +181,10 @@ class _PaymentWebviewPageState extends State<PaymentWebviewPage> {
       ),
     );
 
-    // Auto close after 2 seconds
     _autoCloseTimer = Timer(const Duration(seconds: 2), () {
       if (mounted) {
-        Navigator.of(context).pop(); // Close dialog
-        Navigator.of(context).pop(true); // Return to dashboard with success
+        Navigator.of(context).pop();
+        Navigator.of(context).pop(true);
       }
     });
   }
@@ -204,7 +194,6 @@ class _PaymentWebviewPageState extends State<PaymentWebviewPage> {
 
     _hasReturnedResult = true;
 
-    // Shorter delay for better UX
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
         Navigator.pop(context, isSuccess);
@@ -213,7 +202,6 @@ class _PaymentWebviewPageState extends State<PaymentWebviewPage> {
   }
 
   Future<bool> _onWillPop() async {
-    // If already showing result, don't ask
     if (_hasReturnedResult) return false;
 
     final shouldPop = await showDialog<bool>(
