@@ -40,9 +40,16 @@ dependencies:
   cloud_firestore: ^4.17.5
   intl: ^0.19.0
   http: ^1.2.0
+  image_picker: ^1.0.4
+  webview_flutter: ^4.4.2
   flutter_bloc: ^8.1.5
   equatable: ^2.0.5
   syncfusion_flutter_datepicker: ^25.1.35
+  webview_flutter_web: ^0.2.3+4
+  webview_flutter_android: ^4.10.6
+  url_launcher: ^6.3.2
+  pdf: ^3.10.0
+  printing: ^5.11.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

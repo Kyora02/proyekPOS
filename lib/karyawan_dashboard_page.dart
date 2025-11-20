@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'service/api_service.dart';
-import 'login_page.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:url_launcher/url_launcher.dart';
+import '../service/api_service.dart';
+import '../registration/login_page.dart';
+import '../payment/payment_webview_page.dart';
 
 class KaryawanDashboardPage extends StatefulWidget {
   final Map<String, dynamic> karyawanData;
@@ -20,6 +23,7 @@ class KaryawanDashboardPage extends StatefulWidget {
 
 class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
   final ApiService _apiService = ApiService();
+  final TextEditingController _customerNameController = TextEditingController();
 
   List<Map<String, dynamic>> _categories = [];
   List<Map<String, dynamic>> _allProducts = [];
@@ -28,6 +32,8 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
 
   bool _isLoading = true;
   String _selectedCategoryId = 'all';
+  String _selectedPaymentMethod = 'QRIS';
+  String? _currentOrderId;
 
   double _subtotal = 0.0;
   double _pajak = 0.0;
@@ -44,6 +50,12 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
     _fetchData();
   }
 
+  @override
+  void dispose() {
+    _customerNameController.dispose();
+    super.dispose();
+  }
+
   Future<void> _fetchData() async {
     setState(() => _isLoading = true);
     try {
@@ -58,12 +70,22 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
 
       setState(() {
         _categories = results[0];
-        _allProducts = results[1];
+
+        List<Map<String, dynamic>> rawProducts = results[1];
+        _allProducts = rawProducts.where((product) {
+          return product['showInMenu'] == true || product['showInMenu'] == null;
+        }).toList();
+
         _filteredProducts = _allProducts;
         _isLoading = false;
       });
     } catch (e) {
       setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -73,9 +95,8 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
       if (categoryId == 'all') {
         _filteredProducts = _allProducts;
       } else {
-        _filteredProducts = _allProducts
-            .where((p) => p['categoryId'] == categoryId)
-            .toList();
+        _filteredProducts =
+            _allProducts.where((p) => p['categoryId'] == categoryId).toList();
       }
     });
   }
@@ -143,34 +164,407 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
     }
   }
 
-  void _showPaymentDialog() {
-    if (_cartItems.isEmpty) return;
+  Future<void> _processPayment() async {
+    if (_customerNameController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nama Pelanggan wajib diisi!')),
+      );
+      return;
+    }
+
+    Navigator.pop(context); // Close dialog
+    setState(() => _isLoading = true);
+
+    try {
+      String apiPaymentMethod = 'Midtrans';
+      if (_selectedPaymentMethod == 'EDC') apiPaymentMethod = 'EDC';
+      if (_selectedPaymentMethod == 'Tunai') apiPaymentMethod = 'Tunai';
+
+      print('Creating transaction with payment method: $apiPaymentMethod');
+
+      final result = await _apiService.createTransaction(
+        amount: _total,
+        items: _cartItems,
+        customerName: _customerNameController.text,
+        paymentMethod: apiPaymentMethod,
+        karyawanId: widget.karyawanId,
+        outletId: widget.karyawanData['outletId'] ?? '',
+      );
+
+      print('Transaction result: $result');
+
+      if (_selectedPaymentMethod == 'EDC' || _selectedPaymentMethod == 'Tunai') {
+        await _apiService.updateTransactionStatus(result['orderId'], 'success');
+        setState(() => _isLoading = false);
+        _finishTransaction();
+        return;
+      }
+
+      if (_selectedPaymentMethod == 'QRIS') {
+        if (result['redirect_url'] == null || result['redirect_url'].isEmpty) {
+          throw Exception("Gagal mendapatkan link pembayaran dari server");
+        }
+
+        String url = result['redirect_url'];
+        String orderId = result['orderId'];
+
+        print('Opening payment URL: $url');
+        print('Order ID: $orderId');
+
+        if (kIsWeb) {
+          _currentOrderId = orderId;
+          setState(() => _isLoading = false);
+
+          final Uri uri = Uri.parse(url);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+            if (mounted) {
+              _showWebPaymentStatusDialog(orderId);
+            }
+          } else {
+            throw Exception("Tidak bisa membuka link pembayaran");
+          }
+        } else {
+          // For mobile platform - use webview
+          setState(() => _isLoading = false);
+
+          if (mounted) {
+            final bool? paymentSuccess = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PaymentWebviewPage(
+                  url: url,
+                  orderId: orderId,
+                ),
+              ),
+            );
+
+            print('Payment webview returned: $paymentSuccess');
+
+            if (paymentSuccess == true) {
+              setState(() => _isLoading = true);
+
+              await Future.delayed(const Duration(seconds: 2));
+
+              await _checkFinalPaymentStatus(orderId);
+
+              setState(() => _isLoading = false);
+              _finishTransaction();
+            } else if (paymentSuccess == false) {
+              _showRetryDialog(orderId);
+            } else {
+              setState(() => _isLoading = true);
+              await _checkFinalPaymentStatus(orderId);
+              setState(() => _isLoading = false);
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Status pembayaran tidak jelas. Silakan cek riwayat transaksi.'),
+                ),
+              );
+            }
+          }
+        }
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      print('Payment error: $e');
+
+      String errorMessage = 'Error: $e';
+
+      if (e.toString().contains('409')) {
+        errorMessage = 'Transaksi duplikat terdeteksi. Silakan coba lagi.';
+      } else if (e.toString().contains('400')) {
+        errorMessage = 'Data transaksi tidak valid. Silakan periksa kembali.';
+      } else if (e.toString().contains('timeout')) {
+        errorMessage = 'Koneksi timeout. Silakan cek koneksi internet Anda.';
+      } else if (e.toString().contains('SocketException')) {
+        errorMessage = 'Tidak dapat terhubung ke server. Periksa koneksi internet.';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'COBA LAGI',
+            textColor: Colors.white,
+            onPressed: () {
+              _showPaymentDialog();
+            },
+          ),
+        ),
+      );
+    }
+  }
+
+  // New method for web payment status checker
+  void _showWebPaymentStatusDialog(String orderId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => WebPaymentStatusDialog(
+        orderId: orderId,
+        apiService: _apiService,
+        onSuccess: () {
+          Navigator.pop(context); // Close status dialog
+          _finishTransaction();
+        },
+        onFailed: () {
+          Navigator.pop(context); // Close status dialog
+          _showRetryDialog(orderId);
+        },
+      ),
+    );
+  }
+
+  Future<void> _checkFinalPaymentStatus(String orderId) async {
+    try {
+      print('Checking final payment status for: $orderId');
+
+      final status = await _apiService.checkTransactionStatus(orderId);
+
+      if (status != null) {
+        print('Final payment status: ${status['status']}');
+        print('Payment method used: ${status['paymentMethod']}');
+        print('Transaction status: ${status['transactionStatus']}');
+
+        // Check if payment was successful
+        if (status['status'] == 'success' ||
+            status['transactionStatus'] == 'settlement' ||
+            status['transactionStatus'] == 'capture') {
+          print('✅ Payment confirmed as successful');
+        } else if (status['status'] == 'pending') {
+          print('⏳ Payment still pending');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Pembayaran masih diproses. Silakan cek kembali nanti.'),
+              duration: Duration(seconds: 5),
+            ),
+          );
+        } else {
+          print('❌ Payment failed or cancelled');
+        }
+      } else {
+        print('⚠️ Could not get payment status');
+      }
+    } catch (e) {
+      print('Error checking final status: $e');
+      // Don't show error to user - just log it
+    }
+  }
+
+  void _showRetryDialog(String orderId) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Konfirmasi Pembayaran'),
-        content: Text('Total: ${_currencyFormat.format(_total)}\n\nLanjutkan?'),
+        title: const Text('Pembayaran Dibatalkan'),
+        content: const Text(
+            'Apakah Anda ingin mencoba lagi atau membatalkan transaksi ini?'
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: _primaryColor),
             onPressed: () {
-              setState(() {
-                _cartItems.clear();
-                _calculateTotals();
-              });
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Transaksi Berhasil!')),
-              );
+              // User cancels - do nothing
             },
-            child:
-            const Text('Konfirmasi', style: TextStyle(color: Colors.white)),
+            child: const Text('Batalkan'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              // Check status first
+              setState(() => _isLoading = true);
+              await _checkFinalPaymentStatus(orderId);
+              setState(() => _isLoading = false);
+            },
+            child: const Text('Cek Status'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _finishTransaction() {
+    setState(() {
+      _cartItems.clear();
+      _calculateTotals();
+      _customerNameController.clear();
+      _currentOrderId = null;
+      _isLoading = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('✅ Transaksi Berhasil!'),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: 'OK',
+          textColor: Colors.white,
+          onPressed: () {},
+        ),
+      ),
+    );
+  }
+
+  void _showPaymentDialog() {
+    if (_cartItems.isEmpty) return;
+    _customerNameController.clear();
+    setState(() {
+      _selectedPaymentMethod = 'QRIS';
+    });
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          return Dialog(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.85,
+              constraints: const BoxConstraints(maxWidth: 500),
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Checkout',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 30),
+                  Center(
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Total Pembayaran',
+                          style: TextStyle(color: Colors.grey, fontSize: 14),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _currencyFormat.format(_total),
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: _primaryColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  TextField(
+                    controller: _customerNameController,
+                    decoration: InputDecoration(
+                      labelText: 'Nama Pelanggan',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      prefixIcon: const Icon(Icons.person),
+                      filled: true,
+                      fillColor: Colors.grey[50],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    "Metode Pembayaran",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Row(
+                      children: [
+                        _buildPaymentTab(
+                            'QRIS / Online', 'QRIS', setStateDialog),
+                        _buildPaymentTab('EDC', 'EDC', setStateDialog),
+                        _buildPaymentTab('Tunai', 'Tunai', setStateDialog),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                      ),
+                      onPressed: _processPayment,
+                      child: const Text(
+                        'Bayar',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPaymentTab(
+      String label, String value, StateSetter setStateDialog) {
+    final bool isSelected = _selectedPaymentMethod == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setStateDialog(() {
+            _selectedPaymentMethod = value;
+          });
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: isSelected ? _primaryColor : Colors.transparent,
+            borderRadius: BorderRadius.circular(7),
+          ),
+          alignment: Alignment.center,
+          margin: const EdgeInsets.all(2),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.grey[600],
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              fontSize: 13,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -222,6 +616,8 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                       itemBuilder: (context, index) {
                         final item = _cartItems[index];
                         return Card(
+                          color: Colors.white,
+                          surfaceTintColor: Colors.white,
                           margin: const EdgeInsets.only(bottom: 8),
                           child: ListTile(
                             title: Text(item['nama'],
@@ -257,46 +653,7 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                       },
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      border: Border(top: BorderSide(color: Colors.grey[300]!)),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('Total',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16)),
-                              Text(_currencyFormat.format(_total),
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      color: _primaryColor))
-                            ]),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _primaryColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                            ),
-                            onPressed: () {
-                              Navigator.pop(context);
-                              _showPaymentDialog();
-                            },
-                            child: const Text('BAYAR'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  _buildCartSummary(),
                 ],
               );
             },
@@ -342,8 +699,8 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
             decoration: InputDecoration(
               hintText: 'Cari produk...',
               prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.0)),
+              border:
+              OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
               contentPadding:
               const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
             ),
@@ -370,7 +727,7 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
             children: [
               _buildMobileCategoryChip('all', 'Semua'),
               ..._categories.map((cat) => _buildMobileCategoryChip(
-                  cat['_id'] ?? '', cat['name'] ?? 'No Name')),
+                  cat['id'] ?? '', cat['name'] ?? 'No Name')),
             ],
           ),
         ),
@@ -452,17 +809,15 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                   width: double.infinity,
                   color: Colors.white,
                   child: const Text("Kategori",
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 16)),
+                      style:
+                      TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
                 Expanded(
                   child: ListView(
                     children: [
                       _buildCategoryTile('all', 'Semua Produk'),
-                      // FIX: Check for 'id' first, then '_id'
                       ..._categories.map((cat) => _buildCategoryTile(
-                          cat['id'] ?? cat['_id'] ?? '',
-                          cat['name'] ?? 'No Name')),
+                          cat['id'] ?? '', cat['name'] ?? 'No Name')),
                     ],
                   ),
                 ),
@@ -482,8 +837,8 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                     prefixIcon: const Icon(Icons.search),
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12.0)),
-                    contentPadding: const EdgeInsets.symmetric(
-                        vertical: 0, horizontal: 12),
+                    contentPadding:
+                    const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
                   ),
                   onChanged: (val) {
                     setState(() {
@@ -531,11 +886,11 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                   padding: const EdgeInsets.all(16),
                   width: double.infinity,
                   decoration: BoxDecoration(
-                      border: Border(
-                          bottom: BorderSide(color: Colors.grey[300]!))),
+                      border:
+                      Border(bottom: BorderSide(color: Colors.grey[300]!))),
                   child: const Text('Keranjang',
-                      style: TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold)),
+                      style:
+                      TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
                 Expanded(
                   child: ListView.builder(
@@ -544,6 +899,8 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                     itemBuilder: (context, index) {
                       final item = _cartItems[index];
                       return Card(
+                        color: Colors.white,
+                        surfaceTintColor: Colors.white,
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
                           dense: true,
@@ -627,8 +984,12 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
 
   Widget _buildProductCard(Map<String, dynamic> product) {
     final double price = (product['sellingPrice'] ?? 0).toDouble();
+    final String? imageUrl = product['imageUrl'];
+
     return Card(
       elevation: 2,
+      color: Colors.white,
+      surfaceTintColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -637,10 +998,25 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: Container(
-                color: Colors.grey[200],
+              child: (imageUrl != null && imageUrl.isNotEmpty)
+                  ? Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
                 width: double.infinity,
-                child: const Icon(Icons.fastfood, size: 40, color: Colors.grey),
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: Colors.grey[100],
+                    width: double.infinity,
+                    child: const Icon(Icons.broken_image,
+                        color: Colors.grey),
+                  );
+                },
+              )
+                  : Container(
+                color: Colors.grey[100],
+                width: double.infinity,
+                child: const Icon(Icons.fastfood,
+                    size: 40, color: Colors.grey),
               ),
             ),
             Padding(
@@ -676,7 +1052,7 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: Colors.white,
         border: Border(top: BorderSide(color: Colors.grey[300]!)),
       ),
       child: Column(
@@ -710,11 +1086,134 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               onPressed: _showPaymentDialog,
-              child: const Text('BAYAR'),
+              child: const Text('Konfirmasi Bayar'),
             ),
           ),
         ],
       ),
     );
+  }
+}
+
+// New widget for web payment status checker
+class WebPaymentStatusDialog extends StatefulWidget {
+  final String orderId;
+  final ApiService apiService;
+  final VoidCallback onSuccess;
+  final VoidCallback onFailed;
+
+  const WebPaymentStatusDialog({
+    super.key,
+    required this.orderId,
+    required this.apiService,
+    required this.onSuccess,
+    required this.onFailed,
+  });
+
+  @override
+  State<WebPaymentStatusDialog> createState() => _WebPaymentStatusDialogState();
+}
+
+class _WebPaymentStatusDialogState extends State<WebPaymentStatusDialog> {
+  bool _isChecking = false;
+  String _statusMessage = 'Menunggu pembayaran...';
+  bool _hasResult = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Status Pembayaran'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!_hasResult) ...[
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+          ],
+          Text(
+            _statusMessage,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 14),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Setelah selesai membayar di tab baru, klik tombol "Cek Status" di bawah.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+        ],
+      ),
+      actions: [
+        if (!_hasResult) ...[
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              widget.onFailed();
+            },
+            child: const Text('Batalkan'),
+          ),
+          ElevatedButton(
+            onPressed: _isChecking ? null : _checkStatus,
+            child: _isChecking
+                ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+                : const Text('Cek Status'),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _checkStatus() async {
+    setState(() {
+      _isChecking = true;
+      _statusMessage = 'Memeriksa status pembayaran...';
+    });
+
+    try {
+      await Future.delayed(const Duration(seconds: 1));
+
+      final status = await widget.apiService.checkTransactionStatus(widget.orderId);
+
+      if (status != null) {
+        if (status['status'] == 'success' ||
+            status['transactionStatus'] == 'settlement' ||
+            status['transactionStatus'] == 'capture') {
+          setState(() {
+            _statusMessage = '✅ Pembayaran Berhasil!';
+            _hasResult = true;
+          });
+
+          await Future.delayed(const Duration(seconds: 1));
+          widget.onSuccess();
+        } else if (status['status'] == 'pending') {
+          setState(() {
+            _isChecking = false;
+            _statusMessage = 'Pembayaran masih diproses.\nSilakan cek kembali dalam beberapa saat.';
+          });
+        } else {
+          setState(() {
+            _statusMessage = '❌ Pembayaran Gagal atau Dibatalkan';
+            _hasResult = true;
+          });
+
+          await Future.delayed(const Duration(seconds: 2));
+          widget.onFailed();
+        }
+      } else {
+        setState(() {
+          _isChecking = false;
+          _statusMessage = 'Tidak dapat memeriksa status.\nSilakan coba lagi.';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isChecking = false;
+        _statusMessage = 'Error: ${e.toString()}\nSilakan coba lagi.';
+      });
+    }
   }
 }

@@ -3,11 +3,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'business_page.dart';
+import 'profile/business_page.dart';
 import 'dashboard_page.dart';
 import 'service/firebase_options.dart';
-import 'login_page.dart';
-import 'register_page.dart';
+import 'registration/login_page.dart';
+import 'registration/register_page.dart';
 import 'karyawan_dashboard_page.dart';
 
 void main() async {

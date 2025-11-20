@@ -27,6 +27,11 @@ class DetailProdukPage extends StatelessWidget {
     final String desc = product['description'] ?? '-';
     final double costPrice = (product['costPrice'] ?? 0).toDouble();
     final double sellingPrice = (product['sellingPrice'] ?? 0).toDouble();
+    final String? imageUrl = product['imageUrl'];
+
+    if (imageUrl != null) {
+      print("DEBUG IMAGE URL: $imageUrl");
+    }
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -60,21 +65,52 @@ class DetailProdukPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // --- UPDATED IMAGE SECTION ---
                     Center(
                       child: Container(
-                        width: 80,
-                        height: 80,
+                        width: 150, // Increased size for better visibility
+                        height: 150,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF279E9E).withOpacity(0.1),
-                          shape: BoxShape.circle,
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey[300]!),
                         ),
-                        child: const Icon(
-                          Icons.inventory_2_outlined,
-                          size: 40,
-                          color: Color(0xFF279E9E),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: (imageUrl != null && imageUrl.isNotEmpty)
+                              ? Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(
+                                Icons.broken_image_outlined,
+                                size: 50,
+                                color: Colors.grey,
+                              );
+                            },
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Center(
+                                child: CircularProgressIndicator(
+                                  value: loadingProgress.expectedTotalBytes != null
+                                      ? loadingProgress.cumulativeBytesLoaded /
+                                      loadingProgress.expectedTotalBytes!
+                                      : null,
+                                ),
+                              );
+                            },
+                          )
+                              : Center(
+                            child: Icon(
+                              Icons.inventory_2_outlined,
+                              size: 60,
+                              color: const Color(0xFF279E9E).withOpacity(0.5),
+                            ),
+                          ),
                         ),
                       ),
                     ),
+                    // -----------------------------
                     const SizedBox(height: 32),
                     _buildReadOnlyField(
                       label: 'Nama Produk',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:intl/intl.dart';
 import 'package:proyekpos2/service/api_service.dart';
 import 'dart:math' as math;
@@ -52,8 +53,13 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
       _isLoading = true;
     });
     try {
+      final start = DateTime(_startDate.year, _startDate.month, _startDate.day, 0, 0, 0);
+      final end = DateTime(_endDate.year, _endDate.month, _endDate.day, 23, 59, 59);
+
       final data = await _apiService.getProductSalesReports(
         outletId: widget.outletId,
+        startDate: start,
+        endDate: end,
       );
       setState(() {
         _allData = data;
@@ -126,20 +132,16 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
           bValue = b['kategori'] ?? '';
           break;
         case 3:
-          aValue = a['jenisProduk'] ?? '';
-          bValue = b['jenisProduk'] ?? '';
-          break;
-        case 4:
           aValue = a['jumlah'] ?? 0;
           bValue = b['jumlah'] ?? 0;
           break;
-        case 5:
+        case 4:
           aValue = a['penjualanRp'] ?? 0;
           bValue = b['penjualanRp'] ?? 0;
           break;
-        case 6:
-          aValue = a['persentaseJumlah'] ?? 0.0;
-          bValue = b['persentaseJumlah'] ?? 0.0;
+        case 5:
+          aValue = a['persentaseJumlah'] ?? 0;
+          bValue = b['persentaseJumlah'] ?? 0;
           break;
         default:
           return 0;
@@ -318,111 +320,127 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
   }
 
   Widget _buildWebTable(List<Map<String, dynamic>> data) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 10,
-          )
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (data.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(32.0),
-              child: Center(child: Text('Tidak ada data penjualan produk ditemukan.')),
-            )
-          else
-            Scrollbar(
-              controller: _horizontalScrollController,
-              thumbVisibility: true,
-              child: ScrollConfiguration(
-                behavior: MyCustomScrollBehavior(),
-                child: SingleChildScrollView(
-                  controller: _horizontalScrollController,
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    columnSpacing: 100.0,
-                    sortColumnIndex: _sortColumnIndex,
-                    sortAscending: _sortAscending,
-                    headingTextStyle: _tableHeaderStyle(),
-                    dataTextStyle: _tableBodyStyle(),
-                    columns: [
-                      DataColumn(label: const Text('PRODUK'), onSort: _onSort),
-                      DataColumn(label: const Text('SKU'), onSort: _onSort),
-                      DataColumn(label: const Text('KATEGORI'), onSort: _onSort),
-                      DataColumn(
-                          label: const Text('JUMLAH'),
-                          numeric: true,
-                          onSort: _onSort),
-                      DataColumn(
-                          label: const Text('PENJUALAN (RP)'),
-                          numeric: true,
-                          onSort: _onSort),
-                      DataColumn(
-                          label: const Text('JUMLAH (%)'),
-                          numeric: true,
-                          onSort: _onSort),
-                      const DataColumn(label: Text('AKSI')),
-                    ],
-                    rows: data.map((item) {
-                      return DataRow(
-                        cells: [
-                          DataCell(
-                              Text(item['produk'], style: _tableBodyStyle())),
-                          DataCell(Text(item['sku'], style: _tableBodyStyle())),
-                          DataCell(Text(item['kategori'],
-                              style: _tableBodyStyle())),
-                          DataCell(Text(item['jumlah'].toString(),
-                              style: _tableBodyStyle())),
-                          DataCell(Text(
-                              _currencyFormatter.format(item['penjualanRp']),
-                              style:
-                              _tableBodyStyle(fontWeight: FontWeight.bold))),
-                          DataCell(Text(
-                              '${(item['persentaseJumlah'] as num).toStringAsFixed(2)}%',
-                              style: _tableBodyStyle())),
-                          DataCell(
-                            PopupMenuButton<String>(
-                              color: Colors.white,
-                              icon: const Icon(Icons.more_horiz,
-                                  color: Color(0xFF279E9E)),
-                              onSelected: (value) {},
-                              itemBuilder: (context) => [
-                                const PopupMenuItem(
-                                  value: 'lihat_detail',
-                                  child: Text('Lihat Detail'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList(),
-                  ),
-                ),
+    return Scrollbar(
+      controller: _horizontalScrollController,
+      thumbVisibility: true,
+      trackVisibility: true,
+      child: SingleChildScrollView(
+        controller: _horizontalScrollController,
+        scrollDirection: Axis.horizontal,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.05),
+                spreadRadius: 1,
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              )
+            ],
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              dividerColor: Colors.grey[200],
+              dataTableTheme: DataTableThemeData(
+                headingRowColor: MaterialStateProperty.all(Colors.transparent),
+                dataRowColor: MaterialStateProperty.resolveWith<Color>(
+                        (Set<MaterialState> states) {
+                      return Colors.transparent;
+                    }),
               ),
             ),
-        ],
+            child: DataTable(
+              columnSpacing: 35.0,
+              horizontalMargin: 24,
+              headingRowHeight: 50,
+              dataRowMaxHeight: 72,
+              dataRowMinHeight: 72,
+              dividerThickness: 1,
+              showBottomBorder: true,
+              sortColumnIndex: _sortColumnIndex,
+              sortAscending: _sortAscending,
+              columns: [
+                DataColumn(
+                  label: Text('PRODUK', style: _tableHeaderStyle()),
+                  onSort: _onSort,
+                ),
+                DataColumn(
+                  label: Text('SKU', style: _tableHeaderStyle()),
+                  onSort: _onSort,
+                ),
+                DataColumn(
+                  label: Text('KATEGORI', style: _tableHeaderStyle()),
+                  onSort: _onSort,
+                ),
+                DataColumn(
+                  label: Text('JUMLAH', style: _tableHeaderStyle()),
+                  numeric: true,
+                  onSort: _onSort,
+                ),
+                DataColumn(
+                  label: Text('PENJUALAN', style: _tableHeaderStyle()),
+                  numeric: true,
+                  onSort: _onSort,
+                ),
+                DataColumn(
+                  label: Text('JUMLAH (%)', style: _tableHeaderStyle()),
+                  numeric: true,
+                  onSort: _onSort,
+                ),
+                DataColumn(
+                  label: Text('AKSI', style: _tableHeaderStyle()),
+                ),
+              ],
+              rows: data.map((item) {
+                return DataRow(
+                  cells: [
+                    DataCell(Text(
+                        item['produk'] ?? '-',
+                        style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
+                    )),
+                    DataCell(Text(
+                        item['sku'] ?? '-',
+                        style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
+                    )),
+                    DataCell(Text(
+                        item['kategori'] ?? '-',
+                        style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
+                    )),
+                    DataCell(Text(
+                        item['jumlah'].toString(),
+                        style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
+                    )),
+                    DataCell(Text(
+                      _currencyFormatter.format(item['penjualanRp'] ?? 0),
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF444444)),
+                    )),
+                    DataCell(Text(
+                        '${(item['persentaseJumlah'] as num).toStringAsFixed(2)}%',
+                        style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
+                    )),
+                    DataCell(
+                      const Icon(Icons.more_horiz, color: Colors.grey),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ),
       ),
     );
   }
 
   TextStyle _tableHeaderStyle() {
     return TextStyle(
-        fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey[700]);
-  }
-
-  TextStyle _tableBodyStyle({FontWeight fontWeight = FontWeight.normal}) {
-    return TextStyle(
-        fontSize: 14, color: Colors.black87, fontWeight: fontWeight);
+      fontWeight: FontWeight.w600,
+      fontSize: 12,
+      color: Colors.grey[600],
+      letterSpacing: 0.5,
+    );
   }
 
   Widget _buildPagination(int totalItems, int totalPages) {

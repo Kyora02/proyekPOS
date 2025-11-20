@@ -1,6 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:proyekpos2/service/api_service.dart';
+
+class MyCustomScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+  };
+}
 
 class DetailPenjualanPage extends StatefulWidget {
   final String outletId;
@@ -17,11 +29,15 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 7));
   DateTime _endDate = DateTime.now();
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   final ApiService _apiService = ApiService();
   List<Map<String, dynamic>> _allData = [];
   List<Map<String, dynamic>> _filteredData = [];
   bool _isLoading = true;
+
+  int? _sortColumnIndex;
+  bool _isAscending = true;
 
   final NumberFormat _currencyFormatter =
   NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
@@ -33,52 +49,199 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
     _fetchData();
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   Future<void> _fetchData() async {
     setState(() {
       _isLoading = true;
     });
+
     try {
-      final data = await _apiService.getSalesReports(
-        startDate: _startDate,
-        endDate: _endDate,
+      final start = DateTime(_startDate.year, _startDate.month, _startDate.day, 0, 0, 0);
+      final end = DateTime(_endDate.year, _endDate.month, _endDate.day, 23, 59, 59);
+
+      final data = await _apiService.getSalesDetail(
         outletId: widget.outletId,
+        startDate: start,
+        endDate: end,
       );
+
       setState(() {
         _allData = data;
-        _filterData();
+        _filteredData = data;
         _isLoading = false;
       });
+
+      _filterData();
+
     } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal memuat data penjualan: $e')),
+        );
+      }
       setState(() {
         _isLoading = false;
+        _allData = [];
+        _filteredData = [];
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal memuat data: $e')),
-      );
     }
   }
 
   void _filterData() {
     final query = _searchController.text.toLowerCase();
-    final filtered = _allData.where((item) {
+    List<Map<String, dynamic>> filtered = _allData.where((item) {
       final noTransaksi = item['noTransaksi'].toString().toLowerCase();
-      final outlet = item['outlet'].toString().toLowerCase();
-      final metodePembayaran =
-      item['metodePembayaran'].toString().toLowerCase();
-      final customer = item['customer'].toString().toLowerCase();
+      final metodePembayaran = item['metodePembayaran'].toString().toLowerCase();
+      final namaKaryawan = item['namaKaryawan']?.toString().toLowerCase() ?? '';
+      final namaCustomer = item['namaCustomer']?.toString().toLowerCase() ?? '';
 
       final matchesQuery = query.isEmpty ||
           noTransaksi.contains(query) ||
-          outlet.contains(query) ||
           metodePembayaran.contains(query) ||
-          customer.contains(query);
+          namaKaryawan.contains(query) ||
+          namaCustomer.contains(query);
 
       return matchesQuery;
     }).toList();
 
+    if (_sortColumnIndex != null) {
+      _sortList(filtered, _sortColumnIndex!, _isAscending);
+    }
+
     setState(() {
       _filteredData = filtered;
     });
+  }
+
+  void _sortList(List<Map<String, dynamic>> list, int columnIndex, bool ascending) {
+    list.sort((a, b) {
+      int compareResult = 0;
+
+      switch (columnIndex) {
+        case 0:
+          compareResult = (a['noTransaksi'] ?? '').compareTo(b['noTransaksi'] ?? '');
+          break;
+        case 1:
+          final DateTime tA = a['timestamp'] ?? DateTime(0);
+          final DateTime tB = b['timestamp'] ?? DateTime(0);
+          compareResult = tA.compareTo(tB);
+          break;
+        case 2:
+          compareResult = (a['namaKaryawan'] ?? '').compareTo(b['namaKaryawan'] ?? '');
+          break;
+        case 3:
+          compareResult = (a['namaCustomer'] ?? '').compareTo(b['namaCustomer'] ?? '');
+          break;
+        case 4:
+          compareResult = (a['metodePembayaran'] ?? '').compareTo(b['metodePembayaran'] ?? '');
+          break;
+        case 5:
+          final num valA = a['totalPenjualan'] ?? 0;
+          final num valB = b['totalPenjualan'] ?? 0;
+          compareResult = valA.compareTo(valB);
+          break;
+      }
+
+      return ascending ? compareResult : -compareResult;
+    });
+  }
+
+  void _onSort(int columnIndex, bool ascending) {
+    setState(() {
+      _sortColumnIndex = columnIndex;
+      _isAscending = ascending;
+    });
+    _sortList(_filteredData, columnIndex, ascending);
+  }
+
+  Future<void> _exportToPdf() async {
+    try {
+      final doc = pw.Document();
+
+      final font = await PdfGoogleFonts.nunitoExtraLight();
+      final fontBold = await PdfGoogleFonts.nunitoExtraBold();
+
+      doc.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return [
+              pw.Header(
+                level: 0,
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Laporan Penjualan', style: pw.TextStyle(font: fontBold, fontSize: 24)),
+                    pw.Text(
+                      '${DateFormat('dd MMM yyyy').format(_startDate)} - ${DateFormat('dd MMM yyyy').format(_endDate)}',
+                      style: pw.TextStyle(font: font, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 20),
+              pw.Table.fromTextArray(
+                headers: ['No. Transaksi', 'Tanggal', 'Karyawan', 'Customer', 'Metode Bayar', 'Total'],
+                data: _filteredData.map((item) {
+                  final DateTime dateVal = item['timestamp'] is DateTime
+                      ? item['timestamp']
+                      : DateTime.now();
+
+                  return [
+                    item['noTransaksi'] ?? '-',
+                    _dateFormatter.format(dateVal),
+                    item['namaKaryawan'] ?? '-',
+                    item['namaCustomer'] ?? '-',
+                    item['metodePembayaran'] ?? '-',
+                    _currencyFormatter.format(item['totalPenjualan'] ?? 0),
+                  ];
+                }).toList(),
+                headerStyle: pw.TextStyle(font: fontBold, color: PdfColors.white),
+                headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF279E9E)),
+                rowDecoration: const pw.BoxDecoration(
+                  border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.5)),
+                ),
+                cellStyle: pw.TextStyle(font: font, fontSize: 10),
+                cellAlignments: {
+                  0: pw.Alignment.centerLeft,
+                  1: pw.Alignment.centerLeft,
+                  2: pw.Alignment.centerLeft,
+                  3: pw.Alignment.centerLeft,
+                  4: pw.Alignment.centerLeft,
+                  5: pw.Alignment.centerRight,
+                },
+              ),
+              pw.SizedBox(height: 20),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.end,
+                children: [
+                  pw.Text(
+                    'Total Periode Ini: ${_currencyFormatter.format(_filteredData.fold(0.0, (sum, item) => sum + (item['totalPenjualan'] ?? 0)))}',
+                    style: pw.TextStyle(font: fontBold, fontSize: 14),
+                  ),
+                ],
+              ),
+            ];
+          },
+        ),
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => doc.save(),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengekspor PDF: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _selectDateRange(BuildContext context) async {
@@ -141,12 +304,6 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
   }
 
   @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
@@ -174,11 +331,9 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
                         ),
                       ),
                     )
-                        : (isMobile
-                        ? _buildMobileList(_filteredData)
-                        : _buildWebTable(_filteredData)),
+                        : _buildResponsiveTable(_filteredData),
                     const SizedBox(height: 24),
-                    if (!_isLoading && !isMobile) _buildPagination(),
+                    if (!_isLoading) _buildPagination(),
                   ],
                 ),
               ),
@@ -210,7 +365,7 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
           ],
         ),
         ElevatedButton.icon(
-          onPressed: () {},
+          onPressed: _filteredData.isEmpty ? null : () => _exportToPdf(),
           icon: const Icon(Icons.cloud_download_outlined, size: 18),
           label: const Text('Ekspor Laporan'),
           style: ElevatedButton.styleFrom(
@@ -243,12 +398,12 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
     );
 
     final searchField = SizedBox(
-      width: isMobile ? double.infinity : 280,
+      width: isMobile ? double.infinity : 320,
       child: TextField(
         controller: _searchController,
         onChanged: (value) => _filterData(),
         decoration: InputDecoration(
-          hintText: 'Cari No. Transaksi, Outlet, Pelanggan...',
+          hintText: 'Cari No. Transaksi, Karyawan, Pelanggan...',
           prefixIcon: const Icon(Icons.search, color: Color(0xFF279E9E)),
           filled: true,
           fillColor: Colors.white,
@@ -262,235 +417,160 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
       ),
     );
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.start,
+    return isMobile
+        ? Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         searchField,
-        const SizedBox(width: 16),
+        const SizedBox(height: 16),
         datePicker,
       ],
-    );
-  }
-
-  Widget _buildWebTable(List<Map<String, dynamic>> data) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 10,
-          )
-        ],
-      ),
-      child: Column(
-        children: [
-          _buildTableHeader(),
-          if (data.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(32.0),
-              child: Text('Tidak ada data penjualan ditemukan.'),
-            )
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: data.length,
-              itemBuilder: (context, index) => _buildTableRow(data[index]),
-              separatorBuilder: (context, index) => const Divider(
-                  height: 1,
-                  indent: 24,
-                  endIndent: 24,
-                  color: Color(0xFFEEEEEE)),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTableHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F4F8),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-      ),
+    )
+        : SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
         children: [
-          Expanded(
-              flex: 3,
-              child: Text('NO. TRANSAKSI', style: _tableHeaderStyle())),
-          Expanded(
-              flex: 2, child: Text('OUTLET', style: _tableHeaderStyle())),
-          Expanded(
-              flex: 2,
-              child: Text('METODE PEMBAYARAN', style: _tableHeaderStyle())),
-          Expanded(
-              flex: 2,
-              child: Text('TOTAL PENJUALAN',
-                  style: _tableHeaderStyle(), textAlign: TextAlign.right)),
-          const SizedBox(width: 48),
+          searchField,
+          const SizedBox(width: 16),
+          datePicker,
         ],
       ),
     );
   }
 
-  Widget _buildTableRow(Map<String, dynamic> item) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      child: Row(
-        children: [
-          Expanded(
-              flex: 3,
-              child: Text(item['noTransaksi'], style: _tableBodyStyle())),
-          Expanded(
-              flex: 2, child: Text(item['outlet'], style: _tableBodyStyle())),
-          Expanded(
-              flex: 2,
-              child: Text(item['metodePembayaran'], style: _tableBodyStyle())),
-          Expanded(
-              flex: 2,
-              child: Text(_currencyFormatter.format(item['totalPenjualan']),
-                  style: _tableBodyStyle(fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.right)),
-          SizedBox(
-            width: 48,
-            child: PopupMenuButton<String>(
-              color: Colors.white,
-              icon: const Icon(Icons.more_horiz, color: Color(0xFF279E9E)),
-              onSelected: (value) {},
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'lihat_detail',
-                  child: Text('Lihat Detail'),
-                ),
-              ],
-            ),
+  Widget _buildResponsiveTable(List<Map<String, dynamic>> data) {
+    return Scrollbar(
+      controller: _scrollController,
+      thumbVisibility: true,
+      trackVisibility: true,
+      child: SingleChildScrollView(
+        controller: _scrollController,
+        scrollDirection: Axis.horizontal,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.05),
+                spreadRadius: 1,
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              )
+            ],
+            border: Border.all(color: Colors.grey.shade200),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMobileList(List<Map<String, dynamic>> data) {
-    if (data.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(32.0),
-        child: Center(child: Text('Tidak ada data penjualan ditemukan.')),
-      );
-    }
-
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: data.length,
-      itemBuilder: (context, index) => _buildMobileCard(data[index]),
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-    );
-  }
-
-  Widget _buildMobileCard(Map<String, dynamic> item) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-          )
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item['noTransaksi'],
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _dateFormatter.format(item['timestamp']),
-                        style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-                PopupMenuButton<String>(
-                  color: Colors.white,
-                  icon: const Icon(Icons.more_horiz, color: Color(0xFF279E9E)),
-                  onSelected: (value) {},
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'lihat_detail',
-                      child: Text('Liat Detail'),
-                    ),
-                  ],
-                ),
-              ],
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              dividerColor: Colors.grey[200],
+              dataTableTheme: DataTableThemeData(
+                headingRowColor: MaterialStateProperty.all(Colors.transparent),
+                dataRowColor: MaterialStateProperty.resolveWith<Color>(
+                        (Set<MaterialState> states) {
+                      return Colors.transparent;
+                    }),
+              ),
             ),
-            const Divider(height: 24),
-            _buildDetailRow(Icons.store_outlined, 'Outlet', item['outlet']),
-            const SizedBox(height: 8),
-            _buildDetailRow(Icons.credit_card_outlined, 'Metode Bayar',
-                item['metodePembayaran']),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Total Penjualan:',
-                    style: TextStyle(color: Colors.black87)),
-                Text(
-                  _currencyFormatter.format(item['totalPenjualan']),
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: Color(0xFF279E9E)),
-                ),
-              ],
-            ),
-          ],
+            child: _buildDataTable(data),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildDetailRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.grey[600], size: 18),
-          const SizedBox(width: 12),
-          Text('$label:', style: TextStyle(color: Colors.grey[700])),
-          const Spacer(),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
-        ],
-      ),
+  DataTable _buildDataTable(List<Map<String, dynamic>> data) {
+    final headerStyle = TextStyle(
+      fontWeight: FontWeight.w600,
+      fontSize: 12,
+      color: Colors.grey[600],
+      letterSpacing: 0.5,
     );
-  }
 
-  TextStyle _tableHeaderStyle() {
-    return TextStyle(
-        fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey[700]);
-  }
+    return DataTable(
+      sortColumnIndex: _sortColumnIndex,
+      sortAscending: _isAscending,
+      columnSpacing: 35,
+      horizontalMargin: 24,
+      headingRowHeight: 50,
+      dataRowMaxHeight: 72,
+      dataRowMinHeight: 72,
+      dividerThickness: 1,
+      showBottomBorder: true,
+      columns: [
+        DataColumn(
+          label: Text('NO. TRANSAKSI', style: headerStyle),
+          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
+        ),
+        DataColumn(
+          label: Text('TANGGAL', style: headerStyle),
+          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
+        ),
+        DataColumn(
+          label: Text('KARYAWAN', style: headerStyle),
+          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
+        ),
+        DataColumn(
+          label: Text('CUSTOMER', style: headerStyle),
+          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
+        ),
+        DataColumn(
+          label: Text('METODE', style: headerStyle),
+          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
+        ),
+        DataColumn(
+          label: Text('TOTAL', style: headerStyle),
+          numeric: true,
+          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
+        ),
+      ],
+      rows: data.map((item) {
+        final DateTime dateVal = item['timestamp'] is DateTime
+            ? item['timestamp']
+            : DateTime.now();
 
-  TextStyle _tableBodyStyle({FontWeight fontWeight = FontWeight.normal}) {
-    return TextStyle(
-        fontSize: 14, color: Colors.black87, fontWeight: fontWeight);
+        return DataRow(
+          cells: [
+            DataCell(Text(
+                item['noTransaksi'] ?? '-',
+                style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
+            )),
+            DataCell(Text(
+                _dateFormatter.format(dateVal),
+                style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
+            )),
+            DataCell(Text(
+                item['namaKaryawan'] ?? '-',
+                style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
+            )),
+            DataCell(Text(
+                item['namaCustomer'] ?? 'Umum',
+                style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
+            )),
+            DataCell(Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFA5D6A7)),
+              ),
+              child: Text(
+                item['metodePembayaran'] ?? '-',
+                style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF2E7D32),
+                    fontWeight: FontWeight.w600
+                ),
+              ),
+            )),
+            DataCell(Text(
+              _currencyFormatter.format(item['totalPenjualan'] ?? 0),
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF444444)),
+            )),
+          ],
+        );
+      }).toList(),
+    );
   }
 
   Widget _buildPagination() {

@@ -1,4 +1,7 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:proyekpos2/service/api_service.dart';
 
 class TambahProdukPage extends StatefulWidget {
@@ -26,6 +29,13 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
   final _skuController = TextEditingController();
   final _hargaJualController = TextEditingController();
   final _hargaBeliController = TextEditingController();
+
+  XFile? _imageFile;
+  final ImagePicker _picker = ImagePicker();
+  String? _existingImageUrl;
+
+  // New State Variable
+  bool _showInMenu = true;
 
   List<Map<String, dynamic>> _outletOptions = [];
   List<Map<String, dynamic>> _kategoriOptions = [];
@@ -65,17 +75,8 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
         });
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Failed to load data: $e'),
-              backgroundColor: Colors.red),
-        );
-      }
     } finally {
-      if (mounted) {
-        setState(() => _isFetchingData = false);
-      }
+      if (mounted) setState(() => _isFetchingData = false);
     }
   }
 
@@ -86,30 +87,33 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
     _skuController.text = product['sku'] ?? '';
     _hargaJualController.text = product['sellingPrice']?.toString() ?? '';
     _hargaBeliController.text = product['costPrice']?.toString() ?? '0';
+    _existingImageUrl = product['imageUrl'];
+
+    // Populate Toggle
+    _showInMenu = product['showInMenu'] ?? true;
 
     final savedCategoryId = product['categoryId'];
     if (_kategoriOptions.any((cat) => cat['id'] == savedCategoryId)) {
       _selectedKategoriId = savedCategoryId;
     }
-
   }
 
-  @override
-  void dispose() {
-    _namaProdukController.dispose();
-    _deskripsiController.dispose();
-    _skuController.dispose();
-    _hargaJualController.dispose();
-    _hargaBeliController.dispose();
-    super.dispose();
+  Future<void> _pickImage() async {
+    final XFile? pickedFile =
+    await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        _imageFile = pickedFile;
+      });
+    }
   }
 
   Future<void> _saveProduct() async {
-    // Hapus validasi _selectedOutlets
     if (_selectedKategoriId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Kategori harus dipilih'), backgroundColor: Colors.red),
+            content: Text('Kategori harus dipilih'),
+            backgroundColor: Colors.red),
       );
       return;
     }
@@ -119,24 +123,11 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
 
     setState(() => _isLoading = true);
 
-    Map<String, dynamic>? activeOutlet;
     try {
-      activeOutlet =
-          _outletOptions.firstWhere((opt) => opt['id'] == widget.outletId);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('Error: Outlet aktif tidak valid. $e'),
-            backgroundColor: Colors.red),
-      );
-      setState(() => _isLoading = false);
-      return;
-    }
+      Map<String, dynamic> activeOutlet =
+      _outletOptions.firstWhere((opt) => opt['id'] == widget.outletId);
+      final List<Map<String, dynamic>> outletsToSave = [activeOutlet];
 
-    // Buat daftar outlet yang akan disimpan (selalu hanya 1)
-    final List<Map<String, dynamic>> outletsToSave = [activeOutlet];
-
-    try {
       final sellingPrice = double.tryParse(_hargaJualController.text) ?? 0.0;
       final costPrice = double.tryParse(_hargaBeliController.text);
 
@@ -150,6 +141,8 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
           costPrice: costPrice,
           categoryId: _selectedKategoriId!,
           outlets: outletsToSave,
+          imageFile: _imageFile,
+          showInMenu: _showInMenu, // Send Toggle Value
         );
       } else {
         await _apiService.addProduct(
@@ -160,35 +153,80 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
           costPrice: costPrice,
           categoryId: _selectedKategoriId!,
           outlets: outletsToSave,
+          imageFile: _imageFile,
+          showInMenu: _showInMenu, // Send Toggle Value
         );
       }
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Product saved successfully!'),
-              backgroundColor: Colors.green),
-        );
         Navigator.of(context).pop(true);
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Failed to save product: $e'),
-              backgroundColor: Colors.red),
-        );
-      }
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  @override
+  void dispose() {
+    _namaProdukController.dispose();
+    _deskripsiController.dispose();
+    _skuController.dispose();
+    _hargaJualController.dispose();
+    _hargaBeliController.dispose();
+    super.dispose();
+  }
+
+  Widget _buildImagePicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Foto Produk',
+            style: TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: _pickImage,
+          child: Container(
+            height: 150,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: _buildImageDisplay(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImageDisplay() {
+    if (_imageFile != null) {
+      if (kIsWeb) {
+        return Image.network(_imageFile!.path, fit: BoxFit.cover);
+      } else {
+        return Image.file(File(_imageFile!.path), fit: BoxFit.cover);
+      }
+    } else if (_existingImageUrl != null && _existingImageUrl!.isNotEmpty) {
+      return Image.network(_existingImageUrl!, fit: BoxFit.cover);
+    } else {
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.cloud_upload_outlined,
+              size: 40, color: Colors.grey[600]),
+          const SizedBox(height: 8),
+          Text('Pilih Foto', style: TextStyle(color: Colors.grey[700])),
+        ],
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Hapus GestureDetector
     return Scaffold(
       backgroundColor: Colors.grey[200],
       appBar: AppBar(
@@ -226,9 +264,38 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                     title: 'Informasi Produk',
                     child: Column(
                       children: [
-                        // Selalu tampilkan _buildActiveOutletDisplay
                         _buildActiveOutletDisplay(),
                         const SizedBox(height: 16),
+
+                        // NEW TOGGLE FOR SHOW IN MENU
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: SwitchListTile(
+                            title: const Text(
+                              "Tampilkan di Menu",
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15),
+                            ),
+                            subtitle: const Text(
+                              "Produk ini akan muncul di halaman kasir",
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            activeColor: const Color(0xFF00A3A3),
+                            value: _showInMenu,
+                            onChanged: (bool value) {
+                              setState(() {
+                                _showInMenu = value;
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
                         _buildTextField(
                           controller: _namaProdukController,
                           label: 'Nama Produk',
@@ -240,7 +307,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                           controller: _deskripsiController,
                           label: 'Deskripsi Produk',
                           hint:
-                          'Contoh: Perpaduan kopi, susu, dan gula aren',
+                          'Contoh: Perpaduan kopi...',
                           maxLines: 3,
                         ),
                         const SizedBox(height: 16),
@@ -317,8 +384,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                             height: 20,
                             width: 20,
                             child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2))
+                                color: Colors.white, strokeWidth: 2))
                             : const Text('Simpan'),
                       ),
                     ],
@@ -332,7 +398,6 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
     );
   }
 
-  // Widget ini sekarang hanya menampilkan nama outlet aktif
   Widget _buildActiveOutletDisplay() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -348,16 +413,13 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           width: double.infinity,
           decoration: BoxDecoration(
-            color: Colors.grey[200], // Buat terlihat non-aktif
+            color: Colors.grey[200],
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: Colors.grey[300]!),
           ),
           child: Text(
             _isFetchingData ? 'Memuat outlet...' : _activeOutletName,
-            style: const TextStyle(
-              color: Colors.black54,
-              fontSize: 16,
-            ),
+            style: const TextStyle(color: Colors.black54, fontSize: 16),
           ),
         ),
         const SizedBox(height: 4),
@@ -382,10 +444,9 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            Text(title,
+                style:
+                const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
             child,
           ],
@@ -426,13 +487,11 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
             contentPadding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[300]!)),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[300]!)),
           ),
           validator: (value) {
             if (isRequired && (value == null || value.isEmpty)) {
@@ -472,6 +531,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           value: value,
+          dropdownColor: Colors.white,
           hint: Text(hint, style: TextStyle(color: Colors.grey[600])),
           decoration: InputDecoration(
             filled: true,
@@ -479,13 +539,11 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
             contentPadding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[300]!)),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[300]!)),
           ),
           items: items.map((Map<String, dynamic> item) {
             return DropdownMenuItem<String>(
@@ -500,44 +558,6 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
             }
             return null;
           },
-        ),
-      ],
-    );
-  }
-
-  // Hapus _buildMultiSelectOutletField
-
-  Widget _buildImagePicker() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Foto Produk', style: TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        InkWell(
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Buka galeri... (fitur belum ada)')),
-            );
-          },
-          child: Container(
-            height: 150,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: Colors.grey[300]!),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.cloud_upload_outlined,
-                    size: 40, color: Colors.grey[600]),
-                const SizedBox(height: 8),
-                Text('Pilih atau letakkan berkas di sini',
-                    style: TextStyle(color: Colors.grey[700])),
-              ],
-            ),
-          ),
         ),
       ],
     );

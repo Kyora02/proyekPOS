@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:proyekpos2/daftarMaster/daftarAbsensi_page.dart';
 import 'package:proyekpos2/daftarMaster/daftarKaryawan_page.dart';
 import 'package:proyekpos2/daftarMaster/daftarStok_page.dart';
 import 'package:proyekpos2/laporan/detailPenjualan_page.dart';
@@ -10,13 +11,13 @@ import 'package:proyekpos2/laporan/penjualanKategori_page.dart';
 import 'package:proyekpos2/laporan/penjualanProduk_page.dart';
 import 'package:proyekpos2/laporan/ringkasanPenjualan_page.dart';
 import 'template/dashboard_layout.dart';
-import 'profile_page.dart';
+import 'profile/profile_page.dart';
 import 'daftarMaster/daftarProduk_page.dart';
 import 'daftarMaster/daftarKategori_page.dart';
 import 'daftarMaster/daftarPelanggan_page.dart';
 import 'daftarMaster/daftarKupon_page.dart';
 import 'daftarMaster/daftarOutlet_page.dart';
-import 'profileBusiness_page.dart';
+import 'profile/profileBusiness_page.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -302,7 +303,10 @@ class _DashboardHostState extends State<DashboardHost> {
           )
               : noOutletSelected;
           break;
-
+        case 'Daftar Absensi':
+          _currentPage = (activeOutletId != null)
+              ? DaftarAbsensiPage(outletId: activeOutletId)
+              : noOutletSelected;
         default:
           _currentPage = (activeOutletId != null)
               ? const DashboardContent()

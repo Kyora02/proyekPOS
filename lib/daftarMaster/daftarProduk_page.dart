@@ -26,6 +26,9 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
   bool _sortAscending = true;
   String _searchQuery = '';
   String? _selectedCategoryId;
+
+  String _statusFilter = 'all';
+
   int _currentPage = 1;
   int _itemsPerPage = 10;
 
@@ -106,6 +109,10 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
           aValue = a['sellingPrice'] ?? 0;
           bValue = b['sellingPrice'] ?? 0;
           break;
+        case 5:
+          aValue = (a['showInMenu'] ?? true) ? 1 : 0;
+          bValue = (b['showInMenu'] ?? true) ? 1 : 0;
+          break;
         default:
           return 0;
       }
@@ -146,6 +153,12 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
       products = products.where((product) {
         return product['categoryId'] == _selectedCategoryId;
       }).toList();
+    }
+
+    if (_statusFilter == 'show') {
+      products = products.where((p) => p['showInMenu'] == true || p['showInMenu'] == null).toList();
+    } else if (_statusFilter == 'hide') {
+      products = products.where((p) => p['showInMenu'] == false).toList();
     }
 
     return products;
@@ -382,6 +395,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
             child: DropdownButton<String>(
               dropdownColor: Colors.white,
               value: _selectedCategoryId,
+              isExpanded: true, // <--- FIXED: PREVENTS OVERFLOW
               onChanged: (String? newValue) {
                 setState(() {
                   _selectedCategoryId = newValue;
@@ -392,9 +406,36 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
                       (Map<String, dynamic> value) {
                     return DropdownMenuItem<String>(
                       value: value['id'],
-                      child: Text(value['name']),
+                      child: Text(value['name'], overflow: TextOverflow.ellipsis),
                     );
                   }).toList(),
+            ),
+          ),
+        ),
+        Container(
+          width: 150,
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey[300]!),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              dropdownColor: Colors.white,
+              value: _statusFilter,
+              isExpanded: true, // <--- FIXED: PREVENTS OVERFLOW
+              onChanged: (String? newValue) {
+                setState(() {
+                  _statusFilter = newValue!;
+                  _currentPage = 1;
+                });
+              },
+              items: const [
+                DropdownMenuItem(value: 'all', child: Text('Semua Status', overflow: TextOverflow.ellipsis)),
+                DropdownMenuItem(value: 'show', child: Text('Tampil di Menu', overflow: TextOverflow.ellipsis)),
+                DropdownMenuItem(value: 'hide', child: Text('Sembunyi', overflow: TextOverflow.ellipsis)),
+              ],
             ),
           ),
         ),
@@ -442,7 +483,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
             controller: _horizontalScrollController,
             scrollDirection: Axis.horizontal,
             child: DataTable(
-              columnSpacing: 130.0,
+              columnSpacing: 80.0,
               sortColumnIndex: _sortColumnIndex,
               sortAscending: _sortAscending,
               headingTextStyle: _tableHeaderStyle(),
@@ -470,11 +511,16 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
                   numeric: true,
                   onSort: _onSort,
                 ),
+                DataColumn(
+                  label: const Text('STATUS'),
+                  onSort: _onSort,
+                ),
                 const DataColumn(
                   label: Text('AKSI'),
                 ),
               ],
               rows: productsOnCurrentPage.map((product) {
+                final bool isShown = product['showInMenu'] ?? true;
                 return DataRow(
                   cells: [
                     DataCell(Text(product['name'] ?? 'N/A')),
@@ -484,6 +530,26 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
                     DataCell(Text(_formatCurrency(product['costPrice'] ?? 0))),
                     DataCell(
                         Text(_formatCurrency(product['sellingPrice'] ?? 0))),
+
+                    DataCell(
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                              color: isShown ? Colors.green[50] : Colors.grey[100],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: isShown ? Colors.green[200]! : Colors.grey[300]!)
+                          ),
+                          child: Text(
+                            isShown ? 'Aktif' : 'Tidak Aktif',
+                            style: TextStyle(
+                                color: isShown ? Colors.green[700] : Colors.grey[600],
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold
+                            ),
+                          ),
+                        )
+                    ),
+
                     DataCell(
                       PopupMenuButton<String>(
                         color: Colors.white,
@@ -493,7 +559,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
                         icon: const Icon(Icons.more_horiz),
                         onSelected: (String value) {
                           switch (value) {
-                            case 'ubah':
+                            case 'Ubah':
                               _navigateToEditProduct(product);
                               break;
                             case 'Detail':
@@ -506,7 +572,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
                                 ),
                               );
                               break;
-                            case 'hapus':
+                            case 'Hapus':
                               _showDeleteConfirmationDialog(
                                   context, product['id'], product['name']);
                               break;
@@ -515,7 +581,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
                         itemBuilder: (BuildContext context) =>
                         <PopupMenuEntry<String>>[
                           const PopupMenuItem<String>(
-                            value: 'ubah',
+                            value: 'Ubah',
                             child: Row(
                               children: [
                                 Icon(Icons.edit_outlined,
@@ -526,17 +592,17 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
                             ),
                           ),
                           const PopupMenuItem<String>(
-                            value: 'Detail',
-                            child: Row(
-                              children: [
-                                Icon(Icons.info_outline, size: 20, color: Colors.black54),
-                                SizedBox(width: 12),
-                                Text('Detail'),
-                              ],
-                            )
+                              value: 'Detail',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.info_outline, size: 20, color: Colors.black54),
+                                  SizedBox(width: 12),
+                                  Text('Detail'),
+                                ],
+                              )
                           ),
                           const PopupMenuItem<String>(
-                            value: 'hapus',
+                            value: 'Hapus',
                             child: Row(
                               children: [
                                 Icon(Icons.delete_outline,
@@ -650,6 +716,4 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
       ],
     );
   }
-
-
 }

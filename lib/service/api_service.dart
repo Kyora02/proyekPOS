@@ -1,8 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ApiService {
   final String _baseUrl = kIsWeb
@@ -10,7 +11,8 @@ class ApiService {
       : 'http://10.0.2.2:3000/api';
 
   Future<String> _getAuthToken() async {
-    final user = FirebaseAuth.instance.currentUser;    if (user == null) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
       throw Exception('Pengguna tidak login.');
     }
     final String? token = await user.getIdToken();
@@ -37,7 +39,6 @@ class ApiService {
         throw Exception('Gagal memuat outlets: ${response.body}');
       }
     } catch (e) {
-      print('Error di getOutlets: $e');
       rethrow;
     }
   }
@@ -65,10 +66,7 @@ class ApiService {
       if (response.statusCode != 201) {
         throw Exception('Gagal menambah kategori: ${response.body}');
       }
-
-      print('Kategori berhasil ditambahkan!');
     } catch (e) {
-      print('Error di addCategory: $e');
       rethrow;
     }
   }
@@ -92,7 +90,6 @@ class ApiService {
         throw Exception('Gagal memuat kategori: ${response.body}');
       }
     } catch (e) {
-      print('Error di getCategories: $e');
       rethrow;
     }
   }
@@ -125,9 +122,7 @@ class ApiService {
         final errorBody = jsonDecode(response.body);
         throw Exception('Failed to update category: ${errorBody['message']}');
       }
-      print('Kategori berhasil diupdate!');
     } catch (e) {
-      print('Error in updateCategory: $e');
       throw Exception('Failed to update category. $e');
     }
   }
@@ -140,27 +135,39 @@ class ApiService {
     double? costPrice,
     required String categoryId,
     required List<Map<String, dynamic>> outlets,
+    XFile? imageFile,
+    bool showInMenu = true,
   }) async {
     final token = await _getAuthToken();
     final url = Uri.parse('$_baseUrl/products');
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({
-        'name': name,
-        'description': description,
-        'sku': sku,
-        'sellingPrice': sellingPrice,
-        'costPrice': costPrice,
-        'categoryId': categoryId,
-        'outlets': outlets,
-      }),
-    );
+
+    var request = http.MultipartRequest('POST', url);
+    request.headers['Authorization'] = 'Bearer $token';
+
+    request.fields['name'] = name;
+    if (description != null) request.fields['description'] = description;
+    if (sku != null) request.fields['sku'] = sku;
+    request.fields['sellingPrice'] = sellingPrice.toString();
+    if (costPrice != null) request.fields['costPrice'] = costPrice.toString();
+    request.fields['categoryId'] = categoryId;
+    request.fields['outlets'] = jsonEncode(outlets);
+    request.fields['showInMenu'] = showInMenu.toString();
+
+    if (imageFile != null) {
+      final bytes = await imageFile.readAsBytes();
+      request.files.add(
+          http.MultipartFile.fromBytes(
+              'image',
+              bytes,
+              filename: imageFile.name
+          )
+      );
+    }
+
+    var response = await request.send();
     if (response.statusCode != 201) {
-      throw Exception('Failed to add product: ${response.body}');
+      final respStr = await response.stream.bytesToString();
+      throw Exception('Failed to add product: $respStr');
     }
   }
 
@@ -188,33 +195,39 @@ class ApiService {
     double? costPrice,
     required String categoryId,
     List<Map<String, dynamic>>? outlets,
+    XFile? imageFile,
+    bool showInMenu = true,
   }) async {
     final token = await _getAuthToken();
     final url = Uri.parse('$_baseUrl/products/$id');
 
-    final Map<String, dynamic> body = {
-      'name': name,
-      'description': description,
-      'sku': sku,
-      'sellingPrice': sellingPrice,
-      'costPrice': costPrice,
-      'categoryId': categoryId,
-    };
+    var request = http.MultipartRequest('PUT', url);
+    request.headers['Authorization'] = 'Bearer $token';
 
-    if (outlets != null) {
-      body['outlets'] = outlets;
+    request.fields['name'] = name;
+    if (description != null) request.fields['description'] = description;
+    if (sku != null) request.fields['sku'] = sku;
+    request.fields['sellingPrice'] = sellingPrice.toString();
+    if (costPrice != null) request.fields['costPrice'] = costPrice.toString();
+    request.fields['categoryId'] = categoryId;
+    if (outlets != null) request.fields['outlets'] = jsonEncode(outlets);
+    request.fields['showInMenu'] = showInMenu.toString();
+
+    if (imageFile != null) {
+      final bytes = await imageFile.readAsBytes();
+      request.files.add(
+          http.MultipartFile.fromBytes(
+              'image',
+              bytes,
+              filename: imageFile.name
+          )
+      );
     }
 
-    final response = await http.put(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode(body),
-    );
+    var response = await request.send();
     if (response.statusCode != 200) {
-      throw Exception('Failed to update product: ${response.body}');
+      final respStr = await response.stream.bytesToString();
+      throw Exception('Failed to update product: $respStr');
     }
   }
 
@@ -348,7 +361,6 @@ class ApiService {
         throw Exception('Gagal memuat karyawan: ${response.body}');
       }
     } catch (e) {
-      print('Error di getKaryawan: $e');
       rethrow;
     }
   }
@@ -390,7 +402,6 @@ class ApiService {
         throw Exception('Gagal menambah karyawan: ${response.body}');
       }
     } catch (e) {
-      print('Error di addKaryawan: $e');
       rethrow;
     }
   }
@@ -429,7 +440,6 @@ class ApiService {
         throw Exception('Gagal mengupdate karyawan: ${response.body}');
       }
     } catch (e) {
-      print('Error di updateKaryawan: $e');
       rethrow;
     }
   }
@@ -447,7 +457,6 @@ class ApiService {
         throw Exception('Gagal menghapus karyawan: ${response.body}');
       }
     } catch (e) {
-      print('Error di deleteKaryawan: $e');
       rethrow;
     }
   }
@@ -699,24 +708,73 @@ class ApiService {
         throw Exception('Failed to update stock: ${response.body}');
       }
     } catch (e) {
-      print('Error di updateStock: $e');
       rethrow;
     }
   }
 
-  Future<List<Map<String, dynamic>>> getSalesReports({
+  Future<Map<String, dynamic>> createTransaction({
+    required double amount,
+    required List<Map<String, dynamic>> items,
+    required String customerName,
+    required String paymentMethod,
+    required String karyawanId,
+    required String outletId,
+  }) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/payment/charge');
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'grossAmount': amount,
+        'items': items,
+        'customerName': customerName,
+        'paymentMethod': paymentMethod,
+        'karyawanId': karyawanId,
+        'outletId': outletId,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to create transaction: ${response.body}');
+    }
+  }
+
+  Future<void> updateTransactionStatus(String orderId, String status) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/payment/update-status');
+
+    await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'orderId': orderId,
+        'status': status,
+      }),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getSalesDetail({
+    required String outletId,
     required DateTime startDate,
     required DateTime endDate,
-    required String outletId,
   }) async {
     try {
       final token = await _getAuthToken();
-
-      final String start = DateFormat('yyyy-MM-dd').format(startDate);
-      final String end = DateFormat('yyyy-MM-dd').format(endDate);
+      final formattedStartDate = startDate.toIso8601String();
+      final formattedEndDate = endDate.toIso8601String();
 
       final url = Uri.parse(
-          '$_baseUrl/reports/sales?startDate=$start&endDate=$end&outletId=$outletId');
+          '$_baseUrl/reports/sales-detail?outletId=$outletId&startDate=$formattedStartDate&endDate=$formattedEndDate');
 
       final response = await http.get(url, headers: {
         'Content-Type': 'application/json',
@@ -725,35 +783,33 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        return data.map((dynamic item) {
-          final Map<String, dynamic> map = item as Map<String, dynamic>;
-
+        return data.cast<Map<String, dynamic>>().map((item) {
           return {
-            'noTransaksi': map['noTransaksi'],
-            'outlet': map['namaOutlet'],
-            'totalPenjualan': map['total_bayar'],
-            'metodePembayaran': map['metodePembayaran'],
-            'timestamp': DateTime.parse(map['waktuTransaksi']),
-            'customer': map['namaCustomer'],
-            'karyawan': map['namaKaryawan'],
+            ...item,
+            'timestamp': DateTime.fromMillisecondsSinceEpoch(item['timestamp']),
+            'outlet': 'Outlet Name Placeholder',
           };
         }).toList();
       } else {
-        throw Exception('Gagal memuat laporan penjualan: ${response.body}');
+        throw Exception(
+            'Gagal memuat detail penjualan: ${response.body}');
       }
     } catch (e) {
-      print('Error di getSalesReports: $e');
       rethrow;
     }
   }
   Future<List<Map<String, dynamic>>> getProductSalesReports({
     required String outletId,
+    required DateTime startDate,
+    required DateTime endDate,
   }) async {
     try {
       final token = await _getAuthToken();
+      final formattedStartDate = startDate.toIso8601String();
+      final formattedEndDate = endDate.toIso8601String();
 
       final url = Uri.parse(
-          '$_baseUrl/reports/product-sales?outletId=$outletId');
+          '$_baseUrl/reports/product-sales-reports?outletId=$outletId&startDate=$formattedStartDate&endDate=$formattedEndDate');
 
       final response = await http.get(url, headers: {
         'Content-Type': 'application/json',
@@ -768,8 +824,40 @@ class ApiService {
             'Gagal memuat laporan penjualan produk: ${response.body}');
       }
     } catch (e) {
-      print('Error di getProductSalesReports: $e');
       rethrow;
+    }
+  }
+
+
+  Future<Map<String, dynamic>?> checkTransactionStatus(String orderId) async {
+    try {
+      final token = await _getAuthToken();
+
+      final url = Uri.parse('$_baseUrl/payment/check-status/$orderId');
+
+      print('Checking status at: $url');
+      final response = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      print('Status check response code: ${response.statusCode}');
+      print('Status check response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else if (response.statusCode == 404) {
+        print('Transaction not found: $orderId');
+        return null;
+      } else {
+        throw Exception('Failed to check status: ${response.body}');
+      }
+    } catch (e) {
+      print('Error checking transaction status: $e');
+      return null;
     }
   }
 }

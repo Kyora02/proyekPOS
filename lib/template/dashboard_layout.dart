@@ -235,7 +235,6 @@ class TopAppBar extends StatelessWidget implements PreferredSizeWidget {
             icon: const Icon(Icons.notifications_none_outlined),
             color: Colors.grey[600],
             onPressed: () {
-              // TODO: Implement notification logic
             },
           ),
           IconButton(
