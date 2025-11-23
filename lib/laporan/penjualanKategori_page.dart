@@ -1,74 +1,174 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:intl/intl.dart';
+import 'package:proyekpos2/service/api_service.dart';
+import 'dart:math' as math;
+import 'dart:ui';
+
+class MyCustomScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+  };
+}
 
 class PenjualanKategoriPage extends StatefulWidget {
-  const PenjualanKategoriPage({super.key});
+  final String outletId;
+
+  const PenjualanKategoriPage({
+    super.key,
+    required this.outletId,
+  });
 
   @override
   State<PenjualanKategoriPage> createState() => _PenjualanKategoriPageState();
 }
 
 class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
-  DateTime _startDate = DateTime.now().subtract(const Duration(days: 7));
+  final ApiService _apiService = ApiService();
+  final ScrollController _scrollController = ScrollController();
+  DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
   DateTime _endDate = DateTime.now();
   final TextEditingController _searchController = TextEditingController();
 
+  List<Map<String, dynamic>> _allData = [];
+  List<Map<String, dynamic>> _filteredData = [];
+  bool _isLoading = true;
+
+  int _currentPage = 1;
+  int _itemsPerPage = 10;
+  int? _sortColumnIndex;
+  bool _isAscending = true;
+
   final NumberFormat _currencyFormatter =
   NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
-  final DateFormat _dateFormatter = DateFormat('dd MMM yyyy');
 
-  final List<Map<String, dynamic>> _dummyData = [
-    {
-      'kategori': 'Makanan',
-      'jumlahProduk': 5,
-      'produkPersen': 25.0,
-      'penjualanRp': 2500000,
-      'penjualanPersen': 40.0,
-      'hppRp': 1000000,
-      'timestamp': DateTime(2025, 10, 30),
-    },
-    {
-      'kategori': 'Minuman',
-      'jumlahProduk': 3,
-      'produkPersen': 15.0,
-      'penjualanRp': 1500000,
-      'penjualanPersen': 30.0,
-      'hppRp': 500000,
-      'timestamp': DateTime(2025, 10, 29),
-    },
-    {
-      'kategori': 'Snack',
-      'jumlahProduk': 2,
-      'produkPersen': 10.0,
-      'penjualanRp': 1000000,
-      'penjualanPersen': 20.0,
-      'hppRp': 300000,
-      'timestamp': DateTime(2025, 10, 28),
-    },
-    {
-      'kategori': 'Dessert',
-      'jumlahProduk': 1,
-      'produkPersen': 5.0,
-      'penjualanRp': 200000,
-      'penjualanPersen': 10.0,
-      'hppRp': 50000,
-      'timestamp': DateTime(2025, 10, 27),
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchData() async {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      final start = DateTime(_startDate.year, _startDate.month, _startDate.day, 0, 0, 0);
+      final end = DateTime(_endDate.year, _endDate.month, _endDate.day, 23, 59, 59);
+
+      final data = await _apiService.getCategorySalesReports(
+        outletId: widget.outletId,
+        startDate: start,
+        endDate: end,
+      );
+
+      setState(() {
+        _allData = data;
+        _filteredData = data;
+        _isLoading = false;
+      });
+
+      _filterData();
+
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal memuat data: $e')),
+        );
+      }
+      setState(() {
+        _isLoading = false;
+        _allData = [];
+        _filteredData = [];
+      });
+    }
+  }
+
+  void _filterData() {
+    final query = _searchController.text.toLowerCase();
+    List<Map<String, dynamic>> filtered = _allData.where((item) {
+      final kategori = (item['kategori'] ?? '').toString().toLowerCase();
+      return query.isEmpty || kategori.contains(query);
+    }).toList();
+
+    if (_sortColumnIndex != null) {
+      _sortList(filtered, _sortColumnIndex!, _isAscending);
+    }
+
+    setState(() {
+      _filteredData = filtered;
+      _currentPage = 1;
+    });
+  }
+
+  void _sortList(List<Map<String, dynamic>> list, int columnIndex, bool ascending) {
+    list.sort((a, b) {
+      int compareResult = 0;
+
+      switch (columnIndex) {
+        case 0:
+          compareResult = (a['kategori'] ?? '').compareTo(b['kategori'] ?? '');
+          break;
+        case 1:
+          final num valA = a['jumlahProduk'] ?? 0;
+          final num valB = b['jumlahProduk'] ?? 0;
+          compareResult = valA.compareTo(valB);
+          break;
+        case 2:
+          final num valA = a['produkPersen'] ?? 0;
+          final num valB = b['produkPersen'] ?? 0;
+          compareResult = valA.compareTo(valB);
+          break;
+        case 3:
+          final num valA = a['penjualanRp'] ?? 0;
+          final num valB = b['penjualanRp'] ?? 0;
+          compareResult = valA.compareTo(valB);
+          break;
+        case 4:
+          final num valA = a['penjualanPersen'] ?? 0;
+          final num valB = b['penjualanPersen'] ?? 0;
+          compareResult = valA.compareTo(valB);
+          break;
+        case 5:
+          final num valA = a['hppRp'] ?? 0;
+          final num valB = b['hppRp'] ?? 0;
+          compareResult = valA.compareTo(valB);
+          break;
+      }
+
+      return ascending ? compareResult : -compareResult;
+    });
+  }
+
+  void _onSort(int columnIndex, bool ascending) {
+    setState(() {
+      _sortColumnIndex = columnIndex;
+      _isAscending = ascending;
+    });
+    _sortList(_filteredData, columnIndex, ascending);
+  }
 
   Future<void> _selectDateRange(BuildContext context) async {
-    final picked = await showDateRangePicker(
+    final DateTime? newStartDate = await showDatePicker(
       context: context,
+      initialDate: _startDate,
       firstDate: DateTime(2000),
       lastDate: DateTime(2030),
-      initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
       builder: (context, child) {
         return Theme(
           data: ThemeData.light().copyWith(
             colorScheme: const ColorScheme.light(
               primary: Color(0xFF279E9E),
               onPrimary: Colors.white,
-              onSurface: Colors.black,
             ),
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
@@ -81,91 +181,101 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
       },
     );
 
-    if (picked != null) {
-      setState(() {
-        _startDate = picked.start;
-        _endDate = picked.end;
-      });
-    }
-  }
+    if (newStartDate == null) return;
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
+    final DateTime? newEndDate = await showDatePicker(
+      context: context,
+      initialDate: _endDate.isAfter(newStartDate) ? _endDate : newStartDate,
+      firstDate: newStartDate,
+      lastDate: DateTime(2030),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF279E9E),
+              onPrimary: Colors.white,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF279E9E),
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (newEndDate == null) return;
+
+    setState(() {
+      _startDate = newStartDate;
+      _endDate = newEndDate;
+    });
+
+    _fetchData();
   }
 
   @override
   Widget build(BuildContext context) {
-    final filteredData = _dummyData.where((item) {
-      final query = _searchController.text.toLowerCase();
-      final kategori = item['kategori'].toString().toLowerCase();
-      final date = item['timestamp'] as DateTime;
-
-      final matchesQuery = query.isEmpty || kategori.contains(query);
-
-      final matchesDate =
-          date.isAfter(_startDate.subtract(const Duration(days: 1))) &&
-              date.isBefore(_endDate.add(const Duration(days: 1)));
-
-      return matchesQuery && matchesDate;
-    }).toList();
+    final totalItems = _filteredData.length;
+    final totalPages = (totalItems / _itemsPerPage).ceil().clamp(1, 9999);
+    if (_currentPage > totalPages && totalPages > 0) {
+      _currentPage = totalPages;
+    }
+    final startIndex = (_currentPage - 1) * _itemsPerPage;
+    final endIndex = (startIndex + _itemsPerPage).clamp(0, totalItems);
+    final dataOnCurrentPage = _filteredData.sublist(startIndex, endIndex);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isMobile = constraints.maxWidth < 800;
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1200),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(context, isMobile),
-                    const SizedBox(height: 24),
-                    _buildFilterActions(context, isMobile),
-                    const SizedBox(height: 24),
-                    if (isMobile)
-                      _buildMobileList(filteredData)
-                    else
-                      _buildWebTable(filteredData),
-                    const SizedBox(height: 24),
-                    if (!isMobile) _buildPagination(filteredData.length),
-                  ],
-                ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(context),
+                  const SizedBox(height: 24),
+                  _buildFilterActions(context),
+                  const SizedBox(height: 24),
+                  _isLoading
+                      ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32.0),
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF279E9E),
+                      ),
+                    ),
+                  )
+                      : _buildResponsiveTable(dataOnCurrentPage),
+                  const SizedBox(height: 24),
+                  if (!_isLoading && totalItems > 0) _buildPagination(totalItems, totalPages),
+                ],
               ),
-            );
-          },
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool isMobile) {
+  Widget _buildHeader(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            if (isMobile)
-              IconButton(
-                icon: const Icon(Icons.menu, color: Color(0xFF333333)),
-                onPressed: () => Scaffold.of(context).openDrawer(),
-              ),
-            const Text(
-              'Penjualan Kategori',
-              style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF333333)),
-            ),
-          ],
+        const Text(
+          'Penjualan Kategori',
+          style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF333333)),
         ),
         ElevatedButton.icon(
-          onPressed: () {},
+          onPressed: _filteredData.isEmpty ? null : () {},
           icon: const Icon(Icons.cloud_download_outlined, size: 18),
           label: const Text('Ekspor Laporan'),
           style: ElevatedButton.styleFrom(
@@ -180,7 +290,7 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
     );
   }
 
-  Widget _buildFilterActions(BuildContext context, bool isMobile) {
+  Widget _buildFilterActions(BuildContext context) {
     final formattedStartDate = DateFormat('dd MMM yyyy').format(_startDate);
     final formattedEndDate = DateFormat('dd MMM yyyy').format(_endDate);
 
@@ -191,6 +301,7 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
       label: Text('$formattedStartDate - $formattedEndDate'),
       style: OutlinedButton.styleFrom(
         foregroundColor: Colors.grey[800],
+        backgroundColor: Colors.white,
         side: BorderSide(color: Colors.grey[300]!),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -198,10 +309,10 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
     );
 
     final searchField = SizedBox(
-      width: isMobile ? double.infinity : 280,
+      width: 280,
       child: TextField(
         controller: _searchController,
-        onChanged: (value) => setState(() {}),
+        onChanged: (value) => _filterData(),
         decoration: InputDecoration(
           hintText: 'Cari Kategori...',
           prefixIcon: const Icon(Icons.search, color: Color(0xFF279E9E)),
@@ -217,288 +328,206 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
       ),
     );
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.start,
+    return Wrap(
+      spacing: 16,
+      runSpacing: 16,
       children: [
         searchField,
-        const SizedBox(width: 16),
         datePicker,
       ],
     );
   }
 
-  Widget _buildWebTable(List<Map<String, dynamic>> data) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 10,
-          )
-        ],
-      ),
-      child: Column(
-        children: [
-          _buildTableHeader(),
-          if (data.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(32.0),
-              child: Text('Tidak ada data penjualan kategori ditemukan.'),
-            )
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: data.length,
-              itemBuilder: (context, index) => _buildTableRow(data[index]),
-              separatorBuilder: (context, index) => const Divider(
-                  height: 1,
-                  indent: 24,
-                  endIndent: 24,
-                  color: Color(0xFFEEEEEE)),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTableHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F4F8),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-      ),
-      child: Row(
-        children: [
-          Expanded(flex: 3, child: Text('KATEGORI', style: _tableHeaderStyle())),
-          Expanded(
-              flex: 2,
-              child: Text('JUMLAH PRODUK',
-                  style: _tableHeaderStyle(), textAlign: TextAlign.center)),
-          Expanded(
-              flex: 2,
-              child: Text('PRODUK (%)',
-                  style: _tableHeaderStyle(), textAlign: TextAlign.right)),
-          Expanded(
-              flex: 2,
-              child: Text('PENJUALAN (RP)',
-                  style: _tableHeaderStyle(), textAlign: TextAlign.right)),
-          Expanded(
-              flex: 2,
-              child: Text('PENJUALAN (%)',
-                  style: _tableHeaderStyle(), textAlign: TextAlign.right)),
-          Expanded(
-              flex: 2,
-              child: Text('HPP (RP)',
-                  style: _tableHeaderStyle(), textAlign: TextAlign.right)),
-          const SizedBox(width: 48),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTableRow(Map<String, dynamic> item) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      child: Row(
-        children: [
-          Expanded(
-              flex: 3, child: Text(item['kategori'], style: _tableBodyStyle())),
-          Expanded(
-              flex: 2,
-              child: Text(item['jumlahProduk'].toString(),
-                  style: _tableBodyStyle(), textAlign: TextAlign.center)),
-          Expanded(
-              flex: 2,
-              child: Text('${item['produkPersen']}%',
-                  style: _tableBodyStyle(), textAlign: TextAlign.right)),
-          Expanded(
-              flex: 2,
-              child: Text(_currencyFormatter.format(item['penjualanRp']),
-                  style: _tableBodyStyle(fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.right)),
-          Expanded(
-              flex: 2,
-              child: Text('${item['penjualanPersen']}%',
-                  style: _tableBodyStyle(), textAlign: TextAlign.right)),
-          Expanded(
-              flex: 2,
-              child: Text(_currencyFormatter.format(item['hppRp']),
-                  style: _tableBodyStyle(), textAlign: TextAlign.right)),
-          SizedBox(
-            width: 48,
-            child: PopupMenuButton<String>(
-              color: Colors.white,
-              icon: const Icon(Icons.more_horiz, color: Color(0xFF279E9E)),
-              onSelected: (value) {},
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'lihat_detail',
-                  child: Text('Lihat Detail'),
-                ),
-              ],
-            ),
+  Widget _buildResponsiveTable(List<Map<String, dynamic>> data) {
+    return Scrollbar(
+      controller: _scrollController,
+      thumbVisibility: true,
+      trackVisibility: true,
+      child: SingleChildScrollView(
+        controller: _scrollController,
+        scrollDirection: Axis.horizontal,
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 1000),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.05),
+                spreadRadius: 1,
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              )
+            ],
+            border: Border.all(color: Colors.grey.shade200),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMobileList(List<Map<String, dynamic>> data) {
-    if (data.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(32.0),
-        child:
-        Center(child: Text('Tidak ada data penjualan kategori ditemukan.')),
-      );
-    }
-
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: data.length,
-      itemBuilder: (context, index) => _buildMobileCard(data[index]),
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-    );
-  }
-
-  Widget _buildMobileCard(Map<String, dynamic> item) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-          )
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item['kategori'],
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Jumlah Produk: ${item['jumlahProduk']}',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-                PopupMenuButton<String>(
-                  color: Colors.white,
-                  icon: const Icon(Icons.more_horiz, color: Color(0xFF279E9E)),
-                  onSelected: (value) {},
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'lihat_detail',
-                      child: Text('Lihat Detail'),
-                    ),
-                  ],
-                ),
-              ],
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              dividerColor: Colors.grey[200],
+              dataTableTheme: DataTableThemeData(
+                headingRowColor: MaterialStateProperty.all(Colors.transparent),
+                dataRowColor: MaterialStateProperty.resolveWith<Color>(
+                        (Set<MaterialState> states) {
+                      return Colors.transparent;
+                    }),
+              ),
             ),
-            const Divider(height: 24),
-            _buildDetailRow(
-                Icons.pie_chart_outline, 'Produk (%)', '${item['produkPersen']}%'),
-            const SizedBox(height: 8),
-            _buildDetailRow(Icons.show_chart, 'Penjualan (%)',
-                '${item['penjualanPersen']}%'),
-            const SizedBox(height: 8),
-            _buildDetailRow(
-                Icons.money_off, 'HPP (RP)', _currencyFormatter.format(item['hppRp'])),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Total Penjualan:',
-                    style: TextStyle(color: Colors.black87)),
-                Text(
-                  _currencyFormatter.format(item['penjualanRp']),
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: Color(0xFF279E9E)),
+            child: _buildDataTable(data),
+          ),
+        ),
+      ),
+    );
+  }
+
+  DataTable _buildDataTable(List<Map<String, dynamic>> data) {
+    final headerStyle = TextStyle(
+      fontWeight: FontWeight.w600,
+      fontSize: 12,
+      color: Colors.grey[600],
+      letterSpacing: 0.5,
+    );
+
+    return DataTable(
+      sortColumnIndex: _sortColumnIndex,
+      sortAscending: _isAscending,
+      columnSpacing: 50,
+      horizontalMargin: 24,
+      headingRowHeight: 50,
+      dataRowMaxHeight: 72,
+      dataRowMinHeight: 72,
+      dividerThickness: 1,
+      showBottomBorder: true,
+      columns: [
+        DataColumn(
+          label: SizedBox(width: 120, child: Text('KATEGORI', style: headerStyle)),
+          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
+        ),
+        DataColumn(
+          label: SizedBox(width: 100, child: Text('JUMLAH PRODUK', style: headerStyle)),
+          numeric: true,
+          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
+        ),
+        DataColumn(
+          label: SizedBox(width: 100, child: Text('PRODUK (%)', style: headerStyle)),
+          numeric: true,
+          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
+        ),
+        DataColumn(
+          label: SizedBox(width: 120, child: Text('PENJUALAN (RP)', style: headerStyle)),
+          numeric: true,
+          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
+        ),
+        DataColumn(
+          label: SizedBox(width: 100, child: Text('PENJUALAN (%)', style: headerStyle)),
+          numeric: true,
+          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
+        ),
+        DataColumn(
+          label: SizedBox(width: 120, child: Text('HPP (RP)', style: headerStyle)),
+          numeric: true,
+          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
+        ),
+      ],
+      rows: data.map((item) {
+        return DataRow(
+          cells: [
+            DataCell(SizedBox(width: 120, child: Text(
+                item['kategori'] ?? '-',
+                style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
+            ))),
+            DataCell(SizedBox(width: 100, child: Text(
+                item['jumlahProduk'].toString(),
+                style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
+            ))),
+            DataCell(SizedBox(width: 100, child: Text(
+                '${item['produkPersen']}%',
+                style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
+            ))),
+            DataCell(SizedBox(width: 120, child: Text(
+              _currencyFormatter.format(item['penjualanRp'] ?? 0),
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF444444)),
+            ))),
+            DataCell(SizedBox(width: 100, child: Text(
+                '${item['penjualanPersen']}%',
+                style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
+            ))),
+            DataCell(SizedBox(width: 120, child: Text(
+              _currencyFormatter.format(item['hppRp'] ?? 0),
+              style: const TextStyle(fontSize: 14, color: Color(0xFF444444)),
+            ))),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildPagination(int totalItems, int totalPages) {
+    if (totalItems == 0) return const SizedBox.shrink();
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            const Text('Tampilkan:', style: TextStyle(color: Colors.grey)),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<int>(
+                  value: _itemsPerPage,
+                  onChanged: (int? newValue) {
+                    setState(() {
+                      _itemsPerPage = newValue!;
+                      _currentPage = 1;
+                    });
+                  },
+                  items: <int>[10, 20, 50, 100]
+                      .map<DropdownMenuItem<int>>((int value) {
+                    return DropdownMenuItem<int>(
+                      value: value,
+                      child: Text(value.toString()),
+                    );
+                  }).toList(),
                 ),
-              ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Text(
+              'Ditampilkan ${((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems)} - ${math.min(_currentPage * _itemsPerPage, totalItems)} dari $totalItems data',
+              style: const TextStyle(color: Colors.grey),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.grey[600], size: 18),
-          const SizedBox(width: 12),
-          Text('$label:', style: TextStyle(color: Colors.grey[700])),
-          const Spacer(),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  }
-
-  TextStyle _tableHeaderStyle() {
-    return TextStyle(
-        fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey[700]);
-  }
-
-  TextStyle _tableBodyStyle({FontWeight fontWeight = FontWeight.normal}) {
-    return TextStyle(
-        fontSize: 14, color: Colors.black87, fontWeight: fontWeight);
-  }
-
-  Widget _buildPagination(int totalItems) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Text(
-          'Ditampilkan 1 - $totalItems dari $totalItems data',
-          style: const TextStyle(color: Colors.grey),
-        ),
-        const SizedBox(width: 24),
-        IconButton(
-          icon: const Icon(Icons.arrow_back_ios,
-              size: 16, color: Color(0xFF279E9E)),
-          onPressed: null,
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-              color: const Color(0xFF279E9E),
-              borderRadius: BorderRadius.circular(8)),
-          child: const Text('1',
-              style:
-              TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        ),
-        IconButton(
-          icon: const Icon(Icons.arrow_forward_ios,
-              size: 16, color: Color(0xFF279E9E)),
-          onPressed: null,
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back_ios, size: 16, color: Color(0xFF279E9E)),
+              onPressed: _currentPage > 1
+                  ? () => setState(() => _currentPage--)
+                  : null,
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                  color: const Color(0xFF279E9E),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Text('$_currentPage',
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+            IconButton(
+              icon: const Icon(Icons.arrow_forward_ios, size: 16, color: Color(0xFF279E9E)),
+              onPressed: _currentPage < totalPages
+                  ? () => setState(() => _currentPage++)
+                  : null,
+            ),
+          ],
         ),
       ],
     );

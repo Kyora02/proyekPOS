@@ -29,12 +29,12 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
   final _skuController = TextEditingController();
   final _hargaJualController = TextEditingController();
   final _hargaBeliController = TextEditingController();
+  final _stokController = TextEditingController();
 
   XFile? _imageFile;
   final ImagePicker _picker = ImagePicker();
   String? _existingImageUrl;
 
-  // New State Variable
   bool _showInMenu = true;
 
   List<Map<String, dynamic>> _outletOptions = [];
@@ -87,9 +87,9 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
     _skuController.text = product['sku'] ?? '';
     _hargaJualController.text = product['sellingPrice']?.toString() ?? '';
     _hargaBeliController.text = product['costPrice']?.toString() ?? '0';
+    _stokController.text = product['stok']?.toString() ?? '0';
     _existingImageUrl = product['imageUrl'];
 
-    // Populate Toggle
     _showInMenu = product['showInMenu'] ?? true;
 
     final savedCategoryId = product['categoryId'];
@@ -130,6 +130,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
 
       final sellingPrice = double.tryParse(_hargaJualController.text) ?? 0.0;
       final costPrice = double.tryParse(_hargaBeliController.text);
+      final stok = int.tryParse(_stokController.text) ?? 0;
 
       if (_isEditMode) {
         await _apiService.updateProduct(
@@ -139,10 +140,11 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
           sku: _skuController.text,
           sellingPrice: sellingPrice,
           costPrice: costPrice,
+          stok: stok,
           categoryId: _selectedKategoriId!,
           outlets: outletsToSave,
           imageFile: _imageFile,
-          showInMenu: _showInMenu, // Send Toggle Value
+          showInMenu: _showInMenu,
         );
       } else {
         await _apiService.addProduct(
@@ -151,10 +153,11 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
           sku: _skuController.text,
           sellingPrice: sellingPrice,
           costPrice: costPrice,
+          stok: stok,
           categoryId: _selectedKategoriId!,
           outlets: outletsToSave,
           imageFile: _imageFile,
-          showInMenu: _showInMenu, // Send Toggle Value
+          showInMenu: _showInMenu,
         );
       }
 
@@ -176,6 +179,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
     _skuController.dispose();
     _hargaJualController.dispose();
     _hargaBeliController.dispose();
+    _stokController.dispose();
     super.dispose();
   }
 
@@ -266,8 +270,6 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                       children: [
                         _buildActiveOutletDisplay(),
                         const SizedBox(height: 16),
-
-                        // NEW TOGGLE FOR SHOW IN MENU
                         Container(
                           padding: const EdgeInsets.symmetric(vertical: 8),
                           decoration: BoxDecoration(
@@ -323,6 +325,14 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                               _selectedKategoriId = value;
                             });
                           },
+                          isRequired: true,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _stokController,
+                          label: 'Stok Produk',
+                          hint: '0',
+                          keyboardType: TextInputType.number,
                           isRequired: true,
                         ),
                       ],

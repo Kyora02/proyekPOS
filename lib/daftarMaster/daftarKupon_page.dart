@@ -25,7 +25,7 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
   String _searchQuery = '';
   String? _selectedStatus = 'Semua Status';
 
-  final List<String> _statusOptions = ['Semua Status', 'Aktif', 'Tidak Aktif'];
+  final List<String> _statusOptions = ['Semua Status', 'Aktif', 'Tidak Aktif', 'Kadaluarsa'];
 
   int _currentPage = 1;
   int _itemsPerPage = 10;
@@ -116,21 +116,35 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
     }
   }
 
+  String _getCouponStatus(Map<String, dynamic> coupon) {
+    final endDate = _parseFirestoreDate(coupon['tanggalSelesai']);
+    final bool isActive = coupon['status'] ?? false;
+
+    if (endDate != null && DateTime.now().isAfter(endDate)) {
+      return 'expired';
+    }
+
+    return isActive ? 'active' : 'inactive';
+  }
+
   List<Map<String, dynamic>> get _filteredCoupons {
     List<Map<String, dynamic>> coupons = _kuponList;
 
     if (_searchQuery.isNotEmpty) {
       coupons = coupons.where((coupon) {
         final name = coupon['nama']?.toLowerCase() ?? '';
+        final code = coupon['kodeKupon']?.toLowerCase() ?? '';
         final query = _searchQuery.toLowerCase();
-        return name.contains(query);
+        return name.contains(query) || code.contains(query);
       }).toList();
     }
 
     if (_selectedStatus == 'Aktif') {
-      coupons = coupons.where((coupon) => coupon['status'] == true).toList();
+      coupons = coupons.where((coupon) => _getCouponStatus(coupon) == 'active').toList();
     } else if (_selectedStatus == 'Tidak Aktif') {
-      coupons = coupons.where((coupon) => coupon['status'] == false).toList();
+      coupons = coupons.where((coupon) => _getCouponStatus(coupon) == 'inactive').toList();
+    } else if (_selectedStatus == 'Kadaluarsa') {
+      coupons = coupons.where((coupon) => _getCouponStatus(coupon) == 'expired').toList();
     }
     return coupons;
   }
@@ -148,16 +162,20 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
           bValue = b['nama'] ?? '';
           break;
         case 1:
+          aValue = a['kodeKupon'] ?? '';
+          bValue = b['kodeKupon'] ?? '';
+          break;
+        case 2:
           aValue = a['nilai'] ?? 0;
           bValue = b['nilai'] ?? 0;
           break;
-        case 2:
+        case 3:
           aValue = _parseFirestoreDate(a['tanggalMulai']);
           bValue = _parseFirestoreDate(b['tanggalMulai']);
           break;
-        case 3:
-          aValue = a['status'] ?? false;
-          bValue = b['status'] ?? false;
+        case 4:
+          aValue = _getCouponStatus(a);
+          bValue = _getCouponStatus(b);
           break;
         default:
           return 0;
@@ -169,8 +187,6 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
         compare = aValue.compareTo(bValue);
       } else if (aValue is DateTime && bValue is DateTime) {
         compare = aValue.compareTo(bValue);
-      } else if (aValue is bool && bValue is bool) {
-        compare = (aValue ? 1 : 0).compareTo(bValue ? 1 : 0);
       } else {
         compare = 0;
       }
@@ -356,7 +372,7 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
           width: 250,
           child: TextField(
             decoration: InputDecoration(
-              hintText: 'Cari nama kupon...',
+              hintText: 'Cari nama atau kode kupon...',
               prefixIcon: const Icon(Icons.search, color: Colors.grey),
               border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -434,15 +450,16 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
           controller: _horizontalScrollController,
           scrollDirection: Axis.horizontal,
           child: DataTable(
-            columnSpacing: 130.0,
+            columnSpacing: 100.0,
             sortColumnIndex: _sortColumnIndex,
             sortAscending: _sortAscending,
             headingTextStyle: _tableHeaderStyle(),
             dataTextStyle: _tableBodyStyle(),
             columns: [
               DataColumn(label: const Text('NAMA KUPON'), onSort: _onSort),
+              DataColumn(label: const Text('KODE KUPON'), onSort: _onSort),
               DataColumn(label: const Text('BESARAN'), onSort: _onSort),
-              DataColumn(label: const Text('DURASI'), onSort: _onSort),
+              DataColumn(label: const Text('MASA BERLAKU'), onSort: _onSort),
               DataColumn(label: const Text('STATUS'), onSort: _onSort),
               DataColumn(label: const Text('AKSI')),
             ],
@@ -450,9 +467,10 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
               return DataRow(
                 cells: [
                   DataCell(Text(coupon['nama'] ?? 'N/A')),
+                  DataCell(Text(coupon['kodeKupon'] ?? '-')),
                   DataCell(Text(_formatBesaran(coupon))),
                   DataCell(Text(_formatDurasi(coupon))),
-                  DataCell(_buildStatusChip(coupon['status'] ?? false)),
+                  DataCell(_buildStatusChip(_getCouponStatus(coupon))),
                   DataCell(_buildPopupMenuButton(coupon)),
                 ],
               );
@@ -477,9 +495,28 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
     );
   }
 
-  Widget _buildStatusChip(bool isActive) {
-    Color chipColor = isActive ? Colors.green : Colors.red;
-    String text = isActive ? 'Aktif' : 'Tidak Aktif';
+  Widget _buildStatusChip(String status) {
+    Color chipColor;
+    String text;
+
+    switch (status) {
+      case 'active':
+        chipColor = Colors.green;
+        text = 'Aktif';
+        break;
+      case 'inactive':
+        chipColor = Colors.orange;
+        text = 'Tidak Aktif';
+        break;
+      case 'expired':
+        chipColor = Colors.red;
+        text = 'Kadaluarsa';
+        break;
+      default:
+        chipColor = Colors.grey;
+        text = 'Unknown';
+    }
+
     return Chip(
       label: Text(text,
           style: const TextStyle(

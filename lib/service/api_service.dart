@@ -127,6 +127,21 @@ class ApiService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> getProducts(
+      {required String outletId}) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/products?outletId=$outletId');
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load products: ${response.body}');
+    }
+  }
+
   Future<void> addProduct({
     required String name,
     String? description,
@@ -137,6 +152,7 @@ class ApiService {
     required List<Map<String, dynamic>> outlets,
     XFile? imageFile,
     bool showInMenu = true,
+    int? stok,
   }) async {
     final token = await _getAuthToken();
     final url = Uri.parse('$_baseUrl/products');
@@ -152,6 +168,7 @@ class ApiService {
     request.fields['categoryId'] = categoryId;
     request.fields['outlets'] = jsonEncode(outlets);
     request.fields['showInMenu'] = showInMenu.toString();
+    if (stok != null) request.fields['stok'] = stok.toString();
 
     if (imageFile != null) {
       final bytes = await imageFile.readAsBytes();
@@ -171,21 +188,6 @@ class ApiService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> getProducts(
-      {required String outletId}) async {
-    final token = await _getAuthToken();
-    final url = Uri.parse('$_baseUrl/products?outletId=$outletId');
-    final response = await http.get(
-      url,
-      headers: {'Authorization': 'Bearer $token'},
-    );
-    if (response.statusCode == 200) {
-      return List<Map<String, dynamic>>.from(jsonDecode(response.body));
-    } else {
-      throw Exception('Failed to load products: ${response.body}');
-    }
-  }
-
   Future<void> updateProduct({
     required String id,
     required String name,
@@ -197,6 +199,7 @@ class ApiService {
     List<Map<String, dynamic>>? outlets,
     XFile? imageFile,
     bool showInMenu = true,
+    int? stok,
   }) async {
     final token = await _getAuthToken();
     final url = Uri.parse('$_baseUrl/products/$id');
@@ -212,6 +215,7 @@ class ApiService {
     request.fields['categoryId'] = categoryId;
     if (outlets != null) request.fields['outlets'] = jsonEncode(outlets);
     request.fields['showInMenu'] = showInMenu.toString();
+    if (stok != null) request.fields['stok'] = stok.toString();
 
     if (imageFile != null) {
       final bytes = await imageFile.readAsBytes();
@@ -462,9 +466,10 @@ class ApiService {
   }
 
   Future<List<Map<String, dynamic>>> getKupon(
-      {required String outletId}) async {
+    {required String outletId}) async {
     final token = await _getAuthToken();
     final url = Uri.parse('$_baseUrl/kupon?outletId=$outletId');
+
     final response = await http.get(
       url,
       headers: {'Authorization': 'Bearer $token'},
@@ -478,6 +483,7 @@ class ApiService {
 
   Future<void> addKupon({
     required String nama,
+    required String kodeKupon,
     String? deskripsi,
     required double nilai,
     required String outletId,
@@ -490,6 +496,7 @@ class ApiService {
     final url = Uri.parse('$_baseUrl/kupon');
     final body = jsonEncode({
       'nama': nama,
+      'kodeKupon': kodeKupon,
       'deskripsi': deskripsi,
       'nilai': nilai,
       'outletId': outletId,
@@ -514,6 +521,7 @@ class ApiService {
   Future<void> updateKupon({
     required String id,
     required String nama,
+    required String kodeKupon,
     String? deskripsi,
     required double nilai,
     required String outletId,
@@ -526,6 +534,7 @@ class ApiService {
     final url = Uri.parse('$_baseUrl/kupon/$id');
     final body = jsonEncode({
       'nama': nama,
+      'kodeKupon': kodeKupon,
       'deskripsi': deskripsi,
       'nilai': nilai,
       'outletId': outletId,
@@ -655,60 +664,90 @@ class ApiService {
     }
   }
 
-  Future<void> addStock({
-    required String outletId,
-    required String productId,
-    required String stokToAdd,
-  }) async {
+  Future<List<Map<String, dynamic>>> getRawMaterials(String outletId) async {
     final token = await _getAuthToken();
-    final url = Uri.parse('$_baseUrl/stok/add');
-    final body = jsonEncode({
-      'outletId': outletId,
-      'productId': productId,
-      'stokToAdd': stokToAdd,
-    });
+    final url = Uri.parse('$_baseUrl/stok?outletId=$outletId');
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    );
 
-    final response = await http.post(url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token'
-        },
-        body: body);
-
-    if (response.statusCode != 200) {
-      throw Exception('Failed to add stock: ${response.body}');
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load raw materials: ${response.body}');
     }
   }
 
-  Future<void> updateStock({
+  Future<void> addRawMaterial({
+    required String name,
+    required DateTime date,
+    required double price,
     required String outletId,
-    required String productId,
-    required String newStock,
   }) async {
-    try {
-      final token = await _getAuthToken();
-      final url = Uri.parse('$_baseUrl/stok/update');
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/stok');
+    final body = jsonEncode({
+      'name': name,
+      'date': date.toIso8601String(),
+      'price': price,
+      'outletId': outletId,
+    });
 
-      final body = jsonEncode({
-        'outletId': outletId,
-        'productId': productId,
-        'newStock': newStock,
-      });
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token'
+      },
+      body: body,
+    );
 
-      final response = await http.put(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token'
-        },
-        body: body,
-      );
+    if (response.statusCode != 201) {
+      throw Exception('Failed to add raw material: ${response.body}');
+    }
+  }
 
-      if (response.statusCode != 200) {
-        throw Exception('Failed to update stock: ${response.body}');
-      }
-    } catch (e) {
-      rethrow;
+  Future<void> updateRawMaterial({
+    required String id,
+    required String name,
+    required DateTime date,
+    required double price,
+    required String outletId,
+  }) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/stok/$id');
+    final body = jsonEncode({
+      'name': name,
+      'date': date.toIso8601String(),
+      'price': price,
+      'outletId': outletId,
+    });
+
+    final response = await http.put(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token'
+      },
+      body: body,
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update raw material: ${response.body}');
+    }
+  }
+
+  Future<void> deleteRawMaterial(String id) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/stok/$id');
+    final response = await http.delete(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete raw material: ${response.body}');
     }
   }
 
@@ -716,6 +755,7 @@ class ApiService {
     required double amount,
     required List<Map<String, dynamic>> items,
     required String customerName,
+    required String customerPhone,
     required String paymentMethod,
     required String karyawanId,
     required String outletId,
@@ -733,6 +773,7 @@ class ApiService {
         'grossAmount': amount,
         'items': items,
         'customerName': customerName,
+        'customerPhone': customerPhone,
         'paymentMethod': paymentMethod,
         'karyawanId': karyawanId,
         'outletId': outletId,
@@ -860,4 +901,113 @@ class ApiService {
       return null;
     }
   }
+
+  Future<void> reduceStock({required List<Map<String, dynamic>> items}) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/reports/reduce-stock');
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'items': items}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to reduce stock: ${response.body}');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getCategorySalesReports({
+    required String outletId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      final formattedStartDate = startDate.toIso8601String();
+      final formattedEndDate = endDate.toIso8601String();
+
+      final url = Uri.parse(
+          '$_baseUrl/reports/category-sales-reports?outletId=$outletId&startDate=$formattedStartDate&endDate=$formattedEndDate');
+
+      final response = await http.get(url, headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      });
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(data);
+      } else {
+        throw Exception(
+            'Gagal memuat laporan penjualan kategori: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getCustomerSalesReports({
+    required String outletId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      final formattedStartDate = startDate.toIso8601String();
+      final formattedEndDate = endDate.toIso8601String();
+
+      final url = Uri.parse(
+          '$_baseUrl/reports/customer-sales-reports?outletId=$outletId&startDate=$formattedStartDate&endDate=$formattedEndDate');
+
+      final response = await http.get(url, headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      });
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(data);
+      } else {
+        throw Exception(
+            'Gagal memuat laporan pelanggan: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getPurchaseDetail({
+    required String outletId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      final formattedStartDate = startDate.toIso8601String();
+      final formattedEndDate = endDate.toIso8601String();
+
+      final url = Uri.parse(
+          '$_baseUrl/reports/purchase-detail?outletId=$outletId&startDate=$formattedStartDate&endDate=$formattedEndDate');
+
+      final response = await http.get(url, headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      });
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw Exception(
+            'Gagal memuat detail pembelian: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
 }

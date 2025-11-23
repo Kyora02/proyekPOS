@@ -5,6 +5,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:proyekpos2/service/api_service.dart';
+import 'dart:math' as math;
 
 class MyCustomScrollBehavior extends MaterialScrollBehavior {
   @override
@@ -26,7 +27,7 @@ class DetailPenjualanPage extends StatefulWidget {
 }
 
 class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
-  DateTime _startDate = DateTime.now().subtract(const Duration(days: 7));
+  DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
   DateTime _endDate = DateTime.now();
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -36,6 +37,8 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
   List<Map<String, dynamic>> _filteredData = [];
   bool _isLoading = true;
 
+  int _currentPage = 1;
+  int _itemsPerPage = 10;
   int? _sortColumnIndex;
   bool _isAscending = true;
 
@@ -116,6 +119,7 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
 
     setState(() {
       _filteredData = filtered;
+      _currentPage = 1;
     });
   }
 
@@ -305,64 +309,61 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
 
   @override
   Widget build(BuildContext context) {
+    final totalItems = _filteredData.length;
+    final totalPages = (totalItems / _itemsPerPage).ceil().clamp(1, 9999);
+    if (_currentPage > totalPages && totalPages > 0) {
+      _currentPage = totalPages;
+    }
+    final startIndex = (_currentPage - 1) * _itemsPerPage;
+    final endIndex = (startIndex + _itemsPerPage).clamp(0, totalItems);
+    final dataOnCurrentPage = _filteredData.sublist(startIndex, endIndex);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isMobile = constraints.maxWidth < 800;
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1200),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(context, isMobile),
-                    const SizedBox(height: 24),
-                    _buildFilterActions(context, isMobile),
-                    const SizedBox(height: 24),
-                    _isLoading
-                        ? const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(32.0),
-                        child: CircularProgressIndicator(
-                          color: Color(0xFF279E9E),
-                        ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(context),
+                  const SizedBox(height: 24),
+                  _buildFilterActions(context),
+                  const SizedBox(height: 24),
+                  _isLoading
+                      ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32.0),
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF279E9E),
                       ),
-                    )
-                        : _buildResponsiveTable(_filteredData),
-                    const SizedBox(height: 24),
-                    if (!_isLoading) _buildPagination(),
-                  ],
-                ),
+                    ),
+                  )
+                      : _buildResponsiveTable(dataOnCurrentPage),
+                  const SizedBox(height: 24),
+                  if (!_isLoading && totalItems > 0) _buildPagination(totalItems, totalPages),
+                ],
               ),
-            );
-          },
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool isMobile) {
+  Widget _buildHeader(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            if (isMobile)
-              IconButton(
-                icon: const Icon(Icons.menu, color: Color(0xFF333333)),
-                onPressed: () => Scaffold.of(context).openDrawer(),
-              ),
-            const Text(
-              'Detail Penjualan',
-              style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF333333)),
-            ),
-          ],
+        const Text(
+          'Detail Penjualan',
+          style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF333333)),
         ),
         ElevatedButton.icon(
           onPressed: _filteredData.isEmpty ? null : () => _exportToPdf(),
@@ -380,7 +381,7 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
     );
   }
 
-  Widget _buildFilterActions(BuildContext context, bool isMobile) {
+  Widget _buildFilterActions(BuildContext context) {
     final formattedStartDate = DateFormat('dd MMM yyyy').format(_startDate);
     final formattedEndDate = DateFormat('dd MMM yyyy').format(_endDate);
 
@@ -391,6 +392,7 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
       label: Text('$formattedStartDate - $formattedEndDate'),
       style: OutlinedButton.styleFrom(
         foregroundColor: Colors.grey[800],
+        backgroundColor: Colors.white,
         side: BorderSide(color: Colors.grey[300]!),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -398,12 +400,12 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
     );
 
     final searchField = SizedBox(
-      width: isMobile ? double.infinity : 320,
+      width: 280,
       child: TextField(
         controller: _searchController,
         onChanged: (value) => _filterData(),
         decoration: InputDecoration(
-          hintText: 'Cari No. Transaksi, Karyawan, Pelanggan...',
+          hintText: 'Cari No. Transaksi, Karyawan...',
           prefixIcon: const Icon(Icons.search, color: Color(0xFF279E9E)),
           filled: true,
           fillColor: Colors.white,
@@ -417,25 +419,13 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
       ),
     );
 
-    return isMobile
-        ? Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Wrap(
+      spacing: 16,
+      runSpacing: 16,
       children: [
         searchField,
-        const SizedBox(height: 16),
         datePicker,
       ],
-    )
-        : SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          searchField,
-          const SizedBox(width: 16),
-          datePicker,
-        ],
-      ),
     );
   }
 
@@ -448,6 +438,7 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
         controller: _scrollController,
         scrollDirection: Axis.horizontal,
         child: Container(
+          constraints: const BoxConstraints(minWidth: 1000),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
@@ -490,7 +481,7 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
     return DataTable(
       sortColumnIndex: _sortColumnIndex,
       sortAscending: _isAscending,
-      columnSpacing: 35,
+      columnSpacing: 50,
       horizontalMargin: 24,
       headingRowHeight: 50,
       dataRowMaxHeight: 72,
@@ -499,27 +490,27 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
       showBottomBorder: true,
       columns: [
         DataColumn(
-          label: Text('NO. TRANSAKSI', style: headerStyle),
+          label: SizedBox(width: 150, child: Text('NO. TRANSAKSI', style: headerStyle)),
           onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
         DataColumn(
-          label: Text('TANGGAL', style: headerStyle),
+          label: SizedBox(width: 130, child: Text('TANGGAL', style: headerStyle)),
           onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
         DataColumn(
-          label: Text('KARYAWAN', style: headerStyle),
+          label: SizedBox(width: 100, child: Text('KARYAWAN', style: headerStyle)),
           onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
         DataColumn(
-          label: Text('CUSTOMER', style: headerStyle),
+          label: SizedBox(width: 100, child: Text('CUSTOMER', style: headerStyle)),
           onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
         DataColumn(
-          label: Text('METODE', style: headerStyle),
+          label: SizedBox(width: 100, child: Text('METODE', style: headerStyle)),
           onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
         DataColumn(
-          label: Text('TOTAL', style: headerStyle),
+          label: SizedBox(width: 120, child: Text('TOTAL', style: headerStyle)),
           numeric: true,
           onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
@@ -531,23 +522,23 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
 
         return DataRow(
           cells: [
-            DataCell(Text(
+            DataCell(SizedBox(width: 150, child: Text(
                 item['noTransaksi'] ?? '-',
                 style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
-            )),
-            DataCell(Text(
+            ))),
+            DataCell(SizedBox(width: 130, child: Text(
                 _dateFormatter.format(dateVal),
                 style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
-            )),
-            DataCell(Text(
+            ))),
+            DataCell(SizedBox(width: 100, child: Text(
                 item['namaKaryawan'] ?? '-',
                 style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
-            )),
-            DataCell(Text(
+            ))),
+            DataCell(SizedBox(width: 100, child: Text(
                 item['namaCustomer'] ?? 'Umum',
                 style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
-            )),
-            DataCell(Container(
+            ))),
+            DataCell(SizedBox(width: 100, child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: const Color(0xFFE8F5E9),
@@ -562,44 +553,84 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
                     fontWeight: FontWeight.w600
                 ),
               ),
-            )),
-            DataCell(Text(
+            ))),
+            DataCell(SizedBox(width: 120, child: Text(
               _currencyFormatter.format(item['totalPenjualan'] ?? 0),
               style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF444444)),
-            )),
+            ))),
           ],
         );
       }).toList(),
     );
   }
 
-  Widget _buildPagination() {
+  Widget _buildPagination(int totalItems, int totalPages) {
+    if (totalItems == 0) return const SizedBox.shrink();
+
     return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          'Ditampilkan 1 - ${_filteredData.length} dari ${_allData.length} data',
-          style: const TextStyle(color: Colors.grey),
+        Row(
+          children: [
+            const Text('Tampilkan:', style: TextStyle(color: Colors.grey)),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<int>(
+                  value: _itemsPerPage,
+                  onChanged: (int? newValue) {
+                    setState(() {
+                      _itemsPerPage = newValue!;
+                      _currentPage = 1;
+                    });
+                  },
+                  items: <int>[10, 20, 50, 100]
+                      .map<DropdownMenuItem<int>>((int value) {
+                    return DropdownMenuItem<int>(
+                      value: value,
+                      child: Text(value.toString()),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Text(
+              'Ditampilkan ${((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems)} - ${math.min(_currentPage * _itemsPerPage, totalItems)} dari $totalItems data',
+              style: const TextStyle(color: Colors.grey),
+            ),
+          ],
         ),
-        const SizedBox(width: 24),
-        IconButton(
-          icon: const Icon(Icons.arrow_back_ios,
-              size: 16, color: Color(0xFF279E9E)),
-          onPressed: null,
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-              color: const Color(0xFF279E9E),
-              borderRadius: BorderRadius.circular(8)),
-          child: const Text('1',
-              style:
-              TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        ),
-        IconButton(
-          icon: const Icon(Icons.arrow_forward_ios,
-              size: 16, color: Color(0xFF279E9E)),
-          onPressed: null,
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back_ios, size: 16, color: Color(0xFF279E9E)),
+              onPressed: _currentPage > 1
+                  ? () => setState(() => _currentPage--)
+                  : null,
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                  color: const Color(0xFF279E9E),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Text('$_currentPage',
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+            IconButton(
+              icon: const Icon(Icons.arrow_forward_ios, size: 16, color: Color(0xFF279E9E)),
+              onPressed: _currentPage < totalPages
+                  ? () => setState(() => _currentPage++)
+                  : null,
+            ),
+          ],
         ),
       ],
     );

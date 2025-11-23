@@ -102,14 +102,18 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
           bValue = _getCategoryName(b['categoryId'] ?? '');
           break;
         case 3:
+          aValue = a['stok'] ?? 0;
+          bValue = b['stok'] ?? 0;
+          break;
+        case 4:
           aValue = a['costPrice'] ?? 0;
           bValue = b['costPrice'] ?? 0;
           break;
-        case 4:
+        case 5:
           aValue = a['sellingPrice'] ?? 0;
           bValue = b['sellingPrice'] ?? 0;
           break;
-        case 5:
+        case 6:
           aValue = (a['showInMenu'] ?? true) ? 1 : 0;
           bValue = (b['showInMenu'] ?? true) ? 1 : 0;
           break;
@@ -395,7 +399,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
             child: DropdownButton<String>(
               dropdownColor: Colors.white,
               value: _selectedCategoryId,
-              isExpanded: true, // <--- FIXED: PREVENTS OVERFLOW
+              isExpanded: true,
               onChanged: (String? newValue) {
                 setState(() {
                   _selectedCategoryId = newValue;
@@ -424,7 +428,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
             child: DropdownButton<String>(
               dropdownColor: Colors.white,
               value: _statusFilter,
-              isExpanded: true, // <--- FIXED: PREVENTS OVERFLOW
+              isExpanded: true,
               onChanged: (String? newValue) {
                 setState(() {
                   _statusFilter = newValue!;
@@ -502,6 +506,11 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
                   onSort: _onSort,
                 ),
                 DataColumn(
+                  label: const Text('STOK'),
+                  numeric: true,
+                  onSort: _onSort,
+                ),
+                DataColumn(
                   label: const Text('HARGA BELI'),
                   numeric: true,
                   onSort: _onSort,
@@ -527,6 +536,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
                     DataCell(Text(product['sku'] ?? 'N/A')),
                     DataCell(
                         Text(_getCategoryName(product['categoryId'] ?? ''))),
+                    DataCell(Text((product['stok'] ?? 0).toString())),
                     DataCell(Text(_formatCurrency(product['costPrice'] ?? 0))),
                     DataCell(
                         Text(_formatCurrency(product['sellingPrice'] ?? 0))),

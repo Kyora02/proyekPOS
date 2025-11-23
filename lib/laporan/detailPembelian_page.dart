@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:proyekpos2/service/api_service.dart';
 import 'dart:math' as math;
-import 'dart:ui';
 
 class MyCustomScrollBehavior extends MaterialScrollBehavior {
   @override
@@ -13,17 +15,18 @@ class MyCustomScrollBehavior extends MaterialScrollBehavior {
   };
 }
 
-class PenjualanProdukPage extends StatefulWidget {
+class DetailPembelianPage extends StatefulWidget {
   final String outletId;
-  const PenjualanProdukPage({
+  const DetailPembelianPage({
     super.key,
-    required this.outletId,
+    required this.outletId
   });
+
   @override
-  State<PenjualanProdukPage> createState() => _PenjualanProdukPageState();
+  State<DetailPembelianPage> createState() => _DetailPembelianPageState();
 }
 
-class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
+class _DetailPembelianPageState extends State<DetailPembelianPage> {
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
   DateTime _endDate = DateTime.now();
   final TextEditingController _searchController = TextEditingController();
@@ -41,6 +44,7 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
 
   final NumberFormat _currencyFormatter =
   NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+  final DateFormat _dateFormatter = DateFormat('dd MMM yyyy, HH:mm');
 
   @override
   void initState() {
@@ -64,7 +68,7 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
       final start = DateTime(_startDate.year, _startDate.month, _startDate.day, 0, 0, 0);
       final end = DateTime(_endDate.year, _endDate.month, _endDate.day, 23, 59, 59);
 
-      final data = await _apiService.getProductSalesReports(
+      final data = await _apiService.getPurchaseDetail(
         outletId: widget.outletId,
         startDate: start,
         endDate: end,
@@ -81,7 +85,7 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal memuat data: $e')),
+          SnackBar(content: Text('Gagal memuat data pembelian: $e')),
         );
       }
       setState(() {
@@ -95,16 +99,9 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
   void _filterData() {
     final query = _searchController.text.toLowerCase();
     List<Map<String, dynamic>> filtered = _allData.where((item) {
-      final produk = item['produk'].toString().toLowerCase();
-      final sku = item['sku'].toString().toLowerCase();
-      final kategori = item['kategori'].toString().toLowerCase();
-      final jenisProduk = item['jenisProduk'].toString().toLowerCase();
+      final namaBahan = item['namaBahan'].toString().toLowerCase();
 
-      final matchesQuery = query.isEmpty ||
-          produk.contains(query) ||
-          sku.contains(query) ||
-          kategori.contains(query) ||
-          jenisProduk.contains(query);
+      final matchesQuery = query.isEmpty || namaBahan.contains(query);
 
       return matchesQuery;
     }).toList();
@@ -125,27 +122,16 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
 
       switch (columnIndex) {
         case 0:
-          compareResult = (a['produk'] ?? '').compareTo(b['produk'] ?? '');
+          final DateTime tA = DateTime.fromMillisecondsSinceEpoch(a['timestamp'] ?? 0);
+          final DateTime tB = DateTime.fromMillisecondsSinceEpoch(b['timestamp'] ?? 0);
+          compareResult = tA.compareTo(tB);
           break;
         case 1:
-          compareResult = (a['sku'] ?? '').compareTo(b['sku'] ?? '');
+          compareResult = (a['namaBahan'] ?? '').compareTo(b['namaBahan'] ?? '');
           break;
         case 2:
-          compareResult = (a['kategori'] ?? '').compareTo(b['kategori'] ?? '');
-          break;
-        case 3:
-          final num valA = a['jumlah'] ?? 0;
-          final num valB = b['jumlah'] ?? 0;
-          compareResult = valA.compareTo(valB);
-          break;
-        case 4:
-          final num valA = a['penjualanRp'] ?? 0;
-          final num valB = b['penjualanRp'] ?? 0;
-          compareResult = valA.compareTo(valB);
-          break;
-        case 5:
-          final num valA = a['persentaseJumlah'] ?? 0;
-          final num valB = b['persentaseJumlah'] ?? 0;
+          final num valA = a['harga'] ?? 0;
+          final num valB = b['harga'] ?? 0;
           compareResult = valA.compareTo(valB);
           break;
       }
@@ -160,6 +146,82 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
       _isAscending = ascending;
     });
     _sortList(_filteredData, columnIndex, ascending);
+  }
+
+  Future<void> _exportToPdf() async {
+    try {
+      final doc = pw.Document();
+
+      final font = await PdfGoogleFonts.nunitoExtraLight();
+      final fontBold = await PdfGoogleFonts.nunitoExtraBold();
+
+      doc.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return [
+              pw.Header(
+                level: 0,
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Laporan Pembelian', style: pw.TextStyle(font: fontBold, fontSize: 24)),
+                    pw.Text(
+                      '${DateFormat('dd MMM yyyy').format(_startDate)} - ${DateFormat('dd MMM yyyy').format(_endDate)}',
+                      style: pw.TextStyle(font: font, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 20),
+              pw.Table.fromTextArray(
+                headers: ['Tanggal', 'Nama Bahan', 'Harga'],
+                data: _filteredData.map((item) {
+                  final DateTime dateVal = DateTime.fromMillisecondsSinceEpoch(item['timestamp']);
+
+                  return [
+                    _dateFormatter.format(dateVal),
+                    item['namaBahan'] ?? '-',
+                    _currencyFormatter.format(item['harga'] ?? 0),
+                  ];
+                }).toList(),
+                headerStyle: pw.TextStyle(font: fontBold, color: PdfColors.white),
+                headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF279E9E)),
+                rowDecoration: const pw.BoxDecoration(
+                  border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.5)),
+                ),
+                cellStyle: pw.TextStyle(font: font, fontSize: 10),
+                cellAlignments: {
+                  0: pw.Alignment.centerLeft,
+                  1: pw.Alignment.centerLeft,
+                  2: pw.Alignment.centerRight,
+                },
+              ),
+              pw.SizedBox(height: 20),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.end,
+                children: [
+                  pw.Text(
+                    'Total Periode Ini: ${_currencyFormatter.format(_filteredData.fold(0.0, (sum, item) => sum + (item['harga'] ?? 0)))}',
+                    style: pw.TextStyle(font: fontBold, fontSize: 14),
+                  ),
+                ],
+              ),
+            ];
+          },
+        ),
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => doc.save(),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengekspor PDF: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _selectDateRange(BuildContext context) async {
@@ -273,14 +335,14 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         const Text(
-          'Penjualan Produk',
+          'Detail Pembelian',
           style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Color(0xFF333333)),
         ),
         ElevatedButton.icon(
-          onPressed: _filteredData.isEmpty ? null : () {},
+          onPressed: _filteredData.isEmpty ? null : () => _exportToPdf(),
           icon: const Icon(Icons.cloud_download_outlined, size: 18),
           label: const Text('Ekspor Laporan'),
           style: ElevatedButton.styleFrom(
@@ -319,7 +381,7 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
         controller: _searchController,
         onChanged: (value) => _filterData(),
         decoration: InputDecoration(
-          hintText: 'Cari Produk, SKU, Kategori...',
+          hintText: 'Cari Nama Bahan...',
           prefixIcon: const Icon(Icons.search, color: Color(0xFF279E9E)),
           filled: true,
           fillColor: Colors.white,
@@ -395,69 +457,64 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
     return DataTable(
       sortColumnIndex: _sortColumnIndex,
       sortAscending: _isAscending,
-      columnSpacing: 50,
-      horizontalMargin: 24,
-      headingRowHeight: 50,
-      dataRowMaxHeight: 72,
-      dataRowMinHeight: 72,
+      columnSpacing: 80,
+      horizontalMargin: 32,
+      headingRowHeight: 56,
+      dataRowMaxHeight: 80,
+      dataRowMinHeight: 80,
       dividerThickness: 1,
       showBottomBorder: true,
       columns: [
         DataColumn(
-          label: SizedBox(width: 150, child: Text('PRODUK', style: headerStyle)),
+          label: SizedBox(
+            width: 200,
+            child: Text('TANGGAL', style: headerStyle),
+          ),
           onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
         DataColumn(
-          label: SizedBox(width: 100, child: Text('SKU', style: headerStyle)),
+          label: SizedBox(
+            width: 350,
+            child: Text('NAMA BAHAN', style: headerStyle),
+          ),
           onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
         DataColumn(
-          label: SizedBox(width: 120, child: Text('KATEGORI', style: headerStyle)),
-          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
-        ),
-        DataColumn(
-          label: SizedBox(width: 80, child: Text('JUMLAH', style: headerStyle)),
-          numeric: true,
-          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
-        ),
-        DataColumn(
-          label: SizedBox(width: 120, child: Text('PENJUALAN', style: headerStyle)),
-          numeric: true,
-          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
-        ),
-        DataColumn(
-          label: SizedBox(width: 100, child: Text('JUMLAH (%)', style: headerStyle)),
+          label: SizedBox(
+            width: 200,
+            child: Text('HARGA', style: headerStyle, textAlign: TextAlign.right),
+          ),
           numeric: true,
           onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
       ],
       rows: data.map((item) {
+        final DateTime dateVal = DateTime.fromMillisecondsSinceEpoch(item['timestamp']);
+
         return DataRow(
           cells: [
-            DataCell(SizedBox(width: 150, child: Text(
-                item['produk'] ?? '-',
-                style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
-            ))),
-            DataCell(SizedBox(width: 100, child: Text(
-                item['sku'] ?? '-',
-                style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
-            ))),
-            DataCell(SizedBox(width: 120, child: Text(
-                item['kategori'] ?? '-',
-                style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
-            ))),
-            DataCell(SizedBox(width: 80, child: Text(
-                item['jumlah'].toString(),
-                style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
-            ))),
-            DataCell(SizedBox(width: 120, child: Text(
-              _currencyFormatter.format(item['penjualanRp'] ?? 0),
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF444444)),
-            ))),
-            DataCell(SizedBox(width: 100, child: Text(
-                '${(item['persentaseJumlah'] as num).toStringAsFixed(2)}%',
-                style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
-            ))),
+            DataCell(SizedBox(
+              width: 200,
+              child: Text(
+                _dateFormatter.format(dateVal),
+                style: const TextStyle(fontSize: 14, color: Color(0xFF444444)),
+              ),
+            )),
+            DataCell(SizedBox(
+              width: 350,
+              child: Text(
+                item['namaBahan'] ?? '-',
+                style: const TextStyle(fontSize: 14, color: Color(0xFF444444)),
+              ),
+            )),
+            DataCell(SizedBox(
+              width: 200,
+              child: Text(
+                _currencyFormatter.format(item['harga'] ?? 0),
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF444444)),
+                textAlign: TextAlign.right,
+              ),
+            )),
           ],
         );
       }).toList(),

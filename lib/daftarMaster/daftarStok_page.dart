@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:proyekpos2/crud/tambahStok_page.dart';
 import 'package:proyekpos2/service/api_service.dart';
 import 'dart:math' as math;
@@ -23,6 +24,7 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
   List<Map<String, dynamic>> _filteredStockList = [];
   bool _isLoading = true;
   String? _error;
+  DateTime? _filterDate;
 
   int? _sortColumnIndex;
   bool _sortAscending = true;
@@ -52,7 +54,7 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
 
     try {
       final List<Map<String, dynamic>> data =
-      await _apiService.getAllStock(outletId: widget.outletId);
+      await _apiService.getRawMaterials(widget.outletId);
 
       setState(() {
         _allStockFromServer = data;
@@ -76,11 +78,18 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
       _filteredStockList = _allStockFromServer.where((stock) {
         final query = _searchController.text.toLowerCase();
         final name = stock['name']?.toLowerCase() ?? '';
-        final sku = stock['sku']?.toLowerCase() ?? '';
 
-        final matchesSearch = name.contains(query) || sku.contains(query);
+        bool matchesSearch = name.contains(query);
+        bool matchesDate = true;
 
-        return matchesSearch;
+        if (_filterDate != null && stock['date'] != null) {
+          DateTime stockDate = DateTime.parse(stock['date']);
+          matchesDate = stockDate.year == _filterDate!.year &&
+              stockDate.month == _filterDate!.month &&
+              stockDate.day == _filterDate!.day;
+        }
+
+        return matchesSearch && matchesDate;
       }).toList();
       _currentPage = 1;
     });
@@ -95,20 +104,16 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
       dynamic bValue;
       switch (_sortColumnIndex) {
         case 0:
-          aValue = a['sku'] ?? '';
-          bValue = b['sku'] ?? '';
-          break;
-        case 1:
           aValue = a['name'] ?? '';
           bValue = b['name'] ?? '';
           break;
-        case 2:
-          aValue = a['kategori'] ?? '';
-          bValue = b['kategori'] ?? '';
+        case 1:
+          aValue = a['date'] ?? '';
+          bValue = b['date'] ?? '';
           break;
-        case 3:
-          aValue = a['stok'] ?? 0;
-          bValue = b['stok'] ?? 0;
+        case 2:
+          aValue = a['price'] ?? 0;
+          bValue = b['price'] ?? 0;
           break;
         default:
           return 0;
@@ -132,6 +137,28 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
     });
   }
 
+  Future<void> _selectFilterDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _filterDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        _filterDate = picked;
+        _filterStock();
+      });
+    }
+  }
+
+  void _clearDateFilter() {
+    setState(() {
+      _filterDate = null;
+      _filterStock();
+    });
+  }
+
   Future<void> _navigateToAddStock() async {
     await Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute(
@@ -141,12 +168,12 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
     _fetchStock();
   }
 
-  void _navigateToEditProduct(Map<String, dynamic> productStock) {
+  void _navigateToEditProduct(Map<String, dynamic> material) {
     Navigator.of(context, rootNavigator: true)
         .push(
       MaterialPageRoute(
         builder: (context) => TambahStokPage(
-          s: productStock,
+          s: material,
           outletId: widget.outletId,
         ),
       ),
@@ -168,7 +195,7 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             title: const Text('Konfirmasi Hapus'),
             content: Text(
-                'Apakah Anda yakin ingin menghapus produk "${stock['name']}"? Ini akan menghapus produk dari semua outlet.'),
+                'Apakah Anda yakin ingin menghapus data "${stock['name']}"?'),
             actions: <Widget>[
               TextButton(
                   child: const Text('Batal'),
@@ -179,12 +206,12 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
                 child: const Text('Hapus'),
                 onPressed: () async {
                   try {
-                    await _apiService.deleteProduct(stock['id']);
+                    await _apiService.deleteRawMaterial(stock['id']);
                     Navigator.of(dialogContext).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                           content:
-                          Text('Produk "${stock['name']}" berhasil dihapus'),
+                          Text('Data "${stock['name']}" berhasil dihapus'),
                           backgroundColor: Colors.green),
                     );
                     _fetchStock();
@@ -192,7 +219,7 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
                     Navigator.of(dialogContext).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                          content: Text('Gagal menghapus produk: $e'),
+                          content: Text('Gagal menghapus data: $e'),
                           backgroundColor: Colors.red),
                     );
                   }
@@ -201,6 +228,24 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
             ],
           );
         });
+  }
+
+  String _formatCurrency(num amount) {
+    final formatter = NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    );
+    return formatter.format(amount);
+  }
+
+  String _formatDate(String dateString) {
+    try {
+      DateTime date = DateTime.parse(dateString);
+      return DateFormat('dd/MM/yyyy').format(date);
+    } catch (e) {
+      return dateString;
+    }
   }
 
   @override
@@ -227,7 +272,7 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'Daftar Stok',
+                      'Daftar Bahan Baku',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -237,7 +282,7 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
                     ElevatedButton.icon(
                       onPressed: _navigateToAddStock,
                       icon: const Icon(Icons.add, size: 20),
-                      label: const Text('Tambah Stok'),
+                      label: const Text('Tambah Bahan Baku'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF279E9E),
                         foregroundColor: Colors.white,
@@ -251,7 +296,7 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                _buildSearchbar(),
+                _buildSearchAndFilter(),
                 const SizedBox(height: 24),
                 _buildStockList(stockOnCurrentPage),
                 const SizedBox(height: 24),
@@ -265,24 +310,64 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
     );
   }
 
-  Widget _buildSearchbar() {
-    return SizedBox(
-      width: 280,
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: 'Cari stok...',
-          prefixIcon: const Icon(Icons.search, color: Colors.grey),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide.none,
+  Widget _buildSearchAndFilter() {
+    return Row(
+      children: [
+        SizedBox(
+          width: 280,
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Cari bahan baku...',
+              prefixIcon: const Icon(Icons.search, color: Colors.grey),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide.none,
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
           ),
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
-      ),
+        const SizedBox(width: 16),
+        InkWell(
+          onTap: () => _selectFilterDate(context),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.transparent),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.calendar_today,
+                    color: _filterDate != null ? const Color(0xFF279E9E) : Colors.grey,
+                    size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  _filterDate != null
+                      ? DateFormat('dd/MM/yyyy').format(_filterDate!)
+                      : 'Filter Tanggal',
+                  style: TextStyle(
+                    color: _filterDate != null ? const Color(0xFF279E9E) : Colors.grey[700],
+                    fontWeight: _filterDate != null ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+                if (_filterDate != null) ...[
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: _clearDateFilter,
+                    child: const Icon(Icons.close, size: 16, color: Colors.grey),
+                  )
+                ]
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -326,7 +411,7 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
             padding: EdgeInsets.symmetric(vertical: 48.0),
             child: Center(
               child: Text(
-                'Tidak ada stok ditemukan.',
+                'Tidak ada data ditemukan.',
                 style:
                 TextStyle(fontSize: 16, color: Colors.grey),
               ),
@@ -347,19 +432,15 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
                   fontSize: 14, color: Colors.black87),
               columns: [
                 DataColumn(
-                  label: const Text('SKU'),
+                  label: const Text('NAMA BAHAN BAKU'),
                   onSort: _onSort,
                 ),
                 DataColumn(
-                  label: const Text('NAMA PRODUK'),
+                  label: const Text('TANGGAL PEMBELIAN'),
                   onSort: _onSort,
                 ),
                 DataColumn(
-                  label: const Text('KATEGORI'),
-                  onSort: _onSort,
-                ),
-                DataColumn(
-                  label: const Text('STOK'),
+                  label: const Text('HARGA'),
                   numeric: true,
                   onSort: _onSort,
                 ),
@@ -370,11 +451,10 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
               rows: stockOnCurrentPage.map((stock) {
                 return DataRow(
                   cells: [
-                    DataCell(Text(stock['sku'] ?? 'N/A')),
                     DataCell(Text(stock['name'] ?? 'N/A')),
-                    DataCell(Text(stock['kategori'] ?? 'N/A')),
+                    DataCell(Text(_formatDate(stock['date'] ?? ''))),
                     DataCell(
-                        Text(stock['stok']?.toString() ?? '0')),
+                        Text(_formatCurrency(stock['price'] ?? 0))),
                     DataCell(_buildPopupMenuButton(stock)),
                   ],
                 );

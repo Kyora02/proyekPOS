@@ -21,6 +21,7 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
   final _apiService = ApiService();
 
   final _namaKuponC = TextEditingController();
+  final _kodeKuponC = TextEditingController();
   final _deskripsiC = TextEditingController();
   final _nilaiKuponC = TextEditingController();
 
@@ -39,6 +40,7 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
     if (_isEditMode) {
       final kupon = widget.kupon!;
       _namaKuponC.text = kupon['nama'] ?? '';
+      _kodeKuponC.text = kupon['kodeKupon'] ?? '';
       _deskripsiC.text = kupon['deskripsi'] ?? '';
       _nilaiKuponC.text = (kupon['nilai'] ?? 0).toString();
 
@@ -73,6 +75,7 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
   @override
   void dispose() {
     _namaKuponC.dispose();
+    _kodeKuponC.dispose();
     _deskripsiC.dispose();
     _nilaiKuponC.dispose();
     super.dispose();
@@ -140,6 +143,7 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
           await _apiService.updateKupon(
             id: widget.kupon!['id'],
             nama: _namaKuponC.text,
+            kodeKupon: _kodeKuponC.text,
             deskripsi: _deskripsiC.text,
             nilai: nilai,
             outletId: widget.outletId,
@@ -151,6 +155,7 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
         } else {
           await _apiService.addKupon(
             nama: _namaKuponC.text,
+            kodeKupon: _kodeKuponC.text,
             deskripsi: _deskripsiC.text,
             nilai: nilai,
             outletId: widget.outletId,
@@ -275,6 +280,21 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
             ),
             const SizedBox(height: 16),
             _buildTextField(
+              label: 'Kode Kupon',
+              controller: _kodeKuponC,
+              hint: 'Contoh: LIBURAN2024',
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Kode Kupon wajib diisi';
+                }
+                if (value.contains(' ')) {
+                  return 'Kode kupon tidak boleh mengandung spasi';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            _buildTextField(
               label: 'Deskripsi',
               controller: _deskripsiC,
               hint: 'Contoh: Kupon khusus hari libur nasional',
@@ -296,7 +316,7 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
                       _kuponStatus = value;
                     });
                   },
-                  activeColor: const Color(0xFF279E9E),
+                  activeTrackColor: const Color(0xFF279E9E),
                 ),
               ],
             ),
@@ -428,7 +448,7 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Durasi Kupon',
+              'Masa Berlaku',
               style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
             ),
             const SizedBox(height: 12),
