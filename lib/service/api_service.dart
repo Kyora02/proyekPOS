@@ -1009,5 +1009,418 @@ class ApiService {
       rethrow;
     }
   }
+  Future<List<Map<String, dynamic>>> getAbsensi({
+    required String outletId,
+    String? karyawanId,
+    String? startDate,
+    String? endDate,
+    String? status,
+  }) async {
+    try {
+      final token = await _getAuthToken();
 
+      String queryParams = 'outletId=$outletId';
+      if (karyawanId != null) queryParams += '&karyawanId=$karyawanId';
+      if (startDate != null) queryParams += '&startDate=$startDate';
+      if (endDate != null) queryParams += '&endDate=$endDate';
+      if (status != null) queryParams += '&status=$status';
+
+      final url = Uri.parse('$_baseUrl/absensi?$queryParams');
+
+      final response = await http.get(url, headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      });
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw Exception('Gagal memuat absensi: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> createManualAbsensi({
+    required String karyawanId,
+    required String karyawanName,
+    required String outletId,
+    required String date,
+    required String jamMasuk,
+    String? jamKeluar,
+    String? status,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      final url = Uri.parse('$_baseUrl/absensi/manual');
+
+      final body = jsonEncode({
+        'karyawanId': karyawanId,
+        'karyawanName': karyawanName,
+        'outletId': outletId,
+        'date': date,
+        'jamMasuk': jamMasuk,
+        'jamKeluar': jamKeluar,
+        'status': status,
+      });
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: body,
+      );
+
+      if (response.statusCode != 201) {
+        throw Exception('Gagal membuat absen manual: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> deleteAbsensi(String id) async {
+    try {
+      final token = await _getAuthToken();
+      final url = Uri.parse('$_baseUrl/absensi/$id');
+
+      final response = await http.delete(
+        url,
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Gagal menghapus absensi: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getNotifications({
+    required String outletId,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      final url = Uri.parse('$_baseUrl/notifications?outletId=$outletId');
+
+      final response = await http.get(url, headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      });
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw Exception('Gagal memuat notifikasi: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> markNotificationsAsRead({
+    required List<String> notificationIds,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      final url = Uri.parse('$_baseUrl/notifications/mark-read');
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'notificationIds': notificationIds}),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Gagal menandai notifikasi: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+  Future<List<Map<String, dynamic>>> getSalaryComponents({required String outletId}) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/salary/components?outletId=$outletId');
+    final response = await http.get(url, headers: {
+      'Authorization': 'Bearer $token',
+    });
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load salary components: ${response.body}');
+    }
+  }
+
+  Future<void> addSalaryComponent({
+    required String name,
+    required String type,
+    required String valueType,
+    required double value,
+    required String outletId,
+    bool isActive = true,
+  }) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/salary/components');
+    final body = jsonEncode({
+      'name': name,
+      'type': type,
+      'valueType': valueType,
+      'value': value,
+      'outletId': outletId,
+      'isActive': isActive,
+    });
+
+    final response = await http.post(url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+        body: body);
+
+    if (response.statusCode != 201) {
+      throw Exception('Failed to add salary component: ${response.body}');
+    }
+  }
+
+  Future<void> updateSalaryComponent({
+    required String id,
+    required String name,
+    required String type,
+    required String valueType,
+    required double value,
+    required bool isActive,
+  }) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/salary/components/$id');
+    final body = jsonEncode({
+      'name': name,
+      'type': type,
+      'valueType': valueType,
+      'value': value,
+      'isActive': isActive,
+    });
+
+    final response = await http.put(url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+        body: body);
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update salary component: ${response.body}');
+    }
+  }
+
+  Future<void> deleteSalaryComponent(String id) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/salary/components/$id');
+    final response = await http.delete(url, headers: {
+      'Authorization': 'Bearer $token',
+    });
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete salary component: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>?> getSalaryConfig({required String karyawanId}) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/salary/config/$karyawanId');
+    final response = await http.get(url, headers: {
+      'Authorization': 'Bearer $token',
+    });
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data;
+    } else {
+      throw Exception('Failed to load salary config: ${response.body}');
+    }
+  }
+
+  Future<void> addSalaryConfig({
+    required String karyawanId,
+    required String karyawanName,
+    required String outletId,
+    required double baseSalary,
+    required List<Map<String, dynamic>> allowances,
+    required List<Map<String, dynamic>> deductions,
+  }) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/salary/config');
+    final body = jsonEncode({
+      'karyawanId': karyawanId,
+      'karyawanName': karyawanName,
+      'outletId': outletId,
+      'baseSalary': baseSalary,
+      'allowances': allowances,
+      'deductions': deductions,
+    });
+
+    final response = await http.post(url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+        body: body);
+
+    if (response.statusCode != 201) {
+      throw Exception('Failed to add salary config: ${response.body}');
+    }
+  }
+
+  Future<void> updateSalaryConfig({
+    required String karyawanId,
+    required double baseSalary,
+    required List<Map<String, dynamic>> allowances,
+    required List<Map<String, dynamic>> deductions,
+  }) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/salary/config/$karyawanId');
+    final body = jsonEncode({
+      'baseSalary': baseSalary,
+      'allowances': allowances,
+      'deductions': deductions,
+    });
+
+    final response = await http.put(url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+        body: body);
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update salary config: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> calculateSalary({
+    required String karyawanId,
+    required int month,
+    required int year,
+    required String outletId,
+  }) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/salary/calculate');
+    final body = jsonEncode({
+      'karyawanId': karyawanId,
+      'month': month,
+      'year': year,
+      'outletId': outletId,
+    });
+
+    final response = await http.post(url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+        body: body);
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to calculate salary: ${response.body}');
+    }
+  }
+
+  Future<void> createPayroll(Map<String, dynamic> payrollData) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/salary/payroll');
+    final body = jsonEncode(payrollData);
+
+    final response = await http.post(url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+        body: body);
+
+    if (response.statusCode != 201) {
+      throw Exception('Failed to create payroll: ${response.body}');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getPayroll({
+    required String outletId,
+    String? karyawanId,
+    int? month,
+    int? year,
+    String? status,
+  }) async {
+    final token = await _getAuthToken();
+    String queryParams = 'outletId=$outletId';
+    if (karyawanId != null) queryParams += '&karyawanId=$karyawanId';
+    if (month != null) queryParams += '&month=$month';
+    if (year != null) queryParams += '&year=$year';
+    if (status != null) queryParams += '&status=$status';
+
+    final url = Uri.parse('$_baseUrl/salary/payroll?$queryParams');
+    final response = await http.get(url, headers: {
+      'Authorization': 'Bearer $token',
+    });
+
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load payroll: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> getPayrollDetail(String id) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/salary/payroll/$id');
+    final response = await http.get(url, headers: {
+      'Authorization': 'Bearer $token',
+    });
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to load payroll detail: ${response.body}');
+    }
+  }
+
+  Future<void> payPayroll({
+    required String id,
+    String? paymentMethod,
+    String? notes,
+  }) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/salary/payroll/$id/pay');
+    final body = jsonEncode({
+      'paymentMethod': paymentMethod,
+      'notes': notes,
+    });
+
+    final response = await http.post(url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+        body: body);
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to pay payroll: ${response.body}');
+    }
+  }
+
+  Future<void> deletePayroll(String id) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/salary/payroll/$id');
+    final response = await http.delete(url, headers: {
+      'Authorization': 'Bearer $token',
+    });
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete payroll: ${response.body}');
+    }
+  }
 }

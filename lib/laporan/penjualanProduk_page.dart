@@ -32,7 +32,10 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
   final ApiService _apiService = ApiService();
   List<Map<String, dynamic>> _allData = [];
   List<Map<String, dynamic>> _filteredData = [];
+  List<Map<String, dynamic>> _categories = [];
   bool _isLoading = true;
+  bool _showTopSelling = false;
+  String? _selectedCategoryId;
 
   int _currentPage = 1;
   int _itemsPerPage = 10;
@@ -64,15 +67,19 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
       final start = DateTime(_startDate.year, _startDate.month, _startDate.day, 0, 0, 0);
       final end = DateTime(_endDate.year, _endDate.month, _endDate.day, 23, 59, 59);
 
-      final data = await _apiService.getProductSalesReports(
-        outletId: widget.outletId,
-        startDate: start,
-        endDate: end,
-      );
+      final results = await Future.wait([
+        _apiService.getProductSalesReports(
+          outletId: widget.outletId,
+          startDate: start,
+          endDate: end,
+        ),
+        _apiService.getCategories(outletId: widget.outletId),
+      ]);
 
       setState(() {
-        _allData = data;
-        _filteredData = data;
+        _allData = results[0];
+        _categories = results[1];
+        _filteredData = _allData;
         _isLoading = false;
       });
 
@@ -106,10 +113,16 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
           kategori.contains(query) ||
           jenisProduk.contains(query);
 
-      return matchesQuery;
+      final matchesCategory = _selectedCategoryId == null ||
+          item['categoryId'] == _selectedCategoryId;
+
+      return matchesQuery && matchesCategory;
     }).toList();
 
-    if (_sortColumnIndex != null) {
+    if (_showTopSelling) {
+      filtered.sort((a, b) => (b['jumlah'] as num).compareTo(a['jumlah'] as num));
+      filtered = filtered.take(10).toList();
+    } else if (_sortColumnIndex != null) {
       _sortList(filtered, _sortColumnIndex!, _isAscending);
     }
 
@@ -158,6 +171,7 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
     setState(() {
       _sortColumnIndex = columnIndex;
       _isAscending = ascending;
+      _showTopSelling = false;
     });
     _sortList(_filteredData, columnIndex, ascending);
   }
@@ -233,38 +247,38 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
     final dataOnCurrentPage = _filteredData.sublist(startIndex, endIndex);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1200),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(context),
-                  const SizedBox(height: 24),
-                  _buildFilterActions(context),
-                  const SizedBox(height: 24),
-                  _isLoading
-                      ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(32.0),
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF279E9E),
-                      ),
+        backgroundColor: const Color(0xFFF5F7FA),
+    body: SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1200),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(context),
+                const SizedBox(height: 24),
+                _buildFilterActions(context),
+                const SizedBox(height: 24),
+                _isLoading
+                    ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32.0),
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF279E9E),
                     ),
-                  )
-                      : _buildResponsiveTable(dataOnCurrentPage),
-                  const SizedBox(height: 24),
-                  if (!_isLoading && totalItems > 0) _buildPagination(totalItems, totalPages),
-                ],
-              ),
+                  ),
+                )
+                    : _buildResponsiveTable(dataOnCurrentPage),
+                const SizedBox(height: 24),
+                if (!_isLoading && totalItems > 0) _buildPagination(totalItems, totalPages),
+              ],
             ),
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -333,12 +347,72 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
       ),
     );
 
+    final categoryFilter = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String?>(
+          value: _selectedCategoryId,
+          hint: const Text('Semua Kategori'),
+          icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF279E9E)),
+          onChanged: (String? newValue) {
+            setState(() {
+              _selectedCategoryId = newValue;
+            });
+            _filterData();
+          },
+          items: [
+            const DropdownMenuItem<String?>(
+              value: null,
+              child: Text('Semua Kategori'),
+            ),
+            ..._categories.map<DropdownMenuItem<String?>>((category) {
+              return DropdownMenuItem<String?>(
+                value: category['id'],
+                child: Text(category['name'] ?? 'Tanpa Nama'),
+              );
+            }).toList(),
+          ],
+        ),
+      ),
+    );
+
+    final topSellingToggle = FilterChip(
+      label: const Text('Produk Terlaris'),
+      selected: _showTopSelling,
+      onSelected: (bool selected) {
+        setState(() {
+          _showTopSelling = selected;
+          if (selected) {
+            _sortColumnIndex = null;
+          }
+        });
+        _filterData();
+      },
+      selectedColor: const Color(0xFF279E9E).withOpacity(0.2),
+      checkmarkColor: const Color(0xFF279E9E),
+      labelStyle: TextStyle(
+        color: _showTopSelling ? const Color(0xFF279E9E) : Colors.grey[700],
+        fontWeight: _showTopSelling ? FontWeight.bold : FontWeight.normal,
+      ),
+      backgroundColor: Colors.white,
+      side: BorderSide(
+        color: _showTopSelling ? const Color(0xFF279E9E) : Colors.grey[300]!,
+      ),
+    );
+
     return Wrap(
       spacing: 16,
       runSpacing: 16,
       children: [
         searchField,
         datePicker,
+        categoryFilter,
+        topSellingToggle,
       ],
     );
   }
@@ -393,7 +467,7 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
     );
 
     return DataTable(
-      sortColumnIndex: _sortColumnIndex,
+      sortColumnIndex: _showTopSelling ? null : _sortColumnIndex,
       sortAscending: _isAscending,
       columnSpacing: 50,
       horizontalMargin: 24,
@@ -405,39 +479,80 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
       columns: [
         DataColumn(
           label: SizedBox(width: 150, child: Text('PRODUK', style: headerStyle)),
-          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
+          onSort: _showTopSelling ? null : (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
         DataColumn(
           label: SizedBox(width: 100, child: Text('SKU', style: headerStyle)),
-          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
+          onSort: _showTopSelling ? null : (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
         DataColumn(
           label: SizedBox(width: 120, child: Text('KATEGORI', style: headerStyle)),
-          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
+          onSort: _showTopSelling ? null : (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
         DataColumn(
           label: SizedBox(width: 80, child: Text('JUMLAH', style: headerStyle)),
           numeric: true,
-          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
+          onSort: _showTopSelling ? null : (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
         DataColumn(
           label: SizedBox(width: 120, child: Text('PENJUALAN', style: headerStyle)),
           numeric: true,
-          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
+          onSort: _showTopSelling ? null : (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
         DataColumn(
           label: SizedBox(width: 100, child: Text('JUMLAH (%)', style: headerStyle)),
           numeric: true,
-          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
+          onSort: _showTopSelling ? null : (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
       ],
-      rows: data.map((item) {
+      rows: data.asMap().entries.map((entry) {
+        final index = entry.key;
+        final item = entry.value;
+
         return DataRow(
+          color: _showTopSelling && index < 3
+              ? MaterialStateProperty.all(
+              index == 0 ? Colors.amber.shade50 :
+              index == 1 ? Colors.grey.shade100 :
+              Colors.orange.shade50
+          )
+              : null,
           cells: [
-            DataCell(SizedBox(width: 150, child: Text(
-                item['produk'] ?? '-',
-                style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
-            ))),
+            DataCell(
+              Row(
+                children: [
+                  if (_showTopSelling && index < 3)
+                    Container(
+                      width: 24,
+                      height: 24,
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: index == 0 ? Colors.amber :
+                        index == 1 ? Colors.grey :
+                        Colors.orange,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${index + 1}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  Expanded(
+                    child: Text(
+                      item['produk'] ?? '-',
+                      style: const TextStyle(fontSize: 14, color: Color(0xFF444444)),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             DataCell(SizedBox(width: 100, child: Text(
                 item['sku'] ?? '-',
                 style: const TextStyle(fontSize: 14, color: Color(0xFF444444))

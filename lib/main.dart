@@ -8,7 +8,7 @@ import 'dashboard_page.dart';
 import 'service/firebase_options.dart';
 import 'registration/login_page.dart';
 import 'registration/register_page.dart';
-import 'karyawan_dashboard_page.dart';
+import 'karyawan/karyawan_dashboard_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

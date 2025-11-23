@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+import '../service/api_service.dart';
 
 class DashboardLayout extends StatefulWidget {
   final Widget child;
@@ -102,6 +104,7 @@ class TopAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool isLoading;
   final VoidCallback onProfileSettingsTap;
   final GlobalKey _profileMenuKey = GlobalKey();
+  final GlobalKey _notificationKey = GlobalKey();
   final VoidCallback onBusinessSettingsTap;
 
   TopAppBar({
@@ -156,6 +159,42 @@ class TopAppBar extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
+  void _showNotificationsMenu(BuildContext context) {
+    final RenderBox renderBox =
+    _notificationKey.currentContext!.findRenderObject() as RenderBox;
+    final size = renderBox.size;
+    final offset = renderBox.localToGlobal(Offset.zero);
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.transparent,
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (context, anim1, anim2) {
+        return Stack(
+          children: [
+            Positioned(
+              top: offset.dy + size.height + 5,
+              right: isDesktop
+                  ? (MediaQuery.of(context).size.width - offset.dx - size.width)
+                  : 5.0,
+              child: FadeTransition(
+                opacity: anim1,
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: NotificationsDialog(
+                    userData: userData,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     String getInitials(String name) {
@@ -199,9 +238,10 @@ class TopAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
             const Spacer(),
             IconButton(
+              key: _notificationKey,
               icon: const Icon(Icons.notifications_none_outlined),
               color: Colors.grey[600],
-              onPressed: () {},
+              onPressed: () => _showNotificationsMenu(context),
             ),
             const SizedBox(width: 16),
             UserProfile(
@@ -232,10 +272,10 @@ class TopAppBar extends StatelessWidget implements PreferredSizeWidget {
         elevation: 1,
         actions: [
           IconButton(
+            key: _notificationKey,
             icon: const Icon(Icons.notifications_none_outlined),
             color: Colors.grey[600],
-            onPressed: () {
-            },
+            onPressed: () => _showNotificationsMenu(context),
           ),
           IconButton(
             key: _profileMenuKey,
@@ -250,6 +290,257 @@ class TopAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Size get preferredSize => const Size.fromHeight(60.0);
+}
+
+class NotificationsDialog extends StatefulWidget {
+  final Map<String, dynamic>? userData;
+
+  const NotificationsDialog({
+    super.key,
+    required this.userData,
+  });
+
+  @override
+  State<NotificationsDialog> createState() => _NotificationsDialogState();
+}
+
+class _NotificationsDialogState extends State<NotificationsDialog> {
+  final ApiService _apiService = ApiService();
+  List<Map<String, dynamic>> _notifications = [];
+  bool _isLoading = true;
+  final NumberFormat _currencyFormat =
+  NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
+    setState(() => _isLoading = true);
+    try {
+      final outletId = widget.userData?['activeOutletId'];
+      if (outletId == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final notifications = await _apiService.getNotifications(outletId: outletId);
+      setState(() {
+        _notifications = notifications;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading notifications: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  String _getTimeAgo(int timestamp) {
+    final now = DateTime.now();
+    final notificationTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final difference = now.difference(notificationTime);
+
+    if (difference.inDays > 0) {
+      return '${difference.inDays} hari lalu';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} jam lalu';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} menit lalu';
+    } else {
+      return 'Baru saja';
+    }
+  }
+
+  IconData _getNotificationIcon(String type) {
+    switch (type) {
+      case 'transaction_success':
+        return Icons.check_circle_outline;
+      case 'transaction_failed':
+        return Icons.error_outline;
+      case 'low_stock':
+        return Icons.warning_amber_rounded;
+      default:
+        return Icons.notifications_outlined;
+    }
+  }
+
+  Color _getNotificationColor(String type) {
+    switch (type) {
+      case 'transaction_success':
+        return Colors.green;
+      case 'transaction_failed':
+        return Colors.red;
+      case 'low_stock':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 400,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.6,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            spreadRadius: 5,
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Notifikasi',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+                if (_notifications.isNotEmpty)
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _notifications.clear();
+                      });
+                    },
+                    child: const Text(
+                      'Hapus Semua',
+                      style: TextStyle(
+                        color: Color(0xFF279E9E),
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Flexible(
+            child: _isLoading
+                ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32.0),
+                child: CircularProgressIndicator(
+                  color: Color(0xFF279E9E),
+                ),
+              ),
+            )
+                : _notifications.isEmpty
+                ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.notifications_off_outlined,
+                      size: 64,
+                      color: Colors.grey,
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Tidak ada notifikasi',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+                : ListView.separated(
+              shrinkWrap: true,
+              itemCount: _notifications.length,
+              separatorBuilder: (context, index) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final notification = _notifications[index];
+                final type = notification['type'] as String;
+                final title = notification['title'] as String;
+                final message = notification['message'] as String;
+                final timestamp = notification['timestamp'] as int;
+
+                return ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _getNotificationColor(type).withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _getNotificationIcon(type),
+                      color: _getNotificationColor(type),
+                      size: 24,
+                    ),
+                  ),
+                  title: Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 4),
+                      Text(
+                        message,
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      if (type == 'transaction_success' || type == 'transaction_failed')
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            _currencyFormat.format(notification['amount']),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: type == 'transaction_success'
+                                  ? Colors.green
+                                  : Colors.red,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _getTimeAgo(timestamp),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class UserProfile extends StatelessWidget {
@@ -514,30 +805,30 @@ class _NavListTileState extends State<NavListTile> {
 
     if (item.children.isEmpty) {
       return MouseRegion(
-        onEnter: (_) => setState(() => _isHovering = true),
-        onExit: (_) => setState(() => _isHovering = false),
-        child: Container(
+          onEnter: (_) => setState(() => _isHovering = true),
+          onExit: (_) => setState(() => _isHovering = false),
+          child: Container(
           decoration: BoxDecoration(
-            color: _isHovering
-                ? Colors.white.withOpacity(0.1)
-                : Colors.transparent,
-            border: Border(
-              right: BorderSide(
-                color: isSelected
-                    ? const Color(0xFFFFC107)
-                    : Colors.transparent,
-                width: 4.0,
-              ),
-            ),
+          color: _isHovering
+          ? Colors.white.withOpacity(0.1)
+        : Colors.transparent,
+    border: Border(
+    right: BorderSide(
+    color: isSelected
+    ? const Color(0xFFFFC107)
+        : Colors.transparent,
+    width: 4.0,
+    ),
+    ),
+    ),
+    child: ListTile(
+    contentPadding: widget.padding,
+    leading: Icon(item.icon, color: Colors.white, size: 22),
+    title: Text(item.title,
+    style: const TextStyle(color: Colors.white, fontSize: 15)),
+    onTap: () => widget.onTap(item.title),
+    ),
           ),
-          child: ListTile(
-            contentPadding: widget.padding,
-            leading: Icon(item.icon, color: Colors.white, size: 22),
-            title: Text(item.title,
-                style: const TextStyle(color: Colors.white, fontSize: 15)),
-            onTap: () => widget.onTap(item.title),
-          ),
-        ),
       );
     }
 

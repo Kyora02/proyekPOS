@@ -3,9 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:url_launcher/url_launcher.dart';
-import '../service/api_service.dart';
-import '../registration/login_page.dart';
-import '../payment/payment_webview_page.dart';
+import '../../service/api_service.dart';
+import '../../registration/login_page.dart';
+import '../../payment/payment_webview_page.dart';
 
 class KaryawanDashboardPage extends StatefulWidget {
   final Map<String, dynamic> karyawanData;
@@ -480,7 +480,39 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
 
       String errorMessage = 'Error: $e';
 
-      if (e.toString().contains('409')) {
+      if (e.toString().contains('Nomor telepon ini sudah terdaftar')) {
+        final match = RegExp(r'atas nama "([^"]+)"').firstMatch(e.toString());
+        if (match != null) {
+          final existingName = match.group(1);
+          errorMessage = 'Nomor telepon ini sudah terdaftar atas nama "$existingName". Silakan gunakan nama yang sama atau nomor telepon yang berbeda.';
+
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Nomor Telepon Sudah Terdaftar'),
+              content: Text('Nomor telepon ini sudah terdaftar atas nama "$existingName".\n\nApakah Anda ingin menggunakan nama tersebut?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Batal'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _customerNameController.text = existingName!;
+                    _showPaymentDialog();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _primaryColor,
+                  ),
+                  child: const Text('Ya, Gunakan Nama Ini'),
+                ),
+              ],
+            ),
+          );
+          return;
+        }
+      } else if (e.toString().contains('409')) {
         errorMessage = 'Transaksi duplikat terdeteksi. Silakan coba lagi.';
       } else if (e.toString().contains('400')) {
         errorMessage = 'Data transaksi tidak valid. Silakan periksa kembali.';
