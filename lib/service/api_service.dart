@@ -8,7 +8,7 @@ import 'package:image_picker/image_picker.dart';
 class ApiService {
   final String _baseUrl = kIsWeb
       ? 'http://localhost:3000/api'
-      : 'http://10.0.2.2:3000/api';
+      : 'http://10.15.3.207:3000/api';
 
   Future<String> _getAuthToken() async {
     final user = FirebaseAuth.instance.currentUser;
