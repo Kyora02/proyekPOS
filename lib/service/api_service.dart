@@ -8,7 +8,7 @@ import 'package:image_picker/image_picker.dart';
 class ApiService {
   final String _baseUrl = kIsWeb
       ? 'http://localhost:3000/api'
-      : 'http://10.0.2.2:3000/api';
+      : 'http://10.10.2.45:3000/api';
 
   Future<String> _getAuthToken() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -124,6 +124,18 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Failed to update category. $e');
+    }
+  }
+
+  Future<void> deleteCategory(String id) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/categories/$id');
+    final response = await http.delete(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete category: ${response.body}');
     }
   }
 

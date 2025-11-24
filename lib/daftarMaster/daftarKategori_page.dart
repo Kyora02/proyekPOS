@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:proyekpos2/crud/tambahKategori_page.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:proyekpos2/service/api_service.dart';
 import 'dart:math' as math;
 
 class DaftarKategoriPage extends StatefulWidget {
@@ -18,7 +16,7 @@ class DaftarKategoriPage extends StatefulWidget {
 }
 
 class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
-  final String _baseUrl = 'http://localhost:3000';
+  final ApiService _apiService = ApiService();
   final ScrollController _horizontalScrollController = ScrollController();
 
   List<Map<String, dynamic>> _allCategories = [];
@@ -43,14 +41,6 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
     super.dispose();
   }
 
-  Future<String?> _getAuthToken() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      return null;
-    }
-    return await user.getIdToken();
-  }
-
   Future<void> _fetchCategories() async {
     if (!mounted) return;
     setState(() {
@@ -59,39 +49,13 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
     });
 
     try {
-      final token = await _getAuthToken();
-      if (token == null) {
-        throw Exception('Not authenticated');
-      }
+      final categories = await _apiService.getCategories(outletId: widget.outletId);
 
-      final String? outletId = widget.outletId;
-
-      if (outletId == null) {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            _allCategories = [];
-            _error = "Outlet ID not found.";
-          });
-        }
-        return;
-      }
-
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/categories?outletId=$outletId'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-
-      if (!mounted) return;
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
+      if (mounted) {
         setState(() {
-          _allCategories = List<Map<String, dynamic>>.from(data);
+          _allCategories = categories;
           _isLoading = false;
         });
-      } else {
-        throw Exception('Failed to load categories: ${response.statusCode}');
       }
     } catch (e) {
       if (mounted) {
@@ -184,36 +148,27 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
 
   Future<void> _handleDelete(String categoryId, String categoryName) async {
     try {
-      final token = await _getAuthToken();
-      if (token == null) {
-        throw Exception('Not authenticated');
-      }
-
-      final response = await http.delete(
-        Uri.parse('$_baseUrl/api/categories/$categoryId'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
+      await _apiService.deleteCategory(categoryId);
 
       if (!mounted) return;
 
-      if (response.statusCode == 200) {
-        setState(() {
-          _allCategories.removeWhere((cat) => cat['id'] == categoryId);
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Kategori "$categoryName" berhasil dihapus'),
-              backgroundColor: Colors.green),
-        );
-      } else {
-        final errorData = jsonDecode(response.body);
-        throw Exception(
-            'Gagal menghapus: ${errorData['message'] ?? 'Error server'}');
-      }
+      setState(() {
+        _allCategories.removeWhere((cat) => cat['id'] == categoryId);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Kategori "$categoryName" berhasil dihapus'),
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Gagal menghapus: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -226,11 +181,9 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
       builder: (BuildContext context) {
         return AlertDialog(
           backgroundColor: Colors.white,
-          shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           title: const Text('Konfirmasi Hapus'),
-          content:
-          Text('Apakah Anda yakin ingin menghapus kategori "$categoryName"?'),
+          content: Text('Apakah Anda yakin ingin menghapus kategori "$categoryName"?'),
           actions: <Widget>[
             TextButton(
               child: const Text('Batal'),
@@ -238,7 +191,9 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red, foregroundColor: Colors.white),
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
               child: const Text('Hapus'),
               onPressed: () {
                 Navigator.of(context).pop();
@@ -285,8 +240,10 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
                     Center(
                       child: Padding(
                         padding: const EdgeInsets.all(48.0),
-                        child: Text('Gagal memuat data: $_error',
-                            style: const TextStyle(color: Colors.red)),
+                        child: Text(
+                          'Gagal memuat data: $_error',
+                          style: const TextStyle(color: Colors.red),
+                        ),
                       ),
                     )
                   else
@@ -324,8 +281,7 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
             backgroundColor: const Color(0xFF279E9E),
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-            shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         ),
       ],
@@ -340,8 +296,9 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
           hintText: 'Cari kategori...',
           prefixIcon: const Icon(Icons.search, color: Colors.grey),
           border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide.none),
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none,
+          ),
           filled: true,
           fillColor: Colors.white,
           contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -361,8 +318,6 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
     final List<Map<String, dynamic>> categoriesOnCurrentPage =
     categories.sublist(startIndex, endIndex);
 
-    // --- PERUBAHAN DI SINI ---
-    // Logika untuk menampilkan kotak kosong yang konsisten
     if (categoriesOnCurrentPage.isEmpty) {
       final String message = _searchQuery.isNotEmpty
           ? 'Tidak ada kategori ditemukan.'
@@ -371,23 +326,21 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
       return Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16), // Disesuaikan
-          border: Border.all(color: Colors.grey[200]!), // Disesuaikan
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey[200]!),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 48.0), // Disesuaikan
+          padding: const EdgeInsets.symmetric(vertical: 48.0),
           child: Center(child: Text(message)),
         ),
       );
     }
 
-    // --- PERUBAHAN DI SINI ---
-    // Menyesuaikan gaya container tabel (border, BUKAN shadow)
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16), // Disesuaikan
-        border: Border.all(color: Colors.grey[200]!), // Disesuaikan
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey[200]!),
       ),
       child: Scrollbar(
         thumbVisibility: true,
@@ -468,11 +421,12 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
     );
   }
 
-  PopupMenuItem<String> _buildPopupMenuItem(
-      {required String value,
-        required String text,
-        required IconData icon,
-        bool isDestructive = false}) {
+  PopupMenuItem<String> _buildPopupMenuItem({
+    required String value,
+    required String text,
+    required IconData icon,
+    bool isDestructive = false,
+  }) {
     return PopupMenuItem<String>(
       value: value,
       child: Row(
