@@ -127,6 +127,27 @@ class ApiService {
     }
   }
 
+  Future<void> deleteCategory(String id) async {
+    try {
+      final token = await _getAuthToken();
+      final url = Uri.parse('$_baseUrl/categories/$id');
+
+      final response = await http.delete(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Gagal menghapus kategori: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getProducts(
       {required String outletId}) async {
     final token = await _getAuthToken();
@@ -234,6 +255,7 @@ class ApiService {
       throw Exception('Failed to update product: $respStr');
     }
   }
+
 
   Future<void> deleteProduct(String id) async {
     final token = await _getAuthToken();
