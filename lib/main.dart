@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'profile/business_page.dart';
 import 'dashboard_page.dart';
@@ -12,10 +13,25 @@ import 'karyawan/karyawan_dashboard_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
   await initializeDateFormatting('id_ID', null);
+
+  SystemChrome.setEnabledSystemUIMode(
+    SystemUiMode.immersiveSticky,
+    overlays: [],
+  );
+
+  // Optional: Lock orientation to landscape for tablets
+  // Uncomment if you want to force landscape mode
+  // SystemChrome.setPreferredOrientations([
+  //   DeviceOrientation.landscapeLeft,
+  //   DeviceOrientation.landscapeRight,
+  // ]);
+
   runApp(const MyApp());
 }
 
@@ -83,60 +99,6 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-
-// class AuthWrapper extends StatelessWidget {
-//   const AuthWrapper({super.key});
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return StreamBuilder<User?>(
-//       stream: FirebaseAuth.instance.authStateChanges(),
-//       builder: (context, authSnapshot) {
-//         if (authSnapshot.connectionState == ConnectionState.waiting) {
-//           return const Scaffold(
-//             body: Center(child: CircularProgressIndicator()),
-//           );
-//         }
-//
-//         if (authSnapshot.hasData) {
-//           final user = authSnapshot.data!;
-//
-//           return FutureBuilder<DocumentSnapshot>(
-//             future: FirebaseFirestore.instance
-//                 .collection('users')
-//                 .doc(user.uid)
-//                 .get(),
-//             builder: (context, userDocSnapshot) {
-//               if (userDocSnapshot.connectionState == ConnectionState.waiting) {
-//                 return const Scaffold(
-//                   body: Center(child: CircularProgressIndicator()),
-//                 );
-//               }
-//
-//               if (userDocSnapshot.hasError || !userDocSnapshot.data!.exists) {
-//                 FirebaseAuth.instance.signOut();
-//                 return const LoginPage();
-//               }
-//
-//               final userData =
-//               userDocSnapshot.data!.data() as Map<String, dynamic>;
-//               final bool hasBusinessInfo = userData['hasBusinessInfo'] ?? false;
-//
-//               if (hasBusinessInfo) {
-//                 return const DashboardPage();
-//               } else {
-//                 return const BusinessPage();
-//               }
-//             },
-//           );
-//         }
-//
-//         return const LoginPage();
-//       },
-//     );
-//   }
-// }
-// Di file main.dart
 
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});

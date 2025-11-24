@@ -62,7 +62,6 @@ class _PaymentWebviewPageState extends State<PaymentWebviewPage> {
 
             _checkUrlForCompletion(request.url);
 
-            // Handle external apps (GoPay, ShopeePay, etc.)
             if (!request.url.startsWith('http://') &&
                 !request.url.startsWith('https://') &&
                 !request.url.startsWith('about:blank') &&
