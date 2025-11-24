@@ -9,10 +9,12 @@ import 'package:proyekpos2/daftarMaster/daftarStok_page.dart';
 import 'package:proyekpos2/karyawan/manajemenGaji_page.dart';
 import 'package:proyekpos2/laporan/detailPembelian_page.dart';
 import 'package:proyekpos2/laporan/detailPenjualan_page.dart';
+import 'package:proyekpos2/laporan/laporanKaryawan_page.dart';
 import 'package:proyekpos2/laporan/laporanPelanggan_page.dart';
 import 'package:proyekpos2/laporan/penjualanKategori_page.dart';
 import 'package:proyekpos2/laporan/penjualanPerPeriode_page.dart';
 import 'package:proyekpos2/laporan/penjualanProduk_page.dart';
+import 'package:proyekpos2/laporan/ringkasanPembelian_page.dart';
 import 'package:proyekpos2/laporan/ringkasanPenjualan_page.dart';
 import 'package:proyekpos2/service/api_service.dart';
 import 'template/dashboard_layout.dart';
@@ -260,7 +262,7 @@ class _DashboardHostState extends State<DashboardHost> {
           break;
         case 'Ringkasan Penjualan':
           _currentPage = (activeOutletId != null)
-              ? const RingkasanPenjualanPage()
+              ? RingkasanPenjualanPage(outletId: activeOutletId)
               : noOutletSelected;
           break;
         case 'Detail Penjualan':
@@ -283,6 +285,11 @@ class _DashboardHostState extends State<DashboardHost> {
               ? PenjualanKategoriPage(outletId: activeOutletId)
               : noOutletSelected;
           break;
+        case 'Ringkasan Pembelian':
+          _currentPage = (activeOutletId != null)
+              ? RingkasanPembelianPage(outletId: activeOutletId)
+              : noOutletSelected;
+          break;
         case 'Detail Pembelian':
           _currentPage = (activeOutletId != null)
               ? DetailPembelianPage(outletId: activeOutletId)
@@ -292,7 +299,11 @@ class _DashboardHostState extends State<DashboardHost> {
               ? LaporanPelangganPage(outletId: activeOutletId)
               : noOutletSelected;
           break;
-
+        case 'Laporan Karyawan':
+          _currentPage = (activeOutletId != null)
+              ? LaporanKaryawanPage(outletId: activeOutletId)
+              : noOutletSelected;
+          break;
         case 'Daftar Pelanggan':
           _currentPage = (activeOutletId != null)
               ? DaftarPelangganPage(outletId: activeOutletId)
@@ -320,10 +331,12 @@ class _DashboardHostState extends State<DashboardHost> {
           _currentPage = (activeOutletId != null)
               ? DaftarAbsensiPage(outletId: activeOutletId)
               : noOutletSelected;
+          break;
         case 'Manajemen Gaji':
           _currentPage = (activeOutletId != null)
               ? ManajemenGajiPage(outletId: activeOutletId)
               : noOutletSelected;
+          break;
         default:
           _currentPage = (activeOutletId != null)
               ? DashboardContent(

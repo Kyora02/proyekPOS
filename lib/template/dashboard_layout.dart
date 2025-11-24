@@ -929,10 +929,7 @@ class _SideNavBarState extends State<SideNavBar> {
             ]),
         NavItem(
             title: 'Laporan Karyawan',
-            icon: Icons.people_alt_rounded,
-            children: [
-              NavItem(title: 'Absensi', icon: Icons.fingerprint_rounded)
-            ]),
+            icon: Icons.people_alt_rounded,),
         NavItem(
             title: 'Laporan Keuangan',
             icon: Icons.balance,

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:proyekpos2/service/api_service.dart';
 
 class RingkasanPenjualanPage extends StatefulWidget {
-  const RingkasanPenjualanPage({super.key});
+  final String outletId;
+  const RingkasanPenjualanPage({super.key, required this.outletId});
 
   @override
   State<RingkasanPenjualanPage> createState() => _RingkasanPenjualanPageState();
@@ -11,125 +13,311 @@ class RingkasanPenjualanPage extends StatefulWidget {
 class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 7));
   DateTime _endDate = DateTime.now();
+  bool _isLoading = true;
+  Map<String, dynamic>? _summaryData;
+  String? _errorMessage;
+  DateTime? _lastUpdated;
 
-  Future<void> _selectDateRange(BuildContext context) async {
-    final picked = await showDateRangePicker(
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final data = await ApiService().getSalesSummary(
+        outletId: widget.outletId,
+        startDate: _startDate,
+        endDate: _endDate,
+      );
+
+      setState(() {
+        _summaryData = data;
+        _lastUpdated = DateTime.now();
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _showDatePickerDialog(BuildContext context) {
+    DateTime tempStartDate = _startDate;
+    DateTime tempEndDate = _endDate;
+    bool isSelectingStart = true;
+
+    showDialog(
       context: context,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2030),
-      initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.light().copyWith(
-            primaryColor: const Color(0xFF279E9E),
-            colorScheme:
-            const ColorScheme.light(primary: Color(0xFF279E9E)),
-            buttonTheme:
-            const ButtonThemeData(textTheme: ButtonTextTheme.primary),
-          ),
-          child: child!,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Container(
+                width: 400,
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          isSelectingStart ? 'Pilih Tanggal Mulai' : 'Pilih Tanggal Akhir',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF333333),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: () => Navigator.pop(context),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setDialogState(() {
+                                isSelectingStart = true;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: isSelectingStart ? const Color(0xFF279E9E) : Colors.grey[200],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                DateFormat('dd MMM yyyy').format(tempStartDate),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: isSelectingStart ? Colors.white : Colors.black87,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8),
+                          child: Icon(Icons.arrow_forward, size: 20),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setDialogState(() {
+                                isSelectingStart = false;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: !isSelectingStart ? const Color(0xFF279E9E) : Colors.grey[200],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                DateFormat('dd MMM yyyy').format(tempEndDate),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: !isSelectingStart ? Colors.white : Colors.black87,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    CalendarDatePicker(
+                      initialDate: isSelectingStart ? tempStartDate : tempEndDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2030),
+                      onDateChanged: (DateTime date) {
+                        setDialogState(() {
+                          if (isSelectingStart) {
+                            tempStartDate = date;
+                            if (tempStartDate.isAfter(tempEndDate)) {
+                              tempEndDate = tempStartDate;
+                            }
+                          } else {
+                            tempEndDate = date;
+                            if (tempEndDate.isBefore(tempStartDate)) {
+                              tempStartDate = tempEndDate;
+                            }
+                          }
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text(
+                            'Batal',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              _startDate = tempStartDate;
+                              _endDate = tempEndDate;
+                            });
+                            Navigator.pop(context);
+                            _loadData();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF279E9E),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text('Terapkan'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
-
-    if (picked != null &&
-        (picked.start != _startDate || picked.end != _endDate)) {
-      setState(() {
-        _startDate = picked.start;
-        _endDate = picked.end;
-      });
-    }
   }
 
   final NumberFormat _currencyFormatter =
   NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
-  final Map<String, dynamic> _summaryData = {
-    'totalPendapatan': 1250000,
-    'biayaPromosi': 50000,
-    'totalPenjualan': 1200000,
-    'penjualanBersih': 1100000,
-    'totalLabaKotor': 300000,
-  };
-
-  final Map<String, dynamic> _detailData = {
-    'pendapatan': {
-      'penjualanKotor': 1200000,
-      'ongkosKirim': 20000,
-      'biayaPelayanan': 15000,
-      'biayaPelayananMDR': 10000,
-      'pembulatan': 0,
-      'pajak': 0,
-      'lainnya': 5000,
-    },
-    'biayaPromosi': {
-      'promoPembelian': 10000,
-      'promoProduk': 15000,
-      'komplimen': 25000,
-    },
-    'biayaAdministrasi': {
-      'biayaAdministrasi': 10000,
-    },
-    'penjualanBersih': {
-      'totalPenjualan': 1200000,
-      'pengembalian': 100000,
-    },
-    'labaKotor': {
-      'penjualanBersihLaba': 1100000,
-      'biayaMDR': 20000,
-      'hpp': 780000,
-      'komisi': 0,
-    }
-  };
-
-  int _calculateTotal(Map<String, dynamic> sectionData) {
-    return sectionData.values.fold(0, (sum, item) => sum + (item as int));
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isMobile = constraints.maxWidth < 800;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(context, isMobile),
-                const SizedBox(height: 24),
-                _buildDateAndExport(context, isMobile),
-                const SizedBox(height: 16),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    'Terakhir diperbarui: beberapa detik yang lalu',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _buildSummaryCards(isMobile),
-                const SizedBox(height: 32),
-                const Text(
-                  'Rincian Ringkasan Penjualan',
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF333333)),
-                ),
-                const SizedBox(height: 20),
-                if (isMobile)
-                  _buildDetailedSummaryMobile()
-                else
-                  _buildDetailedSummaryDesktop(),
-              ],
-            );
-          },
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isMobile = constraints.maxWidth < 800;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(context, isMobile),
+                  const SizedBox(height: 24),
+                  _buildDateAndExport(context, isMobile),
+                  const SizedBox(height: 16),
+                  if (_lastUpdated != null)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        'Terakhir diperbarui: ${_getTimeAgo(_lastUpdated!)}',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  if (_isLoading)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(40.0),
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF279E9E),
+                        ),
+                      ),
+                    )
+                  else if (_errorMessage != null)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(40.0),
+                        child: Column(
+                          children: [
+                            Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Gagal memuat data',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey[800],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _errorMessage!,
+                              style: TextStyle(color: Colors.grey[600]),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _loadData,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF279E9E),
+                              ),
+                              child: const Text('Coba Lagi'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else ...[
+                      _buildSummaryCards(isMobile),
+                      const SizedBox(height: 32),
+                      const Text(
+                        'Rincian Ringkasan Penjualan',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF333333),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      if (isMobile)
+                        _buildDetailedSummaryMobile()
+                      else
+                        _buildDetailedSummaryDesktop(),
+                    ],
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
+  }
+
+  String _getTimeAgo(DateTime dateTime) {
+    final difference = DateTime.now().difference(dateTime);
+    if (difference.inSeconds < 60) {
+      return 'beberapa detik yang lalu';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} menit yang lalu';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours} jam yang lalu';
+    } else {
+      return '${difference.inDays} hari yang lalu';
+    }
   }
 
   Widget _buildHeader(BuildContext context, bool isMobile) {
@@ -143,9 +331,10 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
         const Text(
           'Ringkasan Penjualan',
           style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF333333)),
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF333333),
+          ),
         ),
         const SizedBox(width: 8),
         Tooltip(
@@ -162,7 +351,7 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
     final formattedEndDate = DateFormat('dd MMM yyyy').format(_endDate);
 
     final datePicker = OutlinedButton.icon(
-      onPressed: () => _selectDateRange(context),
+      onPressed: () => _showDatePickerDialog(context),
       icon: const Icon(Icons.calendar_today_outlined, size: 18),
       label: Text('$formattedStartDate - $formattedEndDate'),
       style: OutlinedButton.styleFrom(
@@ -206,6 +395,36 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
   }
 
   Widget _buildSummaryCards(bool isMobile) {
+    if (_summaryData == null) return const SizedBox.shrink();
+
+    final cards = [
+      {
+        'title': 'Total Pendapatan',
+        'value': _summaryData!['totalPendapatan'] ?? 0,
+        'color': const Color(0xFF279E9E),
+      },
+      {
+        'title': 'Total Biaya',
+        'value': _summaryData!['totalBiaya'] ?? 0,
+        'color': const Color(0xFFFFC107),
+      },
+      {
+        'title': 'Total Penjualan',
+        'value': _summaryData!['totalPenjualan'] ?? 0,
+        'color': const Color(0xFF2196F3),
+      },
+      {
+        'title': 'Penjualan Bersih',
+        'value': _summaryData!['penjualanBersih'] ?? 0,
+        'color': const Color(0xFFE91E63),
+      },
+      {
+        'title': 'Total Laba Kotor',
+        'value': _summaryData!['totalLabaKotor'] ?? 0,
+        'color': const Color(0xFF9C27B0),
+      },
+    ];
+
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -215,56 +434,25 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
         mainAxisSpacing: 16,
         childAspectRatio: isMobile ? 1.0 : 1.3,
       ),
-      itemCount: 5,
+      itemCount: cards.length,
       itemBuilder: (context, index) {
-        String title;
-        String value;
-        Color color;
-        IconData icon = Icons.info_outline;
-
-        switch (index) {
-          case 0:
-            title = 'Total Pendapatan';
-            value = _currencyFormatter.format(_summaryData['totalPendapatan']);
-            color = const Color(0xFF279E9E); // Kashierku green
-            break;
-          case 1:
-            title = 'Biaya Promosi';
-            value = _currencyFormatter.format(_summaryData['biayaPromosi']);
-            color = const Color(0xFFFFC107); // Kuning
-            break;
-          case 2:
-            title = 'Total Penjualan';
-            value = _currencyFormatter.format(_summaryData['totalPenjualan']);
-            color = const Color(0xFF2196F3); // Biru
-            break;
-          case 3:
-            title = 'Penjualan Bersih';
-            value = _currencyFormatter.format(_summaryData['penjualanBersih']);
-            color = const Color(0xFFE91E63); // Merah Muda
-            break;
-          case 4:
-            title = 'Total Laba Kotor';
-            value = _currencyFormatter.format(_summaryData['totalLabaKotor']);
-            color = const Color(0xFF9C27B0); // Ungu
-            break;
-          default:
-            title = '';
-            value = '';
-            color = Colors.grey;
-        }
-
         return _SummaryCard(
-          title: title,
-          value: value,
-          color: color,
-          icon: icon,
+          title: cards[index]['title'] as String,
+          value: _currencyFormatter.format(cards[index]['value']),
+          color: cards[index]['color'] as Color,
+          icon: Icons.info_outline,
         );
       },
     );
   }
 
   Widget _buildDetailedSummaryMobile() {
+    if (_summaryData == null || _summaryData!['details'] == null) {
+      return const SizedBox.shrink();
+    }
+
+    final details = _summaryData!['details'];
+
     return Column(
       children: [
         _Section(
@@ -272,61 +460,18 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
           formatter: _currencyFormatter,
           children: [
             _DetailRow(
-                label: 'Penjualan Kotor',
-                value: _detailData['pendapatan']['penjualanKotor'],
-                formatter: _currencyFormatter),
+              label: 'Penjualan Kotor',
+              value: details['pendapatan']['penjualanKotor'] ?? 0,
+              formatter: _currencyFormatter,
+            ),
             _DetailRow(
-                label: 'Ongkos Kirim',
-                value: _detailData['pendapatan']['ongkosKirim'],
-                formatter: _currencyFormatter),
-            _DetailRow(
-                label: 'Biaya Pelayanan',
-                value: _detailData['pendapatan']['biayaPelayanan'],
-                formatter: _currencyFormatter),
-            _DetailRow(
-                label: 'Biaya Pelayanan MDR',
-                value: _detailData['pendapatan']['biayaPelayananMDR'],
-                formatter: _currencyFormatter),
-            _DetailRow(
-                label: 'Pembulatan',
-                value: _detailData['pendapatan']['pembulatan'],
-                formatter: _currencyFormatter),
-            _DetailRow(
-                label: 'Pajak',
-                value: _detailData['pendapatan']['pajak'],
-                formatter: _currencyFormatter),
-            _DetailRow(
-                label: 'Lainnya',
-                value: _detailData['pendapatan']['lainnya'],
-                formatter: _currencyFormatter),
+              label: 'Pajak (10%)',
+              value: details['pendapatan']['pajak'] ?? 0,
+              formatter: _currencyFormatter,
+            ),
           ],
-          totalValue: _calculateTotal(_detailData['pendapatan']),
+          totalValue: _summaryData!['totalPendapatan'] ?? 0,
           totalLabel: 'TOTAL PENDAPATAN',
-        ),
-        const SizedBox(height: 24),
-        _Section(
-          title: 'BIAYA PROMOSI',
-          formatter: _currencyFormatter,
-          children: [
-            _DetailRow(
-                label: 'Promo Pembelian',
-                value: _detailData['biayaPromosi']['promoPembelian'],
-                isNegative: true,
-                formatter: _currencyFormatter),
-            _DetailRow(
-                label: 'Promo Produk',
-                value: _detailData['biayaPromosi']['promoProduk'],
-                isNegative: true,
-                formatter: _currencyFormatter),
-            _DetailRow(
-                label: 'Komplimen',
-                value: _detailData['biayaPromosi']['komplimen'],
-                isNegative: true,
-                formatter: _currencyFormatter),
-          ],
-          totalValue: _calculateTotal(_detailData['biayaPromosi']),
-          totalLabel: 'TOTAL BIAYA PROMOSI',
-          isTotalNegative: true,
         ),
         const SizedBox(height: 24),
         _Section(
@@ -334,13 +479,14 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
           formatter: _currencyFormatter,
           children: [
             _DetailRow(
-                label: 'Biaya Administrasi',
-                value: _detailData['biayaAdministrasi']['biayaAdministrasi'],
-                isNegative: true,
-                formatter: _currencyFormatter),
+              label: 'Pembelian Bahan Baku',
+              value: details['biayaAdministrasi']['biayaBahanBaku'] ?? 0,
+              formatter: _currencyFormatter,
+              isNegative: true,
+            ),
           ],
-          totalValue: _calculateTotal(_detailData['biayaAdministrasi']),
-          totalLabel: 'TOTAL BIAYA ADMINISTRASI',
+          totalValue: _summaryData!['totalBiaya'] ?? 0,
+          totalLabel: 'TOTAL BIAYA',
           isTotalNegative: true,
         ),
         const SizedBox(height: 24),
@@ -349,16 +495,18 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
           formatter: _currencyFormatter,
           children: [
             _DetailRow(
-                label: 'Total Penjualan',
-                value: _detailData['penjualanBersih']['totalPenjualan'],
-                formatter: _currencyFormatter),
+              label: 'Total Penjualan',
+              value: details['penjualanBersih']['totalPenjualan'] ?? 0,
+              formatter: _currencyFormatter,
+            ),
             _DetailRow(
-                label: 'Pengembalian',
-                value: _detailData['penjualanBersih']['pengembalian'],
-                isNegative: true,
-                formatter: _currencyFormatter),
+              label: 'Pengembalian',
+              value: details['penjualanBersih']['pengembalian'] ?? 0,
+              formatter: _currencyFormatter,
+              isNegative: true,
+            ),
           ],
-          totalValue: _calculateTotal(_detailData['penjualanBersih']),
+          totalValue: _summaryData!['penjualanBersih'] ?? 0,
           totalLabel: 'TOTAL PENJUALAN BERSIH',
         ),
         const SizedBox(height: 24),
@@ -367,26 +515,18 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
           formatter: _currencyFormatter,
           children: [
             _DetailRow(
-                label: 'Penjualan Bersih',
-                value: _detailData['labaKotor']['penjualanBersihLaba'],
-                formatter: _currencyFormatter),
+              label: 'Penjualan Bersih',
+              value: details['labaKotor']['penjualanBersih'] ?? 0,
+              formatter: _currencyFormatter,
+            ),
             _DetailRow(
-                label: 'Biaya MDR',
-                value: _detailData['labaKotor']['biayaMDR'],
-                isNegative: true,
-                formatter: _currencyFormatter),
-            _DetailRow(
-                label: 'HPP',
-                value: _detailData['labaKotor']['hpp'],
-                isNegative: true,
-                formatter: _currencyFormatter),
-            _DetailRow(
-                label: 'Komisi',
-                value: _detailData['labaKotor']['komisi'],
-                isNegative: true,
-                formatter: _currencyFormatter),
+              label: 'HPP (Harga Pokok Penjualan)',
+              value: details['labaKotor']['hpp'] ?? 0,
+              formatter: _currencyFormatter,
+              isNegative: true,
+            ),
           ],
-          totalValue: _calculateTotal(_detailData['labaKotor']),
+          totalValue: _summaryData!['totalLabaKotor'] ?? 0,
           totalLabel: 'TOTAL LABA KOTOR',
         ),
       ],
@@ -394,6 +534,12 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
   }
 
   Widget _buildDetailedSummaryDesktop() {
+    if (_summaryData == null || _summaryData!['details'] == null) {
+      return const SizedBox.shrink();
+    }
+
+    final details = _summaryData!['details'];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -407,86 +553,37 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
                 formatter: _currencyFormatter,
                 children: [
                   _DetailRow(
-                      label: 'Penjualan Kotor',
-                      value: _detailData['pendapatan']['penjualanKotor'],
-                      formatter: _currencyFormatter),
+                    label: 'Penjualan Kotor',
+                    value: details['pendapatan']['penjualanKotor'] ?? 0,
+                    formatter: _currencyFormatter,
+                  ),
                   _DetailRow(
-                      label: 'Ongkos Kirim',
-                      value: _detailData['pendapatan']['ongkosKirim'],
-                      formatter: _currencyFormatter),
-                  _DetailRow(
-                      label: 'Biaya Pelayanan',
-                      value: _detailData['pendapatan']['biayaPelayanan'],
-                      formatter: _currencyFormatter),
-                  _DetailRow(
-                      label: 'Biaya Pelayanan MDR',
-                      value: _detailData['pendapatan']['biayaPelayananMDR'],
-                      formatter: _currencyFormatter),
-                  _DetailRow(
-                      label: 'Pembulatan',
-                      value: _detailData['pendapatan']['pembulatan'],
-                      formatter: _currencyFormatter),
-                  _DetailRow(
-                      label: 'Pajak',
-                      value: _detailData['pendapatan']['pajak'],
-                      formatter: _currencyFormatter),
-                  _DetailRow(
-                      label: 'Lainnya',
-                      value: _detailData['pendapatan']['lainnya'],
-                      formatter: _currencyFormatter),
+                    label: 'Pajak (10%)',
+                    value: details['pendapatan']['pajak'] ?? 0,
+                    formatter: _currencyFormatter,
+                  ),
                 ],
-                totalValue: _calculateTotal(_detailData['pendapatan']),
+                totalValue: _summaryData!['totalPendapatan'] ?? 0,
                 totalLabel: 'TOTAL PENDAPATAN',
               ),
             ),
             const SizedBox(width: 24),
             Expanded(
               flex: 1,
-              child: Column(
+              child: _Section(
+                title: 'BIAYA ADMINISTRASI',
+                formatter: _currencyFormatter,
                 children: [
-                  _Section(
-                    title: 'BIAYA PROMOSI',
+                  _DetailRow(
+                    label: 'Pembelian Bahan Baku',
+                    value: details['biayaAdministrasi']['biayaBahanBaku'] ?? 0,
                     formatter: _currencyFormatter,
-                    children: [
-                      _DetailRow(
-                          label: 'Promo Pembelian',
-                          value: _detailData['biayaPromosi']['promoPembelian'],
-                          isNegative: true,
-                          formatter: _currencyFormatter),
-                      _DetailRow(
-                          label: 'Promo Produk',
-                          value: _detailData['biayaPromosi']['promoProduk'],
-                          isNegative: true,
-                          formatter: _currencyFormatter),
-                      _DetailRow(
-                          label: 'Komplimen',
-                          value: _detailData['biayaPromosi']['komplimen'],
-                          isNegative: true,
-                          formatter: _currencyFormatter),
-                    ],
-                    totalValue: _calculateTotal(_detailData['biayaPromosi']),
-                    totalLabel: 'TOTAL BIAYA PROMOSI',
-                    isTotalNegative: true,
-                  ),
-                  const SizedBox(height: 24),
-                  _Section(
-                    title: 'PENJUALAN BERSIH',
-                    formatter: _currencyFormatter,
-                    children: [
-                      _DetailRow(
-                          label: 'Total Penjualan',
-                          value: _detailData['penjualanBersih']['totalPenjualan'],
-                          formatter: _currencyFormatter),
-                      _DetailRow(
-                          label: 'Pengembalian',
-                          value: _detailData['penjualanBersih']['pengembalian'],
-                          isNegative: true,
-                          formatter: _currencyFormatter),
-                    ],
-                    totalValue: _calculateTotal(_detailData['penjualanBersih']),
-                    totalLabel: 'TOTAL PENJUALAN BERSIH',
+                    isNegative: true,
                   ),
                 ],
+                totalValue: _summaryData!['totalBiaya'] ?? 0,
+                totalLabel: 'TOTAL BIAYA',
+                isTotalNegative: true,
               ),
             ),
           ],
@@ -498,18 +595,23 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
             Expanded(
               flex: 1,
               child: _Section(
-                title: 'BIAYA ADMINISTRASI',
+                title: 'PENJUALAN BERSIH',
                 formatter: _currencyFormatter,
                 children: [
                   _DetailRow(
-                      label: 'Biaya Administrasi',
-                      value: _detailData['biayaAdministrasi']['biayaAdministrasi'],
-                      isNegative: true,
-                      formatter: _currencyFormatter),
+                    label: 'Total Penjualan',
+                    value: details['penjualanBersih']['totalPenjualan'] ?? 0,
+                    formatter: _currencyFormatter,
+                  ),
+                  _DetailRow(
+                    label: 'Pengembalian',
+                    value: details['penjualanBersih']['pengembalian'] ?? 0,
+                    formatter: _currencyFormatter,
+                    isNegative: true,
+                  ),
                 ],
-                totalValue: _calculateTotal(_detailData['biayaAdministrasi']),
-                totalLabel: 'TOTAL BIAYA ADMINISTRASI',
-                isTotalNegative: true,
+                totalValue: _summaryData!['penjualanBersih'] ?? 0,
+                totalLabel: 'TOTAL PENJUALAN BERSIH',
               ),
             ),
             const SizedBox(width: 24),
@@ -520,26 +622,18 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
                 formatter: _currencyFormatter,
                 children: [
                   _DetailRow(
-                      label: 'Penjualan Bersih',
-                      value: _detailData['labaKotor']['penjualanBersihLaba'],
-                      formatter: _currencyFormatter),
+                    label: 'Penjualan Bersih',
+                    value: details['labaKotor']['penjualanBersih'] ?? 0,
+                    formatter: _currencyFormatter,
+                  ),
                   _DetailRow(
-                      label: 'Biaya MDR',
-                      value: _detailData['labaKotor']['biayaMDR'],
-                      isNegative: true,
-                      formatter: _currencyFormatter),
-                  _DetailRow(
-                      label: 'HPP',
-                      value: _detailData['labaKotor']['hpp'],
-                      isNegative: true,
-                      formatter: _currencyFormatter),
-                  _DetailRow(
-                      label: 'Komisi',
-                      value: _detailData['labaKotor']['komisi'],
-                      isNegative: true,
-                      formatter: _currencyFormatter),
+                    label: 'HPP (Harga Pokok Penjualan)',
+                    value: details['labaKotor']['hpp'] ?? 0,
+                    formatter: _currencyFormatter,
+                    isNegative: true,
+                  ),
                 ],
-                totalValue: _calculateTotal(_detailData['labaKotor']),
+                totalValue: _summaryData!['totalLabaKotor'] ?? 0,
                 totalLabel: 'TOTAL LABA KOTOR',
               ),
             ),
@@ -556,7 +650,7 @@ class _SummaryCard extends StatelessWidget {
   final Color color;
   final IconData icon;
 
-  _SummaryCard({
+  const _SummaryCard({
     required this.title,
     required this.value,
     required this.color,
@@ -577,11 +671,13 @@ class _SummaryCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text(
-                  title,
-                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                  ),
                 ),
                 const SizedBox(width: 4),
                 Tooltip(
@@ -596,9 +692,10 @@ class _SummaryCard extends StatelessWidget {
               child: Text(
                 value,
                 style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF333333)),
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF333333),
+                ),
                 maxLines: 1,
               ),
             ),
@@ -625,7 +722,7 @@ class _Section extends StatelessWidget {
   final bool isTotalNegative;
   final NumberFormat formatter;
 
-  _Section({
+  const _Section({
     required this.title,
     required this.children,
     required this.totalValue,
@@ -642,9 +739,10 @@ class _Section extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 1,
-              blurRadius: 10)
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 10,
+          )
         ],
       ),
       child: Column(
@@ -684,7 +782,10 @@ class _SectionHeader extends StatelessWidget {
       child: Text(
         title,
         style: const TextStyle(
-            fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87),
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+          color: Colors.black87,
+        ),
       ),
     );
   }
@@ -696,7 +797,7 @@ class _DetailRow extends StatelessWidget {
   final NumberFormat formatter;
   final bool isNegative;
 
-  _DetailRow({
+  const _DetailRow({
     required this.label,
     required this.value,
     required this.formatter,
@@ -710,26 +811,14 @@ class _DetailRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Text(
-                label,
-                style: const TextStyle(fontSize: 14, color: Colors.black87),
-              ),
-              if (label == 'Penjualan Kotor' ||
-                  label == 'Penjualan Bersih' ||
-                  label == 'Biaya Administrasi')
-                Tooltip(
-                  message: 'Informasi tentang $label',
-                  child:
-                  Icon(Icons.info_outline, color: Colors.grey[400], size: 16),
-                ),
-            ],
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 14, color: Colors.black87),
+            ),
           ),
           Text(
-            isNegative
-                ? '( ${formatter.format(value)} )'
-                : formatter.format(value),
+            isNegative ? '( ${formatter.format(value)} )' : formatter.format(value),
             style: TextStyle(
               fontSize: 14,
               color: isNegative ? Colors.red[700] : Colors.black87,
@@ -747,7 +836,7 @@ class _TotalRow extends StatelessWidget {
   final NumberFormat formatter;
   final bool isNegative;
 
-  _TotalRow({
+  const _TotalRow({
     required this.label,
     required this.value,
     required this.formatter,
@@ -772,14 +861,13 @@ class _TotalRow extends StatelessWidget {
           Text(
             label,
             style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.black87),
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: Colors.black87,
+            ),
           ),
           Text(
-            isNegative
-                ? '( ${formatter.format(value)} )'
-                : formatter.format(value),
+            isNegative ? '( ${formatter.format(value)} )' : formatter.format(value),
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 14,

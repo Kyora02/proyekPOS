@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -488,7 +487,7 @@ class ApiService {
   }
 
   Future<List<Map<String, dynamic>>> getKupon(
-    {required String outletId}) async {
+      {required String outletId}) async {
     final token = await _getAuthToken();
     final url = Uri.parse('$_baseUrl/kupon?outletId=$outletId');
 
@@ -1443,6 +1442,90 @@ class ApiService {
     });
     if (response.statusCode != 200) {
       throw Exception('Failed to delete payroll: ${response.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> getSalesSummary({
+    required String outletId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      final formattedStartDate = startDate.toIso8601String();
+      final formattedEndDate = endDate.toIso8601String();
+
+      final url = Uri.parse(
+          '$_baseUrl/reports/sales-summary?outletId=$outletId&startDate=$formattedStartDate&endDate=$formattedEndDate');
+
+      final response = await http.get(url, headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      });
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Gagal memuat ringkasan penjualan: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+  Future<Map<String, dynamic>> getPurchaseSummary({
+    required String outletId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      final formattedStartDate = startDate.toIso8601String();
+      final formattedEndDate = endDate.toIso8601String();
+
+      final url = Uri.parse(
+          '$_baseUrl/reports/purchase-summary?outletId=$outletId&startDate=$formattedStartDate&endDate=$formattedEndDate');
+
+      final response = await http.get(url, headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      });
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Gagal memuat ringkasan pembelian: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+  Future<List<Map<String, dynamic>>> getEmployeePerformance({
+    required String outletId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      final formattedStartDate = startDate.toIso8601String();
+      final formattedEndDate = endDate.toIso8601String();
+
+      final url = Uri.parse(
+          '$_baseUrl/reports/employee-performance?outletId=$outletId&startDate=$formattedStartDate&endDate=$formattedEndDate');
+
+      final response = await http.get(url, headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      });
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw Exception(
+            'Gagal memuat laporan karyawan: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
     }
   }
 }

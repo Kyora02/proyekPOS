@@ -159,12 +159,18 @@ class _LaporanPelangganPageState extends State<LaporanPelangganPage> {
     });
   }
 
-  Future<void> _selectDateRange(BuildContext context) async {
-    final picked = await showDateRangePicker(
+  Future<DateTime?> _selectSingleDate({
+    required BuildContext context,
+    required DateTime initialDate,
+    required String helpText,
+  }) async {
+    return showDatePicker(
       context: context,
+      initialDate: initialDate,
       firstDate: DateTime(2000),
       lastDate: DateTime(2030),
-      initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
+      helpText: helpText,
+      initialEntryMode: DatePickerEntryMode.calendar,
       builder: (context, child) {
         return Theme(
           data: ThemeData.light().copyWith(
@@ -183,14 +189,35 @@ class _LaporanPelangganPageState extends State<LaporanPelangganPage> {
         );
       },
     );
+  }
 
-    if (picked != null) {
-      setState(() {
-        _startDate = picked.start;
-        _endDate = picked.end;
-      });
-      _fetchData();
-    }
+  Future<void> _selectDateRange(BuildContext context) async {
+    // 1. Select Start Date
+    final newStartDate = await _selectSingleDate(
+      context: context,
+      initialDate: _startDate,
+      helpText: 'Pilih Tanggal Mulai',
+    );
+
+    if (newStartDate == null) return;
+
+    final newEndDate = await _selectSingleDate(
+      context: context,
+      initialDate: _endDate.isBefore(newStartDate) ? newStartDate : _endDate,
+      helpText: 'Pilih Tanggal Selesai',
+    );
+
+    if (newEndDate == null) return;
+
+    DateTime finalStart = newStartDate.isAfter(newEndDate) ? newEndDate : newStartDate;
+    DateTime finalEnd = newStartDate.isAfter(newEndDate) ? newStartDate : newEndDate;
+
+    setState(() {
+      _startDate = finalStart;
+      _endDate = finalEnd;
+    });
+
+    _fetchData();
   }
 
   @override
