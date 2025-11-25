@@ -1528,4 +1528,214 @@ class ApiService {
       rethrow;
     }
   }
+  Future<Map<String, dynamic>> getBalanceSheet({
+    required String outletId,
+    required DateTime date,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      final formattedDate = date.toIso8601String();
+
+      final url = Uri.parse(
+          '$_baseUrl/reports/balance-sheet?outletId=$outletId&date=$formattedDate');
+
+      final response = await http.get(url, headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      });
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Gagal memuat laporan neraca: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+  Future<List<Map<String, dynamic>>> getExpenses({
+    required String outletId,
+    String? type,
+    String? category,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+
+      String queryParams = 'outletId=$outletId';
+      if (type != null) queryParams += '&type=$type';
+      if (category != null) queryParams += '&category=$category';
+      if (startDate != null) queryParams += '&startDate=${startDate.toIso8601String()}';
+      if (endDate != null) queryParams += '&endDate=${endDate.toIso8601String()}';
+
+      final url = Uri.parse('$_baseUrl/expenses?$queryParams');
+
+      final response = await http.get(url, headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      });
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw Exception('Gagal memuat pengeluaran: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> getExpenseById(String id) async {
+    try {
+      final token = await _getAuthToken();
+      final url = Uri.parse('$_baseUrl/expenses/$id');
+
+      final response = await http.get(url, headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      });
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Gagal memuat detail pengeluaran: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> addExpense({
+    required String name,
+    required double amount,
+    required String type,
+    required String category,
+    String? description,
+    required DateTime date,
+    required String outletId,
+    String? recurringFrequency,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      final url = Uri.parse('$_baseUrl/expenses');
+
+      final body = jsonEncode({
+        'name': name,
+        'amount': amount,
+        'type': type,
+        'category': category,
+        'description': description,
+        'date': date.toIso8601String(),
+        'outletId': outletId,
+        'recurringFrequency': recurringFrequency,
+      });
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: body,
+      );
+
+      if (response.statusCode != 201) {
+        throw Exception('Gagal menambah pengeluaran: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> updateExpense({
+    required String id,
+    required String name,
+    required double amount,
+    required String type,
+    required String category,
+    String? description,
+    required DateTime date,
+    String? recurringFrequency,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      final url = Uri.parse('$_baseUrl/expenses/$id');
+
+      final body = jsonEncode({
+        'name': name,
+        'amount': amount,
+        'type': type,
+        'category': category,
+        'description': description,
+        'date': date.toIso8601String(),
+        'recurringFrequency': recurringFrequency,
+      });
+
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: body,
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Gagal mengupdate pengeluaran: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> deleteExpense(String id) async {
+    try {
+      final token = await _getAuthToken();
+      final url = Uri.parse('$_baseUrl/expenses/$id');
+
+      final response = await http.delete(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Gagal menghapus pengeluaran: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> getExpenseSummary({
+    required String outletId,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+
+      String queryParams = 'outletId=$outletId';
+      if (startDate != null) queryParams += '&startDate=${startDate.toIso8601String()}';
+      if (endDate != null) queryParams += '&endDate=${endDate.toIso8601String()}';
+
+      final url = Uri.parse('$_baseUrl/expenses/summary/by-category?$queryParams');
+
+      final response = await http.get(url, headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      });
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Gagal memuat ringkasan pengeluaran: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

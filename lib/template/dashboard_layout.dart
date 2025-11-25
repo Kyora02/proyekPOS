@@ -2,7 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import '../service/api_service.dart';
+import 'package:proyekpos2/service/api_service.dart';
 
 class DashboardLayout extends StatefulWidget {
   final Widget child;
@@ -937,6 +937,13 @@ class _SideNavBarState extends State<SideNavBar> {
               NavItem(title: 'Laporan Neraca', icon: Icons.balance)
             ])
       ],
+    ),
+    NavItem(
+        title: 'Pengeluaran',
+        icon: Icons.money_off_rounded,
+        children: [
+          NavItem(title: 'Daftar Pengeluaran', icon: Icons.receipt_long_rounded)
+        ]
     ),
     NavItem(
       title: 'Produk',

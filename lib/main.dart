@@ -25,13 +25,6 @@ void main() async {
     overlays: [],
   );
 
-  // Optional: Lock orientation to landscape for tablets
-  // Uncomment if you want to force landscape mode
-  // SystemChrome.setPreferredOrientations([
-  //   DeviceOrientation.landscapeLeft,
-  //   DeviceOrientation.landscapeRight,
-  // ]);
-
   runApp(const MyApp());
 }
 

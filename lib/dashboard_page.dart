@@ -10,12 +10,14 @@ import 'package:proyekpos2/karyawan/manajemenGaji_page.dart';
 import 'package:proyekpos2/laporan/detailPembelian_page.dart';
 import 'package:proyekpos2/laporan/detailPenjualan_page.dart';
 import 'package:proyekpos2/laporan/laporanKaryawan_page.dart';
+import 'package:proyekpos2/laporan/laporanNeraca_page.dart';
 import 'package:proyekpos2/laporan/laporanPelanggan_page.dart';
 import 'package:proyekpos2/laporan/penjualanKategori_page.dart';
 import 'package:proyekpos2/laporan/penjualanPerPeriode_page.dart';
 import 'package:proyekpos2/laporan/penjualanProduk_page.dart';
 import 'package:proyekpos2/laporan/ringkasanPembelian_page.dart';
 import 'package:proyekpos2/laporan/ringkasanPenjualan_page.dart';
+import 'package:proyekpos2/laporan/pengeluaran_page.dart';
 import 'package:proyekpos2/service/api_service.dart';
 import 'template/dashboard_layout.dart';
 import 'profile/profile_page.dart';
@@ -302,6 +304,16 @@ class _DashboardHostState extends State<DashboardHost> {
         case 'Laporan Karyawan':
           _currentPage = (activeOutletId != null)
               ? LaporanKaryawanPage(outletId: activeOutletId)
+              : noOutletSelected;
+          break;
+        case 'Laporan Neraca':
+          _currentPage = (activeOutletId != null)
+              ? LaporanNeracaPage(outletId: activeOutletId)
+              :noOutletSelected;
+          break;
+        case 'Daftar Pengeluaran':
+          _currentPage = (activeOutletId != null)
+              ? PengeluaranPage(outletId: activeOutletId)
               : noOutletSelected;
           break;
         case 'Daftar Pelanggan':
