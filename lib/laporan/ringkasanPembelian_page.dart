@@ -4,46 +4,34 @@ import 'package:proyekpos2/service/api_service.dart';
 
 class RingkasanPembelianPage extends StatefulWidget {
   final String outletId;
-
-  const RingkasanPembelianPage({
-    Key? key,
-    required this.outletId,
-  }) : super(key: key);
+  const RingkasanPembelianPage({super.key, required this.outletId});
 
   @override
   State<RingkasanPembelianPage> createState() => _RingkasanPembelianPageState();
 }
 
 class _RingkasanPembelianPageState extends State<RingkasanPembelianPage> {
-  final ApiService _apiService = ApiService();
-  final currencyFormat = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
-
-  // Define common padding values
-  static const double _horizontalPadding = 16.0;
-  // New: Define left margin to push content away from the (assumed) sidebar
-  static const double _leftMargin = 20.0;
-
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
   DateTime _endDate = DateTime.now();
-
-  bool _isLoading = false;
+  bool _isLoading = true;
   Map<String, dynamic>? _summaryData;
   String? _errorMessage;
+  DateTime? _lastUpdated;
 
   @override
   void initState() {
     super.initState();
-    _fetchSummary();
+    _loadData();
   }
 
-  Future<void> _fetchSummary() async {
+  Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final data = await _apiService.getPurchaseSummary(
+      final data = await ApiService().getPurchaseSummary(
         outletId: widget.outletId,
         startDate: _startDate,
         endDate: _endDate,
@@ -51,6 +39,7 @@ class _RingkasanPembelianPageState extends State<RingkasanPembelianPage> {
 
       setState(() {
         _summaryData = data;
+        _lastUpdated = DateTime.now();
         _isLoading = false;
       });
     } catch (e) {
@@ -156,34 +145,25 @@ class _RingkasanPembelianPageState extends State<RingkasanPembelianPage> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    Theme(
-                      data: Theme.of(context).copyWith(
-                        colorScheme: const ColorScheme.light(
-                          primary: Color(0xFF279E9E),
-                          onPrimary: Colors.white,
-                          onSurface: Colors.black,
-                        ),
-                      ),
-                      child: CalendarDatePicker(
-                        initialDate: isSelectingStart ? tempStartDate : tempEndDate,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime.now(),
-                        onDateChanged: (DateTime date) {
-                          setDialogState(() {
-                            if (isSelectingStart) {
-                              tempStartDate = date;
-                              if (tempStartDate.isAfter(tempEndDate)) {
-                                tempEndDate = tempStartDate;
-                              }
-                            } else {
-                              tempEndDate = date;
-                              if (tempEndDate.isBefore(tempStartDate)) {
-                                tempStartDate = tempEndDate;
-                              }
+                    CalendarDatePicker(
+                      initialDate: isSelectingStart ? tempStartDate : tempEndDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2030),
+                      onDateChanged: (DateTime date) {
+                        setDialogState(() {
+                          if (isSelectingStart) {
+                            tempStartDate = date;
+                            if (tempStartDate.isAfter(tempEndDate)) {
+                              tempEndDate = tempStartDate;
                             }
-                          });
-                        },
-                      ),
+                          } else {
+                            tempEndDate = date;
+                            if (tempEndDate.isBefore(tempStartDate)) {
+                              tempStartDate = tempEndDate;
+                            }
+                          }
+                        });
+                      },
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -204,7 +184,7 @@ class _RingkasanPembelianPageState extends State<RingkasanPembelianPage> {
                               _endDate = tempEndDate;
                             });
                             Navigator.pop(context);
-                            _fetchSummary();
+                            _loadData();
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF279E9E),
@@ -228,30 +208,435 @@ class _RingkasanPembelianPageState extends State<RingkasanPembelianPage> {
     );
   }
 
-  Widget _buildDateRangeButton() {
-    return InkWell(
-      onTap: () => _showDatePickerDialog(context),
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: Colors.grey[300]!),
-          borderRadius: BorderRadius.circular(8),
+  final NumberFormat _currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isMobile = constraints.maxWidth < 800;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(context, isMobile),
+                  const SizedBox(height: 24),
+                  _buildDateAndExport(context, isMobile),
+                  const SizedBox(height: 16),
+                  if (_lastUpdated != null)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        'Terakhir diperbarui: ${_getTimeAgo(_lastUpdated!)}',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  if (_isLoading)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(40.0),
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF279E9E),
+                        ),
+                      ),
+                    )
+                  else if (_errorMessage != null)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(40.0),
+                        child: Column(
+                          children: [
+                            Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Gagal memuat data',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey[800],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _errorMessage!,
+                              style: TextStyle(color: Colors.grey[600]),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _loadData,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF279E9E),
+                              ),
+                              child: const Text('Coba Lagi'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else ...[
+                      _buildSummaryCards(isMobile),
+                      const SizedBox(height: 32),
+                      const Text(
+                        'Rincian Ringkasan Pembelian',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF333333),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      if (isMobile)
+                        _buildDetailedSummaryMobile()
+                      else
+                        _buildDetailedSummaryDesktop(),
+                    ],
+                ],
+              );
+            },
+          ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+      ),
+    );
+  }
+
+  String _getTimeAgo(DateTime dateTime) {
+    final difference = DateTime.now().difference(dateTime);
+    if (difference.inSeconds < 60) {
+      return 'beberapa detik yang lalu';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} menit yang lalu';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours} jam yang lalu';
+    } else {
+      return '${difference.inDays} hari yang lalu';
+    }
+  }
+
+  Widget _buildHeader(BuildContext context, bool isMobile) {
+    return Row(
+      children: [
+        if (isMobile)
+          IconButton(
+            icon: const Icon(Icons.menu, color: Color(0xFF333333)),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        const Text(
+          'Ringkasan Pembelian',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF333333),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Tooltip(
+          message: 'Lihat detail ringkasan pembelian dan pengeluaran.',
+          child: Icon(Icons.info_outline, color: Colors.grey[500], size: 20),
+        ),
+        const Spacer(),
+      ],
+    );
+  }
+
+  Widget _buildDateAndExport(BuildContext context, bool isMobile) {
+    final formattedStartDate = DateFormat('dd MMM yyyy').format(_startDate);
+    final formattedEndDate = DateFormat('dd MMM yyyy').format(_endDate);
+
+    final datePicker = OutlinedButton.icon(
+      onPressed: () => _showDatePickerDialog(context),
+      icon: const Icon(Icons.calendar_today_outlined, size: 18),
+      label: Text('$formattedStartDate - $formattedEndDate'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.grey[800],
+        side: BorderSide(color: Colors.grey[300]!),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+    );
+
+    final exportButton = ElevatedButton.icon(
+      onPressed: () {},
+      icon: const Icon(Icons.cloud_download_outlined, size: 18),
+      label: const Text('Ekspor Laporan'),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF279E9E),
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+    );
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          datePicker,
+          const SizedBox(height: 12),
+          exportButton,
+        ],
+      );
+    } else {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          datePicker,
+          exportButton,
+        ],
+      );
+    }
+  }
+
+  Widget _buildSummaryCards(bool isMobile) {
+    if (_summaryData == null) return const SizedBox.shrink();
+
+    final totalPembelianBahanBaku = _summaryData!['totalPembelianBahanBaku'] ?? 0;
+    final jumlahTransaksiBahanBaku = _summaryData!['jumlahTransaksiBahanBaku'] ?? 0;
+    final rataRataPerTransaksi = _summaryData!['rataRataPerTransaksi'] ?? 0;
+
+    final cards = [
+      {
+        'title': 'Total Biaya (Pembelian)',
+        'value': totalPembelianBahanBaku,
+        'color': const Color(0xFF279E9E),
+        'isCurrency': true
+      },
+      {
+        'title': 'Pembelian Bahan Baku',
+        'value': totalPembelianBahanBaku,
+        'color': const Color(0xFFFFC107),
+        'isCurrency': true
+      },
+      {
+        'title': 'Jumlah Transaksi',
+        'value': jumlahTransaksiBahanBaku,
+        'color': const Color(0xFFE91E63),
+        'isCurrency': false
+      },
+      {
+        'title': 'Rata-rata / Transaksi',
+        'value': rataRataPerTransaksi,
+        'color': const Color(0xFF9C27B0),
+        'isCurrency': true
+      },
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: isMobile ? 2 : 4,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: isMobile ? 1.5 : 2.1,
+      ),
+      itemCount: cards.length,
+      itemBuilder: (context, index) {
+        final val = cards[index]['value'] as num;
+        final isCurr = cards[index]['isCurrency'] as bool;
+        final formattedValue = isCurr ? _currencyFormatter.format(val) : '$val';
+
+        return _SummaryCard(
+          title: cards[index]['title'] as String,
+          value: formattedValue,
+          color: cards[index]['color'] as Color,
+          icon: Icons.info_outline,
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailedSummaryMobile() {
+    if (_summaryData == null) return const SizedBox.shrink();
+
+    final totalPembelianBahanBaku = _summaryData!['totalPembelianBahanBaku'] ?? 0;
+    final jumlahTransaksiBahanBaku = _summaryData!['jumlahTransaksiBahanBaku'] ?? 0;
+    final rataRataPerTransaksi = _summaryData!['rataRataPerTransaksi'] ?? 0;
+
+    return Column(
+      children: [
+        _Section(
+          title: 'RINCIAN BAHAN BAKU',
+          formatter: _currencyFormatter,
           children: [
-            const Icon(Icons.calendar_today_outlined, size: 18, color: Color(0xFF279E9E)),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                '${DateFormat('dd MMM yyyy').format(_startDate)} - ${DateFormat('dd MMM yyyy').format(_endDate)}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Colors.black87,
+            _DetailRow(
+              label: 'Total Pembelian',
+              value: totalPembelianBahanBaku,
+              formatter: _currencyFormatter,
+            ),
+            _DetailRow(
+              label: 'Jumlah Transaksi',
+              value: jumlahTransaksiBahanBaku,
+              formatter: NumberFormat.decimalPattern(),
+              isNonCurrency: true,
+            ),
+            _DetailRow(
+              label: 'Rata-rata Transaksi',
+              value: rataRataPerTransaksi,
+              formatter: _currencyFormatter,
+            ),
+          ],
+          totalValue: totalPembelianBahanBaku,
+          totalLabel: 'TOTAL BAHAN BAKU',
+        ),
+        const SizedBox(height: 24),
+        _Section(
+          title: 'TOTAL PENGELUARAN',
+          formatter: _currencyFormatter,
+          children: [
+            _DetailRow(
+              label: 'Total Bahan Baku',
+              value: totalPembelianBahanBaku,
+              formatter: _currencyFormatter,
+              isNegative: true,
+            ),
+          ],
+          // Correct Logic: Total Overall Cost equals Raw Material Purchase
+          totalValue: totalPembelianBahanBaku,
+          totalLabel: 'TOTAL BIAYA KESELURUHAN',
+          isTotalNegative: true,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDetailedSummaryDesktop() {
+    if (_summaryData == null) return const SizedBox.shrink();
+
+    final totalPembelianBahanBaku = _summaryData!['totalPembelianBahanBaku'] ?? 0;
+    final jumlahTransaksiBahanBaku = _summaryData!['jumlahTransaksiBahanBaku'] ?? 0;
+    final rataRataPerTransaksi = _summaryData!['rataRataPerTransaksi'] ?? 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 1,
+              child: _Section(
+                title: 'RINCIAN BAHAN BAKU',
+                formatter: _currencyFormatter,
+                children: [
+                  _DetailRow(
+                    label: 'Total Pembelian',
+                    value: totalPembelianBahanBaku,
+                    formatter: _currencyFormatter,
+                  ),
+                  _DetailRow(
+                    label: 'Jumlah Transaksi',
+                    value: jumlahTransaksiBahanBaku,
+                    formatter: NumberFormat.decimalPattern(),
+                    isNonCurrency: true,
+                  ),
+                  _DetailRow(
+                    label: 'Rata-rata Transaksi',
+                    value: rataRataPerTransaksi,
+                    formatter: _currencyFormatter,
+                  ),
+                ],
+                totalValue: totalPembelianBahanBaku,
+                totalLabel: 'TOTAL BAHAN BAKU',
+              ),
+            ),
+            const SizedBox(width: 24),
+            Expanded(
+              flex: 1,
+              child: _Section(
+                title: 'TOTAL PENGELUARAN',
+                formatter: _currencyFormatter,
+                children: [
+                  _DetailRow(
+                    label: 'Total Bahan Baku',
+                    value: totalPembelianBahanBaku,
+                    formatter: _currencyFormatter,
+                    isNegative: true,
+                  ),
+                ],
+                // Correct Logic: Total Overall Cost equals Raw Material Purchase
+                totalValue: totalPembelianBahanBaku,
+                totalLabel: 'TOTAL BIAYA KESELURUHAN',
+                isTotalNegative: true,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _SummaryCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final Color color;
+  final IconData icon;
+
+  const _SummaryCard({
+    required this.title,
+    required this.value,
+    required this.color,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                overflow: TextOverflow.ellipsis,
+                Icon(icon, color: Colors.grey[300], size: 16),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF333333),
+              ),
+              maxLines: 1,
+            ),
+            const Spacer(),
+            Container(
+              height: 3,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(2)),
               ),
             ),
           ],
@@ -259,293 +644,175 @@ class _RingkasanPembelianPageState extends State<RingkasanPembelianPage> {
       ),
     );
   }
+}
 
-  // New Widget: Wrap the body content with padding
-  Widget _buildContent() {
-    return Padding(
-      // Apply left margin and remove the top/bottom padding from the main Column
-      padding: const EdgeInsets.only(left: _leftMargin),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1. Title Update: Increase the font size for the page title
-          Padding(
-            padding: const EdgeInsets.only(top: 8, bottom: 16),
-            child: Text(
-              'Ringkasan Pembelian',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 24, // Increased font size
-                color: Colors.black87,
-              ),
-            ),
-          ),
+class _Section extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
+  final num totalValue;
+  final String totalLabel;
+  final bool isTotalNegative;
+  final NumberFormat formatter;
 
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(
-              horizontal: _horizontalPadding,
-              vertical: 12,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 0,
-                  child: _buildDateRangeButton(),
-                ),
-                const Spacer(),
-              ],
-            ),
-          ),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF279E9E)))
-                : _errorMessage != null
-                ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Terjadi Kesalahan',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: Text(
-                      _errorMessage!,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey[600]),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _fetchSummary,
-                    child: const Text('Coba Lagi'),
-                  ),
-                ],
-              ),
-            )
-                : _summaryData == null
-                ? const Center(child: Text('Tidak ada data'))
-                : _buildSummaryContent(),
-          ),
-        ],
-      ),
-    );
-  }
+  const _Section({
+    required this.title,
+    required this.children,
+    required this.totalValue,
+    required this.totalLabel,
+    required this.formatter,
+    this.isTotalNegative = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        // Remove title from AppBar since we are moving it to the body for style
-        title: const Text(''),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
-      ),
-      // Use the new _buildContent widget for the body
-      body: _buildContent(),
-    );
-  }
-
-  Widget _buildSummaryContent() {
-    final totalBiayaKeseluruhan = _summaryData!['totalBiayaKeseluruhan'] ?? 0;
-    final totalPembelianBahanBaku = _summaryData!['totalPembelianBahanBaku'] ?? 0;
-    final jumlahTransaksiBahanBaku = _summaryData!['jumlahTransaksiBahanBaku'] ?? 0;
-    final rataRataPerTransaksi = _summaryData!['rataRataPerTransaksi'] ?? 0;
-    final totalBiayaProduk = _summaryData!['totalBiayaProduk'] ?? 0;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(
-        left: _horizontalPadding,
-        right: _horizontalPadding,
-        top: 16,
-        bottom: 16,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1976D2), Color(0xFF1565C0)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.blue.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Total Biaya Keseluruhan',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  currencyFormat.format(totalBiayaKeseluruhan),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          _buildSectionTitle('Pembelian Bahan Baku'),
-          const SizedBox(height: 12),
-          _buildInfoCard(
-            icon: Icons.shopping_cart,
-            iconColor: Colors.orange,
-            title: 'Total Pembelian Bahan Baku',
-            value: currencyFormat.format(totalPembelianBahanBaku),
-          ),
-          const SizedBox(height: 12),
-          _buildInfoCard(
-            icon: Icons.receipt_long,
-            iconColor: Colors.green,
-            title: 'Jumlah Transaksi',
-            value: '$jumlahTransaksiBahanBaku kali',
-          ),
-          const SizedBox(height: 12),
-          _buildInfoCard(
-            icon: Icons.analytics,
-            iconColor: Colors.purple,
-            title: 'Rata-rata per Transaksi',
-            value: currencyFormat.format(rataRataPerTransaksi),
-          ),
-          const SizedBox(height: 24),
-          _buildSectionTitle('Biaya Produk (Cost Price)'),
-          const SizedBox(height: 12),
-          _buildInfoCard(
-            icon: Icons.inventory_2,
-            iconColor: Colors.red,
-            title: 'Total Biaya Produk',
-            value: currencyFormat.format(totalBiayaProduk),
-            subtitle: 'Berdasarkan produk terjual × cost price',
-          ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.blue[50],
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue[100]!),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline, color: Colors.blue[700]),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Total biaya keseluruhan = Pembelian bahan baku + Biaya produk (HPP)',
-                    style: TextStyle(
-                      color: Colors.blue[900],
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
-        color: Colors.black87,
-      ),
-    );
-  }
-
-  Widget _buildInfoCard({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String value,
-    String? subtitle,
-  }) {
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 10,
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionHeader(title: title),
+          ...children,
+          _TotalRow(
+            label: totalLabel,
+            value: totalValue,
+            formatter: formatter,
+            isNegative: isTotalNegative,
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F4F8),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+        border: Border(
+          bottom: BorderSide(color: Colors.grey[200]!),
+        ),
+      ),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+          color: Colors.black87,
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final num value;
+  final NumberFormat formatter;
+  final bool isNegative;
+  final bool isNonCurrency;
+
+  const _DetailRow({
+    required this.label,
+    required this.value,
+    required this.formatter,
+    this.isNegative = false,
+    this.isNonCurrency = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    String displayValue;
+    if (isNonCurrency) {
+      displayValue = formatter.format(value);
+    } else {
+      displayValue = isNegative ? '( ${formatter.format(value)} )' : formatter.format(value);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: iconColor, size: 24),
-          ),
-          const SizedBox(width: 16),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                ],
-              ],
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 14, color: Colors.black87),
+            ),
+          ),
+          Text(
+            displayValue,
+            style: TextStyle(
+              fontSize: 14,
+              color: isNegative ? Colors.red[700] : Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TotalRow extends StatelessWidget {
+  final String label;
+  final num value;
+  final NumberFormat formatter;
+  final bool isNegative;
+
+  const _TotalRow({
+    required this.label,
+    required this.value,
+    required this.formatter,
+    this.isNegative = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F4F8),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+        border: Border(
+          top: BorderSide(color: Colors.grey[200]!),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: Colors.black87,
+            ),
+          ),
+          Text(
+            isNegative ? '( ${formatter.format(value)} )' : formatter.format(value),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: isNegative ? Colors.red[700] : Colors.black87,
             ),
           ),
         ],

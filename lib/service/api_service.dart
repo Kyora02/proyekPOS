@@ -1168,6 +1168,7 @@ class ApiService {
       rethrow;
     }
   }
+
   Future<List<Map<String, dynamic>>> getSalaryComponents({required String outletId}) async {
     final token = await _getAuthToken();
     final url = Uri.parse('$_baseUrl/salary/components?outletId=$outletId');

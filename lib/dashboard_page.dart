@@ -696,13 +696,11 @@ class _DashboardContentState extends State<DashboardContent> {
       {
         'title': 'Total Pendapatan',
         'value': _formatCurrency(_totalPendapatan),
-        'chart': const SmallLineChart(isPositive: true),
         'isBigNumber': false,
       },
       {
         'title': 'Total Pengeluaran',
         'value': _formatCurrency(_totalPengeluaran),
-        'chart': const SmallLineChart(isPositive: false),
         'isBigNumber': false,
       },
       {
@@ -1056,37 +1054,6 @@ class PurchasesChart extends StatelessWidget {
   }
 }
 
-class SmallLineChart extends StatelessWidget {
-  final bool isPositive;
-  const SmallLineChart({super.key, required this.isPositive});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isPositive ? Colors.green : Colors.red;
-    return LineChart(
-      LineChartData(
-        gridData: const FlGridData(show: false),
-        titlesData: const FlTitlesData(show: false),
-        borderData: FlBorderData(show: false),
-        lineBarsData: [
-          LineChartBarData(
-            spots: isPositive
-                ? const [FlSpot(0, 1), FlSpot(1, 1.5), FlSpot(3, 2)]
-                : const [FlSpot(0, 2), FlSpot(1, 1.5), FlSpot(3, 1.2)],
-            isCurved: true,
-            color: color,
-            barWidth: 2.5,
-            dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(
-              show: true,
-              color: color.withOpacity(0.2),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 Widget _bottomTitleWidgets(double value, TitleMeta meta) {
   const style = TextStyle(color: Colors.grey, fontSize: 12);

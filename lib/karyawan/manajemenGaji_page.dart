@@ -448,13 +448,17 @@ class _KomponenGajiTabState extends State<KomponenGajiTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ElevatedButton.icon(
-            onPressed: _showAddComponentDialog,
-            icon: const Icon(Icons.add),
-            label: const Text('Tambah Komponen'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF279E9E),
-              foregroundColor: Colors.white,
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton.icon(
+              onPressed: _showAddComponentDialog,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Tambah Komponen'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF279E9E),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
             ),
           ),
           const SizedBox(height: 24),
@@ -781,6 +785,7 @@ class _KonfigurasiKaryawanTabState extends State<KonfigurasiKaryawanTab> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF279E9E),
                   foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
               ),
             ),
@@ -968,9 +973,31 @@ class _PayrollTabState extends State<PayrollTab> {
       return 0.0;
     }
 
+    final baseSalary = safeDouble(calculation['baseSalary']);
+
+    double totalAllowances = 0.0;
+    if (calculation['allowances'] != null && (calculation['allowances'] as List).isNotEmpty) {
+      for (var allowance in calculation['allowances'] as List) {
+        totalAllowances += safeDouble(allowance['calculatedValue']);
+      }
+    }
+
+    double totalDeductions = 0.0;
+    if (calculation['deductions'] != null && (calculation['deductions'] as List).isNotEmpty) {
+      for (var deduction in calculation['deductions'] as List) {
+        totalDeductions += safeDouble(deduction['calculatedValue']);
+      }
+    }
+
+    final calculatedTotal = baseSalary + totalAllowances - totalDeductions;
+    final apiTotal = safeDouble(calculation['totalSalary']);
+
+    final finalTotal = apiTotal > 0 ? apiTotal : calculatedTotal;
+
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
         title: Text('Detail Gaji - ${calculation['karyawanName'] ?? 'Unknown'}'),
         content: SizedBox(
           width: 400,
@@ -980,51 +1007,84 @@ class _PayrollTabState extends State<PayrollTab> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                    'Periode: ${DateFormat.MMMM().format(DateTime(calculation['year'] ?? DateTime.now().year, calculation['month'] ?? DateTime.now().month))} ${calculation['year'] ?? DateTime.now().year}'),
-                const Divider(),
+                  'Periode: ${DateFormat.MMMM().format(DateTime(calculation['year'] ?? DateTime.now().year, calculation['month'] ?? DateTime.now().month))} ${calculation['year'] ?? DateTime.now().year}',
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+                const Divider(height: 24),
                 const SizedBox(height: 8),
-                Text('Gaji Pokok: Rp ${NumberFormat('#,###').format(safeDouble(calculation['baseSalary']))}'),
-                const SizedBox(height: 16),
-                if (calculation['allowances'] != null && (calculation['allowances'] as List).isNotEmpty) ...[
-                  const Text('Tunjangan:', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  ...(calculation['allowances'] as List).map((allowance) => Padding(
-                    padding: const EdgeInsets.only(left: 16, bottom: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(allowance['name'] ?? ''),
-                        Text('+ Rp ${NumberFormat('#,###').format(safeDouble(allowance['calculatedValue']))}'),
-                      ],
-                    ),
-                  )),
-                  const SizedBox(height: 16),
-                ],
-                if (calculation['deductions'] != null && (calculation['deductions'] as List).isNotEmpty) ...[
-                  const Text('Potongan:', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  ...(calculation['deductions'] as List).map((deduction) => Padding(
-                    padding: const EdgeInsets.only(left: 16, bottom: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(deduction['name'] ?? ''),
-                        Text('- Rp ${NumberFormat('#,###').format(safeDouble(deduction['calculatedValue']))}'),
-                      ],
-                    ),
-                  )),
-                  const SizedBox(height: 16),
-                ],
-                const Divider(),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Total Gaji:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Text('Gaji Pokok:', style: TextStyle(fontSize: 15)),
                     Text(
-                      'Rp ${NumberFormat('#,###').format(safeDouble(calculation['totalSalary']))}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF279E9E)),
+                      'Rp ${NumberFormat('#,###').format(baseSalary)}',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
                     ),
                   ],
+                ),
+                const SizedBox(height: 16),
+                if (calculation['allowances'] != null && (calculation['allowances'] as List).isNotEmpty) ...[
+                  const Text('Tunjangan:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  const SizedBox(height: 8),
+                  ...(calculation['allowances'] as List).map((allowance) => Padding(
+                    padding: const EdgeInsets.only(left: 16, bottom: 6),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(allowance['name'] ?? '', style: const TextStyle(fontSize: 14)),
+                        Text(
+                          '+ Rp ${NumberFormat('#,###').format(safeDouble(allowance['calculatedValue']))}',
+                          style: const TextStyle(fontSize: 14, color: Colors.green, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  )),
+                  const SizedBox(height: 12),
+                ],
+                if (calculation['deductions'] != null && (calculation['deductions'] as List).isNotEmpty) ...[
+                  const Text('Potongan:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  const SizedBox(height: 8),
+                  ...(calculation['deductions'] as List).map((deduction) => Padding(
+                    padding: const EdgeInsets.only(left: 16, bottom: 6),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(deduction['name'] ?? '', style: const TextStyle(fontSize: 14)),
+                        Text(
+                          '- Rp ${NumberFormat('#,###').format(safeDouble(deduction['calculatedValue']))}',
+                          style: const TextStyle(fontSize: 14, color: Colors.red, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  )),
+                  const SizedBox(height: 12),
+                ],
+                const Divider(height: 24),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF279E9E).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF279E9E).withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Total Gaji:',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      Text(
+                        'Rp ${NumberFormat('#,###').format(finalTotal)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: Color(0xFF279E9E),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1057,6 +1117,27 @@ class _PayrollTabState extends State<PayrollTab> {
       return 0.0;
     }
 
+    final baseSalary = safeDouble(payroll['baseSalary']);
+
+    double totalAllowances = 0.0;
+    if (payroll['allowances'] != null && (payroll['allowances'] as List).isNotEmpty) {
+      for (var allowance in payroll['allowances'] as List) {
+        totalAllowances += safeDouble(allowance['calculatedValue']);
+      }
+    }
+
+    double totalDeductions = 0.0;
+    if (payroll['deductions'] != null && (payroll['deductions'] as List).isNotEmpty) {
+      for (var deduction in payroll['deductions'] as List) {
+        totalDeductions += safeDouble(deduction['calculatedValue']);
+      }
+    }
+
+    final calculatedTotal = baseSalary + totalAllowances - totalDeductions;
+    final apiTotal = safeDouble(payroll['totalSalary'] ?? payroll['netSalary']);
+
+    final finalTotal = apiTotal > 0 ? apiTotal : calculatedTotal;
+
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1070,51 +1151,84 @@ class _PayrollTabState extends State<PayrollTab> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                    'Periode: ${DateFormat.MMMM().format(DateTime(payroll['year'] ?? DateTime.now().year, payroll['month'] ?? DateTime.now().month))} ${payroll['year'] ?? DateTime.now().year}'),
-                const Divider(),
+                  'Periode: ${DateFormat.MMMM().format(DateTime(payroll['year'] ?? DateTime.now().year, payroll['month'] ?? DateTime.now().month))} ${payroll['year'] ?? DateTime.now().year}',
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+                const Divider(height: 24),
                 const SizedBox(height: 8),
-                Text('Gaji Pokok: Rp ${NumberFormat('#,###').format(safeDouble(payroll['baseSalary']))}'),
-                const SizedBox(height: 16),
-                if (payroll['allowances'] != null && (payroll['allowances'] as List).isNotEmpty) ...[
-                  const Text('Tunjangan:', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  ...(payroll['allowances'] as List).map((allowance) => Padding(
-                    padding: const EdgeInsets.only(left: 16, bottom: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(allowance['name'] ?? ''),
-                        Text('+ Rp ${NumberFormat('#,###').format(safeDouble(allowance['calculatedValue']))}'),
-                      ],
-                    ),
-                  )),
-                  const SizedBox(height: 16),
-                ],
-                if (payroll['deductions'] != null && (payroll['deductions'] as List).isNotEmpty) ...[
-                  const Text('Potongan:', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  ...(payroll['deductions'] as List).map((deduction) => Padding(
-                    padding: const EdgeInsets.only(left: 16, bottom: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(deduction['name'] ?? ''),
-                        Text('- Rp ${NumberFormat('#,###').format(safeDouble(deduction['calculatedValue']))}'),
-                      ],
-                    ),
-                  )),
-                  const SizedBox(height: 16),
-                ],
-                const Divider(),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Total Gaji:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Text('Gaji Pokok:', style: TextStyle(fontSize: 15)),
                     Text(
-                      'Rp ${NumberFormat('#,###').format(safeDouble(payroll['totalSalary'] ?? payroll['netSalary']))}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF279E9E)),
+                      'Rp ${NumberFormat('#,###').format(baseSalary)}',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
                     ),
                   ],
+                ),
+                const SizedBox(height: 16),
+                if (payroll['allowances'] != null && (payroll['allowances'] as List).isNotEmpty) ...[
+                  const Text('Tunjangan:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  const SizedBox(height: 8),
+                  ...(payroll['allowances'] as List).map((allowance) => Padding(
+                    padding: const EdgeInsets.only(left: 16, bottom: 6),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(allowance['name'] ?? '', style: const TextStyle(fontSize: 14)),
+                        Text(
+                          '+ Rp ${NumberFormat('#,###').format(safeDouble(allowance['calculatedValue']))}',
+                          style: const TextStyle(fontSize: 14, color: Colors.green, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  )),
+                  const SizedBox(height: 12),
+                ],
+                if (payroll['deductions'] != null && (payroll['deductions'] as List).isNotEmpty) ...[
+                  const Text('Potongan:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  const SizedBox(height: 8),
+                  ...(payroll['deductions'] as List).map((deduction) => Padding(
+                    padding: const EdgeInsets.only(left: 16, bottom: 6),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(deduction['name'] ?? '', style: const TextStyle(fontSize: 14)),
+                        Text(
+                          '- Rp ${NumberFormat('#,###').format(safeDouble(deduction['calculatedValue']))}',
+                          style: const TextStyle(fontSize: 14, color: Colors.red, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  )),
+                  const SizedBox(height: 12),
+                ],
+                const Divider(height: 24),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF279E9E).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF279E9E).withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Total Gaji:',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      Text(
+                        'Rp ${NumberFormat('#,###').format(finalTotal)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: Color(0xFF279E9E),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 16),
                 if (payroll['createdAt'] != null)
@@ -1163,13 +1277,17 @@ class _PayrollTabState extends State<PayrollTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ElevatedButton.icon(
-            onPressed: _showCalculateSalaryDialog,
-            icon: const Icon(Icons.calculate),
-            label: const Text('Hitung Gaji'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF279E9E),
-              foregroundColor: Colors.white,
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton.icon(
+              onPressed: _showCalculateSalaryDialog,
+              icon: const Icon(Icons.calculate, size: 18),
+              label: const Text('Hitung Gaji'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF279E9E),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
             ),
           ),
           const SizedBox(height: 24),
