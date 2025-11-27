@@ -23,6 +23,7 @@ class _TambahStokPageState extends State<TambahStokPage> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
+  final TextEditingController _jumlahController = TextEditingController();
 
   DateTime? _selectedDate;
   bool _isSaving = false;
@@ -37,6 +38,7 @@ class _TambahStokPageState extends State<TambahStokPage> {
       _idToEdit = widget.s!['id'];
       _nameController.text = widget.s!['name'] ?? '';
       _priceController.text = widget.s!['price']?.toString() ?? '';
+      _jumlahController.text = widget.s!['jumlah']?.toString() ?? '';
 
       if (widget.s!['date'] != null) {
         _selectedDate = DateTime.parse(widget.s!['date']);
@@ -50,6 +52,7 @@ class _TambahStokPageState extends State<TambahStokPage> {
     _nameController.dispose();
     _dateController.dispose();
     _priceController.dispose();
+    _jumlahController.dispose();
     super.dispose();
   }
 
@@ -81,6 +84,7 @@ class _TambahStokPageState extends State<TambahStokPage> {
 
       try {
         final price = double.tryParse(_priceController.text) ?? 0;
+        final jumlah = int.tryParse(_jumlahController.text) ?? 0;
 
         if (_isEditMode) {
           await _apiService.updateRawMaterial(
@@ -88,6 +92,7 @@ class _TambahStokPageState extends State<TambahStokPage> {
             name: _nameController.text,
             date: _selectedDate!,
             price: price,
+            jumlah: jumlah,
             outletId: widget.outletId,
           );
         } else {
@@ -95,6 +100,7 @@ class _TambahStokPageState extends State<TambahStokPage> {
             name: _nameController.text,
             date: _selectedDate!,
             price: price,
+            jumlah: jumlah,
             outletId: widget.outletId,
           );
         }
@@ -218,8 +224,28 @@ class _TambahStokPageState extends State<TambahStokPage> {
                   const SizedBox(height: 16),
 
                   _buildTextField(
+                    controller: _jumlahController,
+                    label: 'Jumlah',
+                    hint: 'Contoh: 10',
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Jumlah tidak boleh kosong';
+                      }
+                      if (int.tryParse(value) == null) {
+                        return 'Jumlah harus berupa angka';
+                      }
+                      if (int.parse(value) <= 0) {
+                        return 'Jumlah harus lebih dari 0';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  _buildTextField(
                     controller: _priceController,
-                    label: 'Harga',
+                    label: 'Harga Satuan',
                     hint: 'Contoh: 50000',
                     keyboardType: TextInputType.number,
                     prefixText: 'Rp ',

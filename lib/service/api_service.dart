@@ -7,7 +7,7 @@ import 'package:image_picker/image_picker.dart';
 class ApiService {
   final String _baseUrl = kIsWeb
       ? 'http://localhost:3000/api'
-      : 'http://10.15.3.207:3000/api';
+      : 'http://192.168.68.152:3000/api';
 
   Future<String> _getAuthToken() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -704,6 +704,7 @@ class ApiService {
     required String name,
     required DateTime date,
     required double price,
+    required int jumlah,
     required String outletId,
   }) async {
     final token = await _getAuthToken();
@@ -712,6 +713,7 @@ class ApiService {
       'name': name,
       'date': date.toIso8601String(),
       'price': price,
+      'jumlah': jumlah,
       'outletId': outletId,
     });
 
@@ -734,6 +736,7 @@ class ApiService {
     required String name,
     required DateTime date,
     required double price,
+    required int jumlah,
     required String outletId,
   }) async {
     final token = await _getAuthToken();
@@ -742,6 +745,7 @@ class ApiService {
       'name': name,
       'date': date.toIso8601String(),
       'price': price,
+      'jumlah': jumlah,
       'outletId': outletId,
     });
 

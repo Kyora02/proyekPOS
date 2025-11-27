@@ -42,6 +42,7 @@ dependencies:
   http: ^1.2.0
   image_picker: ^1.0.4
   webview_flutter: ^4.4.2
+  share_plus: ^7.2.0
   flutter_bloc: ^8.1.5
   equatable: ^2.0.5
   syncfusion_flutter_datepicker: ^25.1.35

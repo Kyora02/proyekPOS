@@ -112,8 +112,18 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
           bValue = b['date'] ?? '';
           break;
         case 2:
+          aValue = a['jumlah'] ?? 0;
+          bValue = b['jumlah'] ?? 0;
+          break;
+        case 3:
           aValue = a['price'] ?? 0;
           bValue = b['price'] ?? 0;
+          break;
+        case 4:
+          final aTotal = (a['jumlah'] ?? 0) * (a['price'] ?? 0);
+          final bTotal = (b['jumlah'] ?? 0) * (b['price'] ?? 0);
+          aValue = aTotal;
+          bValue = bTotal;
           break;
         default:
           return 0;
@@ -421,7 +431,7 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
             controller: _horizontalScrollController,
             scrollDirection: Axis.horizontal,
             child: DataTable(
-              columnSpacing: 150.0,
+              columnSpacing: 100.0,
               sortColumnIndex: _sortColumnIndex,
               sortAscending: _sortAscending,
               headingTextStyle: TextStyle(
@@ -440,7 +450,17 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
                   onSort: _onSort,
                 ),
                 DataColumn(
-                  label: const Text('HARGA'),
+                  label: const Text('JUMLAH'),
+                  numeric: true,
+                  onSort: _onSort,
+                ),
+                DataColumn(
+                  label: const Text('HARGA SATUAN'),
+                  numeric: true,
+                  onSort: _onSort,
+                ),
+                DataColumn(
+                  label: const Text('TOTAL HARGA'),
                   numeric: true,
                   onSort: _onSort,
                 ),
@@ -449,12 +469,25 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
                 ),
               ],
               rows: stockOnCurrentPage.map((stock) {
+                final jumlah = stock['jumlah'] ?? 0;
+                final price = stock['price'] ?? 0;
+                final totalHarga = jumlah * price;
+
                 return DataRow(
                   cells: [
                     DataCell(Text(stock['name'] ?? 'N/A')),
                     DataCell(Text(_formatDate(stock['date'] ?? ''))),
+                    DataCell(Text(jumlah.toString())),
+                    DataCell(Text(_formatCurrency(price))),
                     DataCell(
-                        Text(_formatCurrency(stock['price'] ?? 0))),
+                      Text(
+                        _formatCurrency(totalHarga),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
                     DataCell(_buildPopupMenuButton(stock)),
                   ],
                 );

@@ -4,6 +4,9 @@ import 'package:intl/intl.dart';
 import 'package:proyekpos2/service/api_service.dart';
 import 'dart:math' as math;
 import 'dart:ui';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 class MyCustomScrollBehavior extends MaterialScrollBehavior {
   @override
@@ -192,7 +195,6 @@ class _LaporanPelangganPageState extends State<LaporanPelangganPage> {
   }
 
   Future<void> _selectDateRange(BuildContext context) async {
-    // 1. Select Start Date
     final newStartDate = await _selectSingleDate(
       context: context,
       initialDate: _startDate,
@@ -218,6 +220,107 @@ class _LaporanPelangganPageState extends State<LaporanPelangganPage> {
     });
 
     _fetchData();
+  }
+
+  Future<void> _exportReport() async {
+    try {
+      final doc = pw.Document();
+      final totalSales = _calculateTotalSales();
+      final totalTransactions = _calculateTotalTransactions();
+
+      final font = await PdfGoogleFonts.nunitoExtraLight();
+      final fontBold = await PdfGoogleFonts.nunitoExtraBold();
+
+      doc.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return [
+              pw.Header(
+                level: 0,
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Laporan Pelanggan', style: pw.TextStyle(font: fontBold, fontSize: 24)),
+                    pw.Text(
+                      '${DateFormat('dd MMM yyyy').format(_startDate)} - ${DateFormat('dd MMM yyyy').format(_endDate)}',
+                      style: pw.TextStyle(font: font, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 20),
+              pw.Table.fromTextArray(
+                headers: ['Nama Pelanggan', 'No. Telepon', 'Total Transaksi', 'Total Belanja', 'Rata-rata', 'Terakhir Belanja'],
+                data: _filteredData.map((item) {
+                  final lastPurchase = DateTime.fromMillisecondsSinceEpoch(item['terakhirBelanja']);
+                  return [
+                    item['namaPelanggan'] ?? '-',
+                    item['noTelepon'] ?? '-',
+                    item['totalTransaksi'].toString(),
+                    _currencyFormatter.format(item['totalBelanja'] ?? 0),
+                    _currencyFormatter.format(item['rataRataTransaksi'] ?? 0),
+                    DateFormat('dd MMM yyyy').format(lastPurchase),
+                  ];
+                }).toList(),
+                headerStyle: pw.TextStyle(font: fontBold, color: PdfColors.white),
+                headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF279E9E)),
+                rowDecoration: const pw.BoxDecoration(
+                  border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.5)),
+                ),
+                cellStyle: pw.TextStyle(font: font, fontSize: 10),
+                cellAlignments: {
+                  0: pw.Alignment.centerLeft,
+                  1: pw.Alignment.centerLeft,
+                  2: pw.Alignment.centerRight,
+                  3: pw.Alignment.centerRight,
+                  4: pw.Alignment.centerRight,
+                  5: pw.Alignment.centerLeft,
+                },
+              ),
+              pw.SizedBox(height: 20),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.end,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text(
+                        'Total Transaksi: $totalTransactions',
+                        style: pw.TextStyle(font: fontBold, fontSize: 14),
+                      ),
+                      pw.SizedBox(height: 8),
+                      pw.Text(
+                        'Total Penjualan: ${_currencyFormatter.format(totalSales)}',
+                        style: pw.TextStyle(font: fontBold, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ];
+          },
+        ),
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => doc.save(),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengekspor PDF: $e')),
+        );
+      }
+    }
+  }
+
+  double _calculateTotalSales() {
+    return _filteredData.fold(0.0, (sum, item) => sum + (item['totalBelanja'] ?? 0));
+  }
+
+  int _calculateTotalTransactions() {
+    return _filteredData.fold(0, (sum, item) => sum + (item['totalTransaksi'] as int? ?? 0));
   }
 
   @override
@@ -257,6 +360,8 @@ class _LaporanPelangganPageState extends State<LaporanPelangganPage> {
                   )
                       : _buildWebTable(dataOnCurrentPage),
                   const SizedBox(height: 24),
+                  if (!_isLoading && totalItems > 0) _buildTotalSummary(),
+                  const SizedBox(height: 16),
                   if (!_isLoading && totalItems > 0) _buildPagination(totalItems, totalPages),
                 ],
               ),
@@ -279,7 +384,7 @@ class _LaporanPelangganPageState extends State<LaporanPelangganPage> {
               color: Color(0xFF333333)),
         ),
         ElevatedButton.icon(
-          onPressed: () {},
+          onPressed: _filteredData.isEmpty ? null : _exportReport,
           icon: const Icon(Icons.cloud_download_outlined, size: 18),
           label: const Text('Ekspor Laporan'),
           style: ElevatedButton.styleFrom(
@@ -459,6 +564,94 @@ class _LaporanPelangganPageState extends State<LaporanPelangganPage> {
       fontSize: 12,
       color: Colors.grey[600],
       letterSpacing: 0.5,
+    );
+  }
+
+  Widget _buildTotalSummary() {
+    final totalSales = _calculateTotalSales();
+    final totalTransactions = _calculateTotalTransactions();
+
+    return Wrap(
+      spacing: 16,
+      runSpacing: 16,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF279E9E).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF279E9E).withOpacity(0.3)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.shopping_cart, color: Color(0xFF279E9E), size: 20),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Total Transaksi',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF666666),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    totalTransactions.toString(),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF279E9E),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF279E9E).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF279E9E).withOpacity(0.3)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.monetization_on, color: Color(0xFF279E9E), size: 20),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Total Penjualan',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF666666),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _currencyFormatter.format(totalSales),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF279E9E),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

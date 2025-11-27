@@ -4,6 +4,9 @@ import 'package:intl/intl.dart';
 import 'package:proyekpos2/service/api_service.dart';
 import 'dart:math' as math;
 import 'dart:ui';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 class MyCustomScrollBehavior extends MaterialScrollBehavior {
   @override
@@ -216,6 +219,91 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
     _fetchData();
   }
 
+  double _calculateTotalSales() {
+    return _filteredData.fold(0.0, (sum, item) => sum + (item['penjualanRp'] ?? 0));
+  }
+
+  Future<void> _exportReport() async {
+    try {
+      final doc = pw.Document();
+      final totalSales = _calculateTotalSales();
+
+      final font = await PdfGoogleFonts.nunitoExtraLight();
+      final fontBold = await PdfGoogleFonts.nunitoExtraBold();
+
+      doc.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return [
+              pw.Header(
+                level: 0,
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Laporan Penjualan Kategori', style: pw.TextStyle(font: fontBold, fontSize: 24)),
+                    pw.Text(
+                      '${DateFormat('dd MMM yyyy').format(_startDate)} - ${DateFormat('dd MMM yyyy').format(_endDate)}',
+                      style: pw.TextStyle(font: font, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 20),
+              pw.Table.fromTextArray(
+                headers: ['Kategori', 'Jumlah Produk', 'Produk (%)', 'Penjualan (Rp)', 'Penjualan (%)', 'HPP (Rp)'],
+                data: _filteredData.map((item) {
+                  return [
+                    item['kategori'] ?? '-',
+                    item['jumlahProduk'].toString(),
+                    '${item['produkPersen']}%',
+                    _currencyFormatter.format(item['penjualanRp'] ?? 0),
+                    '${item['penjualanPersen']}%',
+                    _currencyFormatter.format(item['hppRp'] ?? 0),
+                  ];
+                }).toList(),
+                headerStyle: pw.TextStyle(font: fontBold, color: PdfColors.white),
+                headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF279E9E)),
+                rowDecoration: const pw.BoxDecoration(
+                  border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.5)),
+                ),
+                cellStyle: pw.TextStyle(font: font, fontSize: 10),
+                cellAlignments: {
+                  0: pw.Alignment.centerLeft,
+                  1: pw.Alignment.centerRight,
+                  2: pw.Alignment.centerRight,
+                  3: pw.Alignment.centerRight,
+                  4: pw.Alignment.centerRight,
+                  5: pw.Alignment.centerRight,
+                },
+              ),
+              pw.SizedBox(height: 20),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.end,
+                children: [
+                  pw.Text(
+                    'Total Penjualan: ${_currencyFormatter.format(totalSales)}',
+                    style: pw.TextStyle(font: fontBold, fontSize: 14),
+                  ),
+                ],
+              ),
+            ];
+          },
+        ),
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => doc.save(),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengekspor PDF: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final totalItems = _filteredData.length;
@@ -253,6 +341,8 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
                   )
                       : _buildResponsiveTable(dataOnCurrentPage),
                   const SizedBox(height: 24),
+                  if (!_isLoading && totalItems > 0) _buildTotalSales(),
+                  const SizedBox(height: 16),
                   if (!_isLoading && totalItems > 0) _buildPagination(totalItems, totalPages),
                 ],
               ),
@@ -275,7 +365,7 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
               color: Color(0xFF333333)),
         ),
         ElevatedButton.icon(
-          onPressed: _filteredData.isEmpty ? null : () {},
+          onPressed: _filteredData.isEmpty ? null : _exportReport,
           icon: const Icon(Icons.cloud_download_outlined, size: 18),
           label: const Text('Ekspor Laporan'),
           style: ElevatedButton.styleFrom(
@@ -403,7 +493,7 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
           onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
         DataColumn(
-          label: SizedBox(width: 100, child: Text('JUMLAH PRODUK', style: headerStyle)),
+          label: SizedBox(width: 120, child: Text('JUMLAH PRODUK', style: headerStyle)),
           numeric: true,
           onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
@@ -458,6 +548,42 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
           ],
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildTotalSales() {
+    final totalSales = _calculateTotalSales();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF279E9E).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF279E9E).withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.monetization_on, color: Color(0xFF279E9E), size: 20),
+          const SizedBox(width: 8),
+          const Text(
+            'Total Penjualan: ',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF333333),
+            ),
+          ),
+          Text(
+            _currencyFormatter.format(totalSales),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF279E9E),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

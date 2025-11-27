@@ -44,7 +44,7 @@ class _DetailPembelianPageState extends State<DetailPembelianPage> {
 
   final NumberFormat _currencyFormatter =
   NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
-  final DateFormat _dateFormatter = DateFormat('dd MMM yyyy, HH:mm');
+  final DateFormat _dateFormatter = DateFormat('dd MMM yyyy');
 
   @override
   void initState() {
@@ -130,9 +130,23 @@ class _DetailPembelianPageState extends State<DetailPembelianPage> {
           compareResult = (a['namaBahan'] ?? '').compareTo(b['namaBahan'] ?? '');
           break;
         case 2:
-          final num valA = a['harga'] ?? 0;
-          final num valB = b['harga'] ?? 0;
+          final num valA = num.tryParse(a['jumlah'].toString()) ?? 0;
+          final num valB = num.tryParse(b['jumlah'].toString()) ?? 0;
           compareResult = valA.compareTo(valB);
+          break;
+        case 3:
+          final num valA = num.tryParse(a['harga'].toString()) ?? 0;
+          final num valB = num.tryParse(a['harga'].toString()) ?? 0;
+          compareResult = valA.compareTo(valB);
+          break;
+        case 4:
+          final num jumlahA = num.tryParse(a['jumlah'].toString()) ?? 0;
+          final num hargaA = num.tryParse(a['harga'].toString()) ?? 0;
+          final num jumlahB = num.tryParse(b['jumlah'].toString()) ?? 0;
+          final num hargaB = num.tryParse(b['harga'].toString()) ?? 0;
+          final num totalA = jumlahA * hargaA;
+          final num totalB = jumlahB * hargaB;
+          compareResult = totalA.compareTo(totalB);
           break;
       }
 
@@ -146,6 +160,14 @@ class _DetailPembelianPageState extends State<DetailPembelianPage> {
       _isAscending = ascending;
     });
     _sortList(_filteredData, columnIndex, ascending);
+  }
+
+  double _calculateTotalHarga() {
+    return _filteredData.fold(0.0, (sum, item) {
+      final jumlah = num.tryParse(item['jumlah'].toString()) ?? 0;
+      final harga = num.tryParse(item['harga'].toString()) ?? 0;
+      return sum + (jumlah * harga);
+    });
   }
 
   Future<void> _exportToPdf() async {
@@ -175,14 +197,19 @@ class _DetailPembelianPageState extends State<DetailPembelianPage> {
               ),
               pw.SizedBox(height: 20),
               pw.Table.fromTextArray(
-                headers: ['Tanggal', 'Nama Bahan', 'Harga'],
+                headers: ['Tanggal', 'Nama Bahan', 'Jumlah', 'Harga Satuan', 'Total Harga'],
                 data: _filteredData.map((item) {
                   final DateTime dateVal = DateTime.fromMillisecondsSinceEpoch(item['timestamp']);
+                  final jumlah = num.tryParse(item['jumlah'].toString()) ?? 0;
+                  final harga = num.tryParse(item['harga'].toString()) ?? 0;
+                  final totalHarga = jumlah * harga;
 
                   return [
                     _dateFormatter.format(dateVal),
                     item['namaBahan'] ?? '-',
-                    _currencyFormatter.format(item['harga'] ?? 0),
+                    jumlah.toString(),
+                    _currencyFormatter.format(harga),
+                    _currencyFormatter.format(totalHarga),
                   ];
                 }).toList(),
                 headerStyle: pw.TextStyle(font: fontBold, color: PdfColors.white),
@@ -195,6 +222,8 @@ class _DetailPembelianPageState extends State<DetailPembelianPage> {
                   0: pw.Alignment.centerLeft,
                   1: pw.Alignment.centerLeft,
                   2: pw.Alignment.centerRight,
+                  3: pw.Alignment.centerRight,
+                  4: pw.Alignment.centerRight,
                 },
               ),
               pw.SizedBox(height: 20),
@@ -202,7 +231,7 @@ class _DetailPembelianPageState extends State<DetailPembelianPage> {
                 mainAxisAlignment: pw.MainAxisAlignment.end,
                 children: [
                   pw.Text(
-                    'Total Periode Ini: ${_currencyFormatter.format(_filteredData.fold(0.0, (sum, item) => sum + (item['harga'] ?? 0)))}',
+                    'Total Periode Ini: ${_currencyFormatter.format(_calculateTotalHarga())}',
                     style: pw.TextStyle(font: fontBold, fontSize: 14),
                   ),
                 ],
@@ -320,6 +349,8 @@ class _DetailPembelianPageState extends State<DetailPembelianPage> {
                   )
                       : _buildResponsiveTable(dataOnCurrentPage),
                   const SizedBox(height: 24),
+                  if (!_isLoading && totalItems > 0) _buildTotalHargaBox(),
+                  const SizedBox(height: 16),
                   if (!_isLoading && totalItems > 0) _buildPagination(totalItems, totalPages),
                 ],
               ),
@@ -405,6 +436,36 @@ class _DetailPembelianPageState extends State<DetailPembelianPage> {
     );
   }
 
+  Widget _buildTotalHargaBox() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE0F2F1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF279E9E).withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.account_balance_wallet_outlined,
+            color: Color(0xFF279E9E),
+            size: 24,
+          ),
+          const SizedBox(width: 12),
+          Text(
+            'Total Pembelian: ${_currencyFormatter.format(_calculateTotalHarga())}',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF279E9E),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildResponsiveTable(List<Map<String, dynamic>> data) {
     return Scrollbar(
       controller: _scrollController,
@@ -457,8 +518,8 @@ class _DetailPembelianPageState extends State<DetailPembelianPage> {
     return DataTable(
       sortColumnIndex: _sortColumnIndex,
       sortAscending: _isAscending,
-      columnSpacing: 80,
-      horizontalMargin: 32,
+      columnSpacing: 20,
+      horizontalMargin: 24,
       headingRowHeight: 56,
       dataRowMaxHeight: 80,
       dataRowMinHeight: 80,
@@ -467,22 +528,38 @@ class _DetailPembelianPageState extends State<DetailPembelianPage> {
       columns: [
         DataColumn(
           label: SizedBox(
-            width: 200,
+            width: 120,
             child: Text('TANGGAL', style: headerStyle),
           ),
           onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
         DataColumn(
           label: SizedBox(
-            width: 350,
+            width: 150,
             child: Text('NAMA BAHAN', style: headerStyle),
           ),
           onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
         DataColumn(
           label: SizedBox(
-            width: 200,
-            child: Text('HARGA', style: headerStyle, textAlign: TextAlign.right),
+            width: 80,
+            child: Text('JUMLAH', style: headerStyle, textAlign: TextAlign.right),
+          ),
+          numeric: true,
+          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
+        ),
+        DataColumn(
+          label: SizedBox(
+            width: 120,
+            child: Text('HARGA SATUAN', style: headerStyle, textAlign: TextAlign.right),
+          ),
+          numeric: true,
+          onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
+        ),
+        DataColumn(
+          label: SizedBox(
+            width: 130,
+            child: Text('TOTAL HARGA', style: headerStyle, textAlign: TextAlign.right),
           ),
           numeric: true,
           onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
@@ -490,28 +567,47 @@ class _DetailPembelianPageState extends State<DetailPembelianPage> {
       ],
       rows: data.map((item) {
         final DateTime dateVal = DateTime.fromMillisecondsSinceEpoch(item['timestamp']);
+        final jumlah = num.tryParse(item['jumlah'].toString()) ?? 0;
+        final harga = num.tryParse(item['harga'].toString()) ?? 0;
+        final totalHarga = jumlah * harga;
 
         return DataRow(
           cells: [
             DataCell(SizedBox(
-              width: 200,
+              width: 120,
               child: Text(
                 _dateFormatter.format(dateVal),
                 style: const TextStyle(fontSize: 14, color: Color(0xFF444444)),
               ),
             )),
             DataCell(SizedBox(
-              width: 350,
+              width: 150,
               child: Text(
                 item['namaBahan'] ?? '-',
                 style: const TextStyle(fontSize: 14, color: Color(0xFF444444)),
               ),
             )),
             DataCell(SizedBox(
-              width: 200,
+              width: 80,
               child: Text(
-                _currencyFormatter.format(item['harga'] ?? 0),
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF444444)),
+                jumlah.toString(),
+                style: const TextStyle(fontSize: 14, color: Color(0xFF444444)),
+                textAlign: TextAlign.right,
+              ),
+            )),
+            DataCell(SizedBox(
+              width: 120,
+              child: Text(
+                _currencyFormatter.format(harga),
+                style: const TextStyle(fontSize: 14, color: Color(0xFF444444)),
+                textAlign: TextAlign.right,
+              ),
+            )),
+            DataCell(SizedBox(
+              width: 130,
+              child: Text(
+                _currencyFormatter.format(totalHarga),
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black),
                 textAlign: TextAlign.right,
               ),
             )),

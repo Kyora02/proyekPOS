@@ -4,6 +4,11 @@ import 'package:intl/intl.dart';
 import 'package:proyekpos2/service/api_service.dart';
 import 'dart:math' as math;
 import 'dart:ui';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 class MyCustomScrollBehavior extends MaterialScrollBehavior {
   @override
@@ -156,11 +161,6 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
           final num valB = b['penjualanRp'] ?? 0;
           compareResult = valA.compareTo(valB);
           break;
-        case 5:
-          final num valA = a['persentaseJumlah'] ?? 0;
-          final num valB = b['persentaseJumlah'] ?? 0;
-          compareResult = valA.compareTo(valB);
-          break;
       }
 
       return ascending ? compareResult : -compareResult;
@@ -235,6 +235,89 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
     _fetchData();
   }
 
+  Future<void> _exportReport() async {
+    try {
+      final doc = pw.Document();
+      final totalSales = _calculateTotalSales();
+
+      final font = await PdfGoogleFonts.nunitoExtraLight();
+      final fontBold = await PdfGoogleFonts.nunitoExtraBold();
+
+      doc.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return [
+              pw.Header(
+                level: 0,
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Laporan Penjualan Produk', style: pw.TextStyle(font: fontBold, fontSize: 24)),
+                    pw.Text(
+                      '${DateFormat('dd MMM yyyy').format(_startDate)} - ${DateFormat('dd MMM yyyy').format(_endDate)}',
+                      style: pw.TextStyle(font: font, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 20),
+              pw.Table.fromTextArray(
+                headers: ['Produk', 'SKU', 'Kategori', 'Jumlah', 'Penjualan'],
+                data: _filteredData.map((item) {
+                  return [
+                    item['produk'] ?? '-',
+                    item['sku'] ?? '-',
+                    item['kategori'] ?? '-',
+                    item['jumlah'].toString(),
+                    _currencyFormatter.format(item['penjualanRp'] ?? 0),
+                  ];
+                }).toList(),
+                headerStyle: pw.TextStyle(font: fontBold, color: PdfColors.white),
+                headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF279E9E)),
+                rowDecoration: const pw.BoxDecoration(
+                  border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.5)),
+                ),
+                cellStyle: pw.TextStyle(font: font, fontSize: 10),
+                cellAlignments: {
+                  0: pw.Alignment.centerLeft,
+                  1: pw.Alignment.centerLeft,
+                  2: pw.Alignment.centerLeft,
+                  3: pw.Alignment.centerRight,
+                  4: pw.Alignment.centerRight,
+                },
+              ),
+              pw.SizedBox(height: 20),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.end,
+                children: [
+                  pw.Text(
+                    'Total Penjualan: ${_currencyFormatter.format(totalSales)}',
+                    style: pw.TextStyle(font: fontBold, fontSize: 14),
+                  ),
+                ],
+              ),
+            ];
+          },
+        ),
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => doc.save(),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengekspor PDF: $e')),
+        );
+      }
+    }
+  }
+
+  double _calculateTotalSales() {
+    return _filteredData.fold(0.0, (sum, item) => sum + (item['penjualanRp'] ?? 0));
+  }
+
   @override
   Widget build(BuildContext context) {
     final totalItems = _filteredData.length;
@@ -247,38 +330,40 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
     final dataOnCurrentPage = _filteredData.sublist(startIndex, endIndex);
 
     return Scaffold(
-        backgroundColor: const Color(0xFFF5F7FA),
-    body: SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1200),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(context),
-                const SizedBox(height: 24),
-                _buildFilterActions(context),
-                const SizedBox(height: 24),
-                _isLoading
-                    ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(32.0),
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF279E9E),
+      backgroundColor: const Color(0xFFF5F7FA),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(context),
+                  const SizedBox(height: 24),
+                  _buildFilterActions(context),
+                  const SizedBox(height: 24),
+                  _isLoading
+                      ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32.0),
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF279E9E),
+                      ),
                     ),
-                  ),
-                )
-                    : _buildResponsiveTable(dataOnCurrentPage),
-                const SizedBox(height: 24),
-                if (!_isLoading && totalItems > 0) _buildPagination(totalItems, totalPages),
-              ],
+                  )
+                      : _buildResponsiveTable(dataOnCurrentPage),
+                  const SizedBox(height: 24),
+                  if (!_isLoading && totalItems > 0) _buildTotalSales(),
+                  const SizedBox(height: 16),
+                  if (!_isLoading && totalItems > 0) _buildPagination(totalItems, totalPages),
+                ],
+              ),
             ),
           ),
         ),
       ),
-    ),
     );
   }
 
@@ -294,7 +379,7 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
               color: Color(0xFF333333)),
         ),
         ElevatedButton.icon(
-          onPressed: _filteredData.isEmpty ? null : () {},
+          onPressed: _filteredData.isEmpty ? null : _exportReport,
           icon: const Icon(Icons.cloud_download_outlined, size: 18),
           label: const Text('Ekspor Laporan'),
           style: ElevatedButton.styleFrom(
@@ -499,11 +584,6 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
           numeric: true,
           onSort: _showTopSelling ? null : (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
-        DataColumn(
-          label: SizedBox(width: 100, child: Text('JUMLAH (%)', style: headerStyle)),
-          numeric: true,
-          onSort: _showTopSelling ? null : (columnIndex, ascending) => _onSort(columnIndex, ascending),
-        ),
       ],
       rows: data.asMap().entries.map((entry) {
         final index = entry.key;
@@ -569,13 +649,45 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
               _currencyFormatter.format(item['penjualanRp'] ?? 0),
               style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF444444)),
             ))),
-            DataCell(SizedBox(width: 100, child: Text(
-                '${(item['persentaseJumlah'] as num).toStringAsFixed(2)}%',
-                style: const TextStyle(fontSize: 14, color: Color(0xFF444444))
-            ))),
           ],
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildTotalSales() {
+    final totalSales = _calculateTotalSales();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF279E9E).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF279E9E).withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.monetization_on, color: Color(0xFF279E9E), size: 20),
+          const SizedBox(width: 8),
+          const Text(
+            'Total Penjualan: ',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF333333),
+            ),
+          ),
+          Text(
+            _currencyFormatter.format(totalSales),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF279E9E),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
