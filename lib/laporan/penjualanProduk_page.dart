@@ -398,17 +398,20 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
     final formattedStartDate = DateFormat('dd MMM yyyy').format(_startDate);
     final formattedEndDate = DateFormat('dd MMM yyyy').format(_endDate);
 
-    final datePicker = OutlinedButton.icon(
-      onPressed: () => _selectDateRange(context),
-      icon: const Icon(Icons.calendar_today_outlined,
-          size: 18, color: Color(0xFF279E9E)),
-      label: Text('$formattedStartDate - $formattedEndDate'),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: Colors.grey[800],
-        backgroundColor: Colors.white,
-        side: BorderSide(color: Colors.grey[300]!),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    final datePicker = SizedBox(
+      height: 48,
+      child: OutlinedButton.icon(
+        onPressed: () => _selectDateRange(context),
+        icon: const Icon(Icons.calendar_today_outlined,
+            size: 18, color: Color(0xFF279E9E)),
+        label: Text('$formattedStartDate - $formattedEndDate'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.grey[800],
+          backgroundColor: Colors.white,
+          side: BorderSide(color: Colors.grey[300]!),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+        ),
       ),
     );
 
@@ -432,61 +435,68 @@ class _PenjualanProdukPageState extends State<PenjualanProdukPage> {
       ),
     );
 
-    final categoryFilter = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String?>(
-          value: _selectedCategoryId,
-          hint: const Text('Semua Kategori'),
-          icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF279E9E)),
-          onChanged: (String? newValue) {
-            setState(() {
-              _selectedCategoryId = newValue;
-            });
-            _filterData();
-          },
-          items: [
-            const DropdownMenuItem<String?>(
-              value: null,
-              child: Text('Semua Kategori'),
-            ),
-            ..._categories.map<DropdownMenuItem<String?>>((category) {
-              return DropdownMenuItem<String?>(
-                value: category['id'],
-                child: Text(category['name'] ?? 'Tanpa Nama'),
-              );
-            }).toList(),
-          ],
+    final categoryFilter = SizedBox(
+      height: 48,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey[300]!),
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String?>(
+            value: _selectedCategoryId,
+            hint: const Text('Semua Kategori'),
+            icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF279E9E)),
+            onChanged: (String? newValue) {
+              setState(() {
+                _selectedCategoryId = newValue;
+              });
+              _filterData();
+            },
+            items: [
+              const DropdownMenuItem<String?>(
+                value: null,
+                child: Text('Semua Kategori'),
+              ),
+              ..._categories.map<DropdownMenuItem<String?>>((category) {
+                return DropdownMenuItem<String?>(
+                  value: category['id'],
+                  child: Text(category['name'] ?? 'Tanpa Nama'),
+                );
+              }).toList(),
+            ],
+          ),
         ),
       ),
     );
 
-    final topSellingToggle = FilterChip(
-      label: const Text('Produk Terlaris'),
-      selected: _showTopSelling,
-      onSelected: (bool selected) {
-        setState(() {
-          _showTopSelling = selected;
-          if (selected) {
-            _sortColumnIndex = null;
-          }
-        });
-        _filterData();
-      },
-      selectedColor: const Color(0xFF279E9E).withOpacity(0.2),
-      checkmarkColor: const Color(0xFF279E9E),
-      labelStyle: TextStyle(
-        color: _showTopSelling ? const Color(0xFF279E9E) : Colors.grey[700],
-        fontWeight: _showTopSelling ? FontWeight.bold : FontWeight.normal,
-      ),
-      backgroundColor: Colors.white,
-      side: BorderSide(
-        color: _showTopSelling ? const Color(0xFF279E9E) : Colors.grey[300]!,
+    final topSellingToggle = SizedBox(
+      height: 48,
+      child: FilterChip(
+        label: const Text('Produk Terlaris'),
+        selected: _showTopSelling,
+        onSelected: (bool selected) {
+          setState(() {
+            _showTopSelling = selected;
+            if (selected) {
+              _sortColumnIndex = null;
+            }
+          });
+          _filterData();
+        },
+        selectedColor: const Color(0xFF279E9E).withOpacity(0.2),
+        checkmarkColor: const Color(0xFF279E9E),
+        labelStyle: TextStyle(
+          color: _showTopSelling ? const Color(0xFF279E9E) : Colors.grey[700],
+          fontWeight: _showTopSelling ? FontWeight.bold : FontWeight.normal,
+        ),
+        backgroundColor: Colors.white,
+        side: BorderSide(
+          color: _showTopSelling ? const Color(0xFF279E9E) : Colors.grey[300]!,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       ),
     );
 

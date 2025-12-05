@@ -376,19 +376,13 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
   }
 
   Future<void> _processPayment() async {
-    if (_customerNameController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nama Pelanggan wajib diisi!')),
-      );
-      return;
-    }
+    final String customerName = _customerNameController.text.trim().isEmpty
+        ? 'Unknown User'
+        : _customerNameController.text.trim();
 
-    if (_customerPhoneController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nomor Telepon wajib diisi!')),
-      );
-      return;
-    }
+    final String customerPhone = _customerPhoneController.text.trim().isEmpty
+        ? '-'
+        : _customerPhoneController.text.trim();
 
     Navigator.pop(context);
     setState(() => _isLoading = true);
@@ -401,8 +395,8 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
       final result = await _apiService.createTransaction(
         amount: _total,
         items: _cartItems,
-        customerName: _customerNameController.text,
-        customerPhone: _customerPhoneController.text,
+        customerName: customerName,
+        customerPhone: customerPhone,
         paymentMethod: apiPaymentMethod,
         karyawanId: widget.karyawanId,
         outletId: widget.karyawanData['outletId'] ?? '',

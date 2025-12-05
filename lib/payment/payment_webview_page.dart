@@ -23,6 +23,7 @@ class _PaymentWebviewPageState extends State<PaymentWebviewPage> {
   String _currentUrl = '';
   bool _hasReturnedResult = false;
   Timer? _autoCloseTimer;
+  Timer? _statusCheckTimer;
 
   @override
   void initState() {
@@ -53,6 +54,10 @@ class _PaymentWebviewPageState extends State<PaymentWebviewPage> {
               });
             }
             _checkUrlForCompletion(url);
+
+            if (url.contains('status_code=200') || url.contains('finish')) {
+              _startStatusPolling();
+            }
           },
           onWebResourceError: (WebResourceError error) {
             print("WebView Error: ${error.description}");
@@ -88,7 +93,30 @@ class _PaymentWebviewPageState extends State<PaymentWebviewPage> {
   @override
   void dispose() {
     _autoCloseTimer?.cancel();
+    _statusCheckTimer?.cancel();
     super.dispose();
+  }
+
+  void _startStatusPolling() {
+    print('Starting status polling for order: ${widget.orderId}');
+    _statusCheckTimer?.cancel();
+
+    int attemptCount = 0;
+    _statusCheckTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      attemptCount++;
+      print('Status check attempt $attemptCount');
+
+      if (attemptCount > 10) {
+        timer.cancel();
+        print('Max polling attempts reached');
+        return;
+      }
+
+      if (_hasReturnedResult) {
+        timer.cancel();
+        return;
+      }
+    });
   }
 
   void _checkUrlForCompletion(String url) {
@@ -99,21 +127,21 @@ class _PaymentWebviewPageState extends State<PaymentWebviewPage> {
     print('Checking URL: $lowerUrl');
 
     bool isSuccess =
-    lowerUrl.contains('status_code=200') ||
-        lowerUrl.contains('transaction_status=settlement') ||
-        lowerUrl.contains('transaction_status=capture') ||
-        lowerUrl.contains('transaction_status=success') ||
-        lowerUrl.contains('/success') ||
-        lowerUrl.contains('payment_successful') ||
-        lowerUrl.contains('payment-successful') ||
-        lowerUrl.contains('payment_success') ||
-        (lowerUrl.contains('order_id=${widget.orderId.toLowerCase()}') &&
-            (lowerUrl.contains('settlement') ||
-                lowerUrl.contains('success') ||
-                lowerUrl.contains('status_code=200'))) ||
-        (lowerUrl.contains('finish') && !lowerUrl.contains('unfinish')) ||
-        lowerUrl.contains('/payment/success') ||
-        lowerUrl.contains('/transaction/success');
+        lowerUrl.contains('status_code=200') ||
+            lowerUrl.contains('transaction_status=settlement') ||
+            lowerUrl.contains('transaction_status=capture') ||
+            lowerUrl.contains('transaction_status=success') ||
+            lowerUrl.contains('/success') ||
+            lowerUrl.contains('payment_successful') ||
+            lowerUrl.contains('payment-successful') ||
+            lowerUrl.contains('payment_success') ||
+            (lowerUrl.contains('order_id=${widget.orderId.toLowerCase()}') &&
+                (lowerUrl.contains('settlement') ||
+                    lowerUrl.contains('success') ||
+                    lowerUrl.contains('status_code=200'))) ||
+            (lowerUrl.contains('finish') && !lowerUrl.contains('unfinish')) ||
+            lowerUrl.contains('/payment/success') ||
+            lowerUrl.contains('/transaction/success');
 
     bool isFailed =
         lowerUrl.contains('status_code=201') ||
@@ -128,10 +156,10 @@ class _PaymentWebviewPageState extends State<PaymentWebviewPage> {
             lowerUrl.contains('payment-failed');
 
     if (isSuccess) {
-      print('✅ Payment SUCCESS detected for order: ${widget.orderId}');
+      print('Payment SUCCESS detected for order: ${widget.orderId}');
       _showSuccessDialog();
     } else if (isFailed) {
-      print('❌ Payment FAILED detected for order: ${widget.orderId}');
+      print('Payment FAILED detected for order: ${widget.orderId}');
       _returnResult(false);
     }
   }
@@ -139,6 +167,8 @@ class _PaymentWebviewPageState extends State<PaymentWebviewPage> {
   void _showSuccessDialog() {
     if (_hasReturnedResult) return;
     _hasReturnedResult = true;
+
+    _statusCheckTimer?.cancel();
 
     showDialog(
       context: context,
@@ -192,6 +222,7 @@ class _PaymentWebviewPageState extends State<PaymentWebviewPage> {
     if (_hasReturnedResult) return;
 
     _hasReturnedResult = true;
+    _statusCheckTimer?.cancel();
 
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {

@@ -3,6 +3,21 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:proyekpos2/service/api_service.dart';
+import 'package:proyekpos2/subscription_dialog.dart';
+
+class NavItem {
+  final String title;
+  final IconData icon;
+  final List<NavItem> children;
+  final int minRole;
+
+  NavItem({
+    required this.title,
+    required this.icon,
+    this.children = const [],
+    this.minRole = 1,
+  });
+}
 
 class DashboardLayout extends StatefulWidget {
   final Widget child;
@@ -97,6 +112,529 @@ class _DashboardLayoutState extends State<DashboardLayout> {
   }
 }
 
+class NavListTile extends StatefulWidget {
+  final bool isCollapsed;
+  final NavItem item;
+  final EdgeInsetsGeometry padding;
+  final String selectedItem;
+  final Function(String) onTap;
+  final int userRole;
+  final String userId;
+
+  const NavListTile({
+    super.key,
+    required this.isCollapsed,
+    required this.item,
+    required this.padding,
+    required this.selectedItem,
+    required this.onTap,
+    required this.userRole,
+    required this.userId,
+  });
+
+  @override
+  State<NavListTile> createState() => _NavListTileState();
+}
+
+class _NavListTileState extends State<NavListTile> {
+  bool _isHovering = false;
+
+  bool _isChildSelected(NavItem item, String selectedItem) {
+    if (item.children.isEmpty) return false;
+    bool containsSelected = false;
+    for (var child in item.children) {
+      if (child.title == selectedItem) {
+        containsSelected = true;
+        break;
+      }
+      if (child.children.isNotEmpty) {
+        containsSelected = _isChildSelected(child, selectedItem);
+        if (containsSelected) break;
+      }
+    }
+    return containsSelected;
+  }
+
+  void _showSubscriptionLock() {
+    showDialog(
+      context: context,
+      builder: (context) => SubscriptionDialog(userId: widget.userId),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    final bool isSelected = widget.selectedItem == item.title;
+    final bool isChildSelected = _isChildSelected(item, widget.selectedItem);
+    final bool isLocked = widget.userRole < item.minRole;
+
+    if (widget.isCollapsed) {
+      return Tooltip(
+        message: isLocked ? '${item.title} (Locked)' : item.title,
+        child: InkWell(
+          onTap: () {
+            if (isLocked) {
+              _showSubscriptionLock();
+            } else {
+              widget.onTap(item.title);
+            }
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: _isHovering
+                  ? Colors.white.withValues(alpha: 0.1)
+                  : Colors.transparent,
+              border: Border(
+                right: BorderSide(
+                  color: isSelected && !isLocked
+                      ? const Color(0xFFFFC107)
+                      : Colors.transparent,
+                  width: 4.0,
+                ),
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 12.0),
+            child: Center(
+              child: Icon(
+                isLocked ? Icons.lock_outline : item.icon,
+                color: isLocked ? Colors.white38 : Colors.white,
+                size: 22,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (item.children.isEmpty) {
+      return MouseRegion(
+        onEnter: (_) => setState(() => _isHovering = true),
+        onExit: (_) => setState(() => _isHovering = false),
+        child: Container(
+          decoration: BoxDecoration(
+            color: _isHovering
+                ? Colors.white.withValues(alpha: 0.1)
+                : Colors.transparent,
+            border: Border(
+              right: BorderSide(
+                color: isSelected && !isLocked
+                    ? const Color(0xFFFFC107)
+                    : Colors.transparent,
+                width: 4.0,
+              ),
+            ),
+          ),
+          child: ListTile(
+            contentPadding: widget.padding,
+            leading: Icon(
+              isLocked ? Icons.lock_outline : item.icon,
+              color: isLocked ? Colors.white60 : Colors.white,
+              size: 22,
+            ),
+            title: Text(
+              item.title,
+              style: TextStyle(
+                  color: isLocked ? Colors.white60 : Colors.white,
+                  fontSize: 14,
+                  height: 1.3),
+              maxLines: 2,
+              overflow: TextOverflow.visible,
+            ),
+            onTap: () {
+              if (isLocked) {
+                _showSubscriptionLock();
+              } else {
+                widget.onTap(item.title);
+              }
+            },
+          ),
+        ),
+      );
+    }
+
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        key: PageStorageKey(item.title),
+        initiallyExpanded: isChildSelected,
+        tilePadding: widget.padding,
+        leading: Icon(
+            isLocked ? Icons.lock_outline : item.icon,
+            color: isLocked ? Colors.white60 : Colors.white,
+            size: 22
+        ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                item.title,
+                style: TextStyle(
+                    color: isLocked ? Colors.white60 : Colors.white,
+                    fontSize: 14,
+                    height: 1.3),
+                maxLines: 2,
+                overflow: TextOverflow.visible,
+              ),
+            ),
+            if (isLocked) ...[
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: Text(
+                  item.minRole == 2 ? 'PRO' : 'ENT',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              )
+            ]
+          ],
+        ),
+        trailing: Icon(
+          isLocked ? Icons.lock_outline : Icons.keyboard_arrow_down,
+          color: isLocked ? Colors.white60 : Colors.white,
+          size: isLocked ? 18 : 24,
+        ),
+        onExpansionChanged: isLocked
+            ? (_) {
+          _showSubscriptionLock();
+        }
+            : null,
+        children: isLocked
+            ? []
+            : item.children.map((child) {
+          final newPadding = EdgeInsets.only(
+            left: (widget.padding as EdgeInsets).left + 20.0,
+            right: (widget.padding as EdgeInsets).right,
+          );
+
+          return NavListTile(
+            isCollapsed: widget.isCollapsed,
+            item: child,
+            padding: newPadding,
+            selectedItem: widget.selectedItem,
+            onTap: widget.onTap,
+            userRole: widget.userRole,
+            userId: widget.userId,
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class SideNavBar extends StatefulWidget {
+  final bool isCollapsed;
+  final Map<String, dynamic>? userData;
+  final bool isLoading;
+  final Function(String) onNavigate;
+  final VoidCallback onRefreshUserData;
+
+  const SideNavBar({
+    super.key,
+    required this.isCollapsed,
+    this.userData,
+    required this.isLoading,
+    required this.onNavigate,
+    required this.onRefreshUserData,
+  });
+
+  @override
+  State<SideNavBar> createState() => _SideNavBarState();
+}
+
+class _SideNavBarState extends State<SideNavBar> {
+  final GlobalKey _outletHeaderKey = GlobalKey();
+  String _selectedItem = 'Dashboard';
+
+  final List<NavItem> _navItems = [
+    NavItem(title: 'Dashboard', icon: Icons.dashboard_rounded, minRole: 1),
+    NavItem(
+      title: 'Laporan',
+      icon: Icons.bar_chart_rounded,
+      minRole: 1,
+      children: [
+        NavItem(
+            title: 'Laporan Penjualan',
+            icon: Icons.point_of_sale,
+            minRole: 1,
+            children: [
+              NavItem(
+                  title: 'Ringkasan Penjualan',
+                  icon: Icons.summarize_rounded,
+                  minRole: 1),
+              NavItem(
+                  title: 'Detail Penjualan',
+                  icon: Icons.receipt_long_rounded,
+                  minRole: 1),
+              NavItem(
+                  title: 'Penjualan Per Periode',
+                  icon: Icons.date_range_outlined,
+                  minRole: 1),
+            ]),
+        NavItem(
+            title: 'Laporan Pembelian',
+            icon: Icons.shopping_bag,
+            minRole: 2,
+            children: [
+              NavItem(
+                  title: 'Ringkasan Pembelian',
+                  icon: Icons.assessment_outlined,
+                  minRole: 2),
+              NavItem(
+                  title: 'Detail Pembelian',
+                  icon: Icons.description_outlined,
+                  minRole: 2)
+            ]),
+        NavItem(
+            title: 'Laporan Produk',
+            icon: Icons.inventory_2_rounded,
+            minRole: 2,
+            children: [
+              NavItem(
+                  title: 'Penjualan Produk',
+                  icon: Icons.sell_rounded,
+                  minRole: 2),
+              NavItem(
+                  title: 'Penjualan Kategori',
+                  icon: Icons.category_rounded,
+                  minRole: 2)
+            ]),
+        NavItem(
+            title: 'Laporan Pelanggan',
+            icon: Icons.people_alt_rounded,
+            minRole: 2),
+        NavItem(
+            title: 'Laporan Karyawan',
+            icon: Icons.people_alt_rounded,
+            minRole: 2),
+        NavItem(
+            title: 'Laporan Keuangan',
+            icon: Icons.balance,
+            minRole: 3,
+            children: [
+              NavItem(title: 'Laporan Neraca', icon: Icons.balance, minRole: 3)
+            ])
+      ],
+    ),
+    NavItem(
+        title: 'Pengeluaran',
+        icon: Icons.money_off_rounded,
+        minRole: 3,
+        children: [
+          NavItem(
+              title: 'Daftar Pengeluaran',
+              icon: Icons.receipt_long_rounded,
+              minRole: 3)
+        ]),
+    NavItem(
+      title: 'Produk',
+      icon: Icons.inventory_2_rounded,
+      minRole: 1,
+      children: [
+        NavItem(title: 'Daftar Produk', icon: Icons.list_alt, minRole: 1),
+        NavItem(title: 'Daftar Kategori', icon: Icons.category, minRole: 1),
+      ],
+    ),
+    NavItem(
+        title: 'Inventori',
+        icon: Icons.inventory_2_rounded,
+        minRole: 2,
+        children: [
+          NavItem(
+              title: 'Daftar Bahan Baku',
+              icon: Icons.inventory_2_rounded,
+              minRole: 2)
+        ]),
+    NavItem(
+        title: 'Pelanggan',
+        icon: Icons.people_alt_rounded,
+        minRole: 2,
+        children: [
+          NavItem(title: 'Daftar Pelanggan', icon: Icons.people, minRole: 2)
+        ]),
+    NavItem(
+        title: 'Kupon',
+        icon: Icons.sell_rounded,
+        minRole: 3,
+        children: [
+          NavItem(
+              title: 'Daftar Kupon',
+              icon: Icons.local_offer_rounded,
+              minRole: 3),
+        ]),
+    NavItem(
+        title: 'Outlet',
+        icon: Icons.storefront_rounded,
+        minRole: 3,
+        children: [
+          NavItem(title: 'Daftar Outlet', icon: Icons.store, minRole: 3)
+        ]),
+    NavItem(
+        title: 'Karyawan',
+        icon: Icons.person_outline,
+        minRole: 2,
+        children: [
+          NavItem(
+              title: 'Daftar Karyawan',
+              icon: Icons.person_outline,
+              minRole: 2),
+          NavItem(title: 'Daftar Absensi', icon: Icons.how_to_reg, minRole: 2),
+          NavItem(
+              title: 'Manajemen Gaji',
+              icon: Icons.monetization_on,
+              minRole: 3)
+        ]),
+  ];
+
+  void _showOutletMenu(BuildContext context) {
+    final RenderBox renderBox =
+    _outletHeaderKey.currentContext!.findRenderObject() as RenderBox;
+    final size = renderBox.size;
+    final offset = renderBox.localToGlobal(Offset.zero);
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.transparent,
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (context, anim1, anim2) {
+        return Stack(
+          children: [
+            Positioned(
+              top: offset.dy + size.height + 5,
+              left: offset.dx,
+              child: FadeTransition(
+                opacity: anim1,
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: OutletSelectionDialog(
+                    userData: widget.userData,
+                    onRefreshUserData: widget.onRefreshUserData,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final int userRole =
+    (widget.userData != null && widget.userData!['role'] != null)
+        ? (widget.userData!['role'] is int
+        ? widget.userData!['role']
+        : int.tryParse(widget.userData!['role'].toString()) ?? 1)
+        : 1;
+
+    final String userId =
+        widget.userData?['uid'] ?? FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOutCubic,
+      width: widget.isCollapsed ? 80 : 250,
+      color: const Color(0xFF279E9E),
+      child: Column(
+        children: [
+          _buildOutletHeader(),
+          const Divider(color: Colors.white24, height: 1),
+          const SizedBox(height: 10),
+          Expanded(
+            child: ListView.builder(
+              padding: EdgeInsets.zero,
+              itemCount: _navItems.length,
+              itemBuilder: (context, index) {
+                final item = _navItems[index];
+
+                return NavListTile(
+                  isCollapsed: widget.isCollapsed,
+                  item: item,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  selectedItem: _selectedItem,
+                  onTap: (String title) {
+                    setState(() {
+                      _selectedItem = title;
+                    });
+                    widget.onNavigate(title);
+                  },
+                  userRole: userRole,
+                  userId: userId,
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOutletHeader() {
+    final String businessName =
+        widget.userData?['businessName'] ?? 'Bisnis Anda';
+
+    return InkWell(
+      key: _outletHeaderKey,
+      onTap: () {
+        if (!widget.isCollapsed) {
+          _showOutletMenu(context);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        height: 64,
+        child: widget.isCollapsed
+            ? const Center(
+            child: Icon(Icons.storefront, color: Colors.white, size: 28))
+            : Row(
+          children: [
+            const SizedBox(width: 24),
+            const Icon(Icons.storefront, color: Colors.white, size: 28),
+            const SizedBox(width: 16),
+            Expanded(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Outlet',
+                        style: TextStyle(
+                            color: Colors.white70, fontSize: 14)),
+                    Text(
+                      widget.isLoading ? 'Loading...' : businessName,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const Icon(Icons.keyboard_arrow_down, color: Colors.white),
+            const SizedBox(width: 24),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class TopAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onMenuPressed;
   final bool isDesktop;
@@ -183,9 +721,7 @@ class TopAppBar extends StatelessWidget implements PreferredSizeWidget {
                 opacity: anim1,
                 child: Material(
                   type: MaterialType.transparency,
-                  child: NotificationsDialog(
-                    userData: userData,
-                  ),
+                  child: NotificationsDialog(userData: userData),
                 ),
               ),
             ),
@@ -262,10 +798,9 @@ class TopAppBar extends StatelessWidget implements PreferredSizeWidget {
         title: const Text(
           'Kashierku',
           style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF279E9E),
-          ),
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF279E9E)),
         ),
         iconTheme: const IconThemeData(color: Color(0xFF279E9E)),
         backgroundColor: Colors.white,
@@ -294,11 +829,7 @@ class TopAppBar extends StatelessWidget implements PreferredSizeWidget {
 
 class NotificationsDialog extends StatefulWidget {
   final Map<String, dynamic>? userData;
-
-  const NotificationsDialog({
-    super.key,
-    required this.userData,
-  });
+  const NotificationsDialog({super.key, required this.userData});
 
   @override
   State<NotificationsDialog> createState() => _NotificationsDialogState();
@@ -325,14 +856,14 @@ class _NotificationsDialogState extends State<NotificationsDialog> {
         setState(() => _isLoading = false);
         return;
       }
-
-      final notifications = await _apiService.getNotifications(outletId: outletId);
+      final notifications =
+      await _apiService.getNotifications(outletId: outletId);
       setState(() {
         _notifications = notifications;
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading notifications: $e');
+      debugPrint('Error loading notifications: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -342,15 +873,10 @@ class _NotificationsDialogState extends State<NotificationsDialog> {
     final notificationTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
     final difference = now.difference(notificationTime);
 
-    if (difference.inDays > 0) {
-      return '${difference.inDays} hari lalu';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours} jam lalu';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes} menit lalu';
-    } else {
-      return 'Baru saja';
-    }
+    if (difference.inDays > 0) return '${difference.inDays} hari lalu';
+    if (difference.inHours > 0) return '${difference.inHours} jam lalu';
+    if (difference.inMinutes > 0) return '${difference.inMinutes} menit lalu';
+    return 'Baru saja';
   }
 
   IconData _getNotificationIcon(String type) {
@@ -383,18 +909,16 @@ class _NotificationsDialogState extends State<NotificationsDialog> {
   Widget build(BuildContext context) {
     return Container(
       width: 400,
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.6,
-      ),
+      constraints:
+      BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.6),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            spreadRadius: 5,
-          ),
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 20,
+              spreadRadius: 5)
         ],
       ),
       child: Column(
@@ -406,27 +930,15 @@ class _NotificationsDialogState extends State<NotificationsDialog> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Notifikasi',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
+                const Text('Notifikasi',
+                    style:
+                    TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                 if (_notifications.isNotEmpty)
                   TextButton(
-                    onPressed: () {
-                      setState(() {
-                        _notifications.clear();
-                      });
-                    },
-                    child: const Text(
-                      'Hapus Semua',
-                      style: TextStyle(
-                        color: Color(0xFF279E9E),
-                        fontSize: 14,
-                      ),
-                    ),
+                    onPressed: () => setState(() => _notifications.clear()),
+                    child: const Text('Hapus Semua',
+                        style:
+                        TextStyle(color: Color(0xFF279E9E), fontSize: 14)),
                   ),
               ],
             ),
@@ -435,13 +947,10 @@ class _NotificationsDialogState extends State<NotificationsDialog> {
           Flexible(
             child: _isLoading
                 ? const Center(
-              child: Padding(
-                padding: EdgeInsets.all(32.0),
-                child: CircularProgressIndicator(
-                  color: Color(0xFF279E9E),
-                ),
-              ),
-            )
+                child: Padding(
+                    padding: EdgeInsets.all(32.0),
+                    child: CircularProgressIndicator(
+                        color: Color(0xFF279E9E))))
                 : _notifications.isEmpty
                 ? const Center(
               child: Padding(
@@ -449,19 +958,12 @@ class _NotificationsDialogState extends State<NotificationsDialog> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.notifications_off_outlined,
-                      size: 64,
-                      color: Colors.grey,
-                    ),
+                    Icon(Icons.notifications_off_outlined,
+                        size: 64, color: Colors.grey),
                     SizedBox(height: 16),
-                    Text(
-                      'Tidak ada notifikasi',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 16,
-                      ),
-                    ),
+                    Text('Tidak ada notifikasi',
+                        style: TextStyle(
+                            color: Colors.grey, fontSize: 16)),
                   ],
                 ),
               ),
@@ -469,7 +971,8 @@ class _NotificationsDialogState extends State<NotificationsDialog> {
                 : ListView.separated(
               shrinkWrap: true,
               itemCount: _notifications.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
+              separatorBuilder: (context, index) =>
+              const Divider(height: 1),
               itemBuilder: (context, index) {
                 final notification = _notifications[index];
                 final type = notification['type'] as String;
@@ -481,35 +984,28 @@ class _NotificationsDialogState extends State<NotificationsDialog> {
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: _getNotificationColor(type).withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      _getNotificationIcon(type),
-                      color: _getNotificationColor(type),
-                      size: 24,
-                    ),
+                        color: _getNotificationColor(type)
+                            .withValues(alpha: 0.1),
+                        shape: BoxShape.circle),
+                    child: Icon(_getNotificationIcon(type),
+                        color: _getNotificationColor(type), size: 24),
                   ),
-                  title: Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
+                  title: Text(title,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 14)),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 4),
-                      Text(
-                        message,
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                      if (type == 'transaction_success' || type == 'transaction_failed')
+                      Text(message,
+                          style: const TextStyle(fontSize: 13)),
+                      if (type == 'transaction_success' ||
+                          type == 'transaction_failed')
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
-                            _currencyFormat.format(notification['amount']),
+                            _currencyFormat
+                                .format(notification['amount']),
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
@@ -520,19 +1016,13 @@ class _NotificationsDialogState extends State<NotificationsDialog> {
                           ),
                         ),
                       const SizedBox(height: 4),
-                      Text(
-                        _getTimeAgo(timestamp),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
+                      Text(_getTimeAgo(timestamp),
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey[600])),
                     ],
                   ),
                   contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
+                      horizontal: 16, vertical: 8),
                 );
               },
             ),
@@ -560,23 +1050,19 @@ class UserProfile extends StatelessWidget {
         isLoading
             ? const CircleAvatar(backgroundColor: Color(0xFF279E9E))
             : CircleAvatar(
-          backgroundColor: const Color(0xFF279E9E),
-          child: Text(userInitials,
-              style: const TextStyle(color: Colors.white)),
-        ),
+            backgroundColor: const Color(0xFF279E9E),
+            child: Text(userInitials,
+                style: const TextStyle(color: Colors.white))),
         const SizedBox(width: 12),
         Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              isLoading ? 'Loading...' : userName,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-            ),
-            Text(
-              'Owner',
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
-            ),
+            Text(isLoading ? 'Loading...' : userName,
+                style:
+                const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            Text('Owner',
+                style: TextStyle(color: Colors.grey[600], fontSize: 12)),
           ],
         )
       ],
@@ -610,10 +1096,9 @@ class ProfileMenuDialog extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            spreadRadius: 5,
-          ),
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 20,
+              spreadRadius: 5)
         ],
       ),
       child: Column(
@@ -624,26 +1109,22 @@ class ProfileMenuDialog extends StatelessWidget {
             child: Row(
               children: [
                 const CircleAvatar(
-                  backgroundColor: Color(0xFF279E9E),
-                  child: Icon(Icons.storefront, color: Colors.white, size: 20),
-                ),
+                    backgroundColor: Color(0xFF279E9E),
+                    child:
+                    Icon(Icons.storefront, color: Colors.white, size: 20)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        isLoading ? 'Loading...' : businessName,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        isLoading ? '...' : userName,
-                        style:
-                        TextStyle(color: Colors.grey[600], fontSize: 14),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      Text(isLoading ? 'Loading...' : businessName,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16),
+                          overflow: TextOverflow.ellipsis),
+                      Text(isLoading ? '...' : userName,
+                          style:
+                          TextStyle(color: Colors.grey[600], fontSize: 14),
+                          overflow: TextOverflow.ellipsis),
                     ],
                   ),
                 ),
@@ -682,7 +1163,6 @@ class ProfileMenuDialog extends StatelessWidget {
 class _ProfileMenuItem extends StatefulWidget {
   final String text;
   final VoidCallback onTap;
-
   const _ProfileMenuItem({required this.text, required this.onTap});
 
   @override
@@ -701,404 +1181,12 @@ class _ProfileMenuItemState extends State<_ProfileMenuItem> {
         onTap: widget.onTap,
         child: Container(
           color: _isHovering
-              ? const Color(0xFF279E9E).withOpacity(0.1)
+              ? const Color(0xFF279E9E).withValues(alpha: 0.1)
               : Colors.transparent,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Text(
-                widget.text,
-                style: const TextStyle(fontSize: 15),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class NavItem {
-  final String title;
-  final IconData icon;
-  final List<NavItem> children;
-
-  NavItem({required this.title, required this.icon, this.children = const []});
-}
-
-class NavListTile extends StatefulWidget {
-  final bool isCollapsed;
-  final NavItem item;
-  final EdgeInsetsGeometry padding;
-  final String selectedItem;
-  final Function(String) onTap;
-
-  const NavListTile({
-    super.key,
-    required this.isCollapsed,
-    required this.item,
-    required this.padding,
-    required this.selectedItem,
-    required this.onTap,
-  });
-
-  @override
-  State<NavListTile> createState() => _NavListTileState();
-}
-
-class _NavListTileState extends State<NavListTile> {
-  bool _isHovering = false;
-
-  bool _isChildSelected(NavItem item, String selectedItem) {
-    if (item.children.isEmpty) return false;
-    bool containsSelected = false;
-    for (var child in item.children) {
-      if (child.title == selectedItem) {
-        containsSelected = true;
-        break;
-      }
-      if (child.children.isNotEmpty) {
-        containsSelected = _isChildSelected(child, selectedItem);
-        if (containsSelected) break;
-      }
-    }
-    return containsSelected;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final item = widget.item;
-
-    final bool isSelected = widget.selectedItem == item.title;
-
-    final bool isChildSelected = _isChildSelected(item, widget.selectedItem);
-
-    if (widget.isCollapsed) {
-      return Tooltip(
-        message: item.title,
-        child: InkWell(
-          onTap: () {
-            widget.onTap(item.title);
-          },
-          child: Container(
-            decoration: BoxDecoration(
-              color: _isHovering
-                  ? Colors.white.withOpacity(0.1)
-                  : Colors.transparent,
-              border: Border(
-                right: BorderSide(
-                  color: isSelected
-                      ? const Color(0xFFFFC107)
-                      : Colors.transparent,
-                  width: 4.0,
-                ),
-              ),
-            ),
-            height: 48.0,
-            child: Center(
-              child: Icon(item.icon, color: Colors.white, size: 22),
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (item.children.isEmpty) {
-      return MouseRegion(
-          onEnter: (_) => setState(() => _isHovering = true),
-          onExit: (_) => setState(() => _isHovering = false),
-          child: Container(
-          decoration: BoxDecoration(
-          color: _isHovering
-          ? Colors.white.withOpacity(0.1)
-        : Colors.transparent,
-    border: Border(
-    right: BorderSide(
-    color: isSelected
-    ? const Color(0xFFFFC107)
-        : Colors.transparent,
-    width: 4.0,
-    ),
-    ),
-    ),
-    child: ListTile(
-    contentPadding: widget.padding,
-    leading: Icon(item.icon, color: Colors.white, size: 22),
-    title: Text(item.title,
-    style: const TextStyle(color: Colors.white, fontSize: 15)),
-    onTap: () => widget.onTap(item.title),
-    ),
-          ),
-      );
-    }
-
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        key: PageStorageKey(item.title),
-        initiallyExpanded: isChildSelected,
-        tilePadding: widget.padding,
-        leading: Icon(item.icon, color: Colors.white, size: 22),
-        title: Text(item.title,
-            style: const TextStyle(color: Colors.white, fontSize: 15)),
-        trailing: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
-        children: item.children.map((child) {
-          final newPadding = EdgeInsets.only(
-            left: (widget.padding as EdgeInsets).left + 24.0,
-            right: (widget.padding as EdgeInsets).right,
-          );
-
-          return NavListTile(
-            isCollapsed: widget.isCollapsed,
-            item: child,
-            padding: newPadding,
-            selectedItem: widget.selectedItem,
-            onTap: widget.onTap,
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-class SideNavBar extends StatefulWidget {
-  final bool isCollapsed;
-  final Map<String, dynamic>? userData;
-  final bool isLoading;
-  final Function(String) onNavigate;
-  final VoidCallback onRefreshUserData;
-
-  const SideNavBar({
-    super.key,
-    required this.isCollapsed,
-    this.userData,
-    required this.isLoading,
-    required this.onNavigate,
-    required this.onRefreshUserData,
-  });
-
-  @override
-  State<SideNavBar> createState() => _SideNavBarState();
-}
-
-class _SideNavBarState extends State<SideNavBar> {
-  final GlobalKey _outletHeaderKey = GlobalKey();
-  String _selectedItem = 'Dashboard';
-
-  final List<NavItem> _navItems = [
-    NavItem(title: 'Dashboard', icon: Icons.dashboard_rounded),
-    NavItem(
-      title: 'Laporan',
-      icon: Icons.bar_chart_rounded,
-      children: [
-        NavItem(
-            title: 'Laporan Penjualan',
-            icon: Icons.point_of_sale,
-            children: [
-              NavItem(
-                  title: 'Ringkasan Penjualan', icon: Icons.summarize_rounded),
-              NavItem(
-                  title: 'Detail Penjualan', icon: Icons.receipt_long_rounded),
-              NavItem(
-                  title: 'Penjualan Per Periode',
-                  icon: Icons.date_range_outlined),
-            ]),
-        NavItem(
-            title: 'Laporan Pembelian',
-            icon: Icons.shopping_bag,
-            children: [
-              NavItem(
-                  title: 'Ringkasan Pembelian',
-                  icon: Icons.assessment_outlined),
-              NavItem(
-                  title: 'Detail Pembelian', icon: Icons.description_outlined)
-            ]),
-        NavItem(
-            title: 'Laporan Produk',
-            icon: Icons.inventory_2_rounded,
-            children: [
-              NavItem(title: 'Penjualan Produk', icon: Icons.sell_rounded),
-              NavItem(
-                  title: 'Penjualan Kategori', icon: Icons.category_rounded)
-            ]),
-        NavItem(
-            title: 'Laporan Pelanggan',
-            icon: Icons.people_alt_rounded,
-            children: [
-              NavItem(title: 'Laporan Pelanggan', icon: Icons.analytics_rounded)
-            ]),
-        NavItem(
-            title: 'Laporan Karyawan',
-            icon: Icons.people_alt_rounded,),
-        NavItem(
-            title: 'Laporan Keuangan',
-            icon: Icons.balance,
-            children: [
-              NavItem(title: 'Laporan Neraca', icon: Icons.balance)
-            ])
-      ],
-    ),
-    NavItem(
-        title: 'Pengeluaran',
-        icon: Icons.money_off_rounded,
-        children: [
-          NavItem(title: 'Daftar Pengeluaran', icon: Icons.receipt_long_rounded)
-        ]
-    ),
-    NavItem(
-      title: 'Produk',
-      icon: Icons.inventory_2_rounded,
-      children: [
-        NavItem(title: 'Daftar Produk', icon: Icons.list_alt),
-        NavItem(title: 'Daftar Kategori', icon: Icons.category),
-      ],
-    ),
-    NavItem(
-        title: 'Inventori',
-        icon: Icons.inventory_2_rounded,
-        children: [
-          NavItem(title: 'Daftar Stok', icon: Icons.inventory_2_rounded)
-        ]),
-    NavItem(
-        title: 'Pelanggan',
-        icon: Icons.people_alt_rounded,
-        children: [NavItem(title: 'Daftar Pelanggan', icon: Icons.people)]),
-    NavItem(title: 'Kupon', icon: Icons.sell_rounded, children: [
-      NavItem(title: 'Daftar Kupon', icon: Icons.local_offer_rounded),
-    ]),
-    NavItem(title: 'Outlet', icon: Icons.storefront_rounded, children: [
-      NavItem(title: 'Daftar Outlet', icon: Icons.store)
-    ]),
-    NavItem(title: 'Karyawan', icon: Icons.person_outline, children: [
-      NavItem(title: 'Daftar Karyawan', icon: Icons.person_outline),
-      NavItem(title: 'Daftar Absensi', icon: Icons.how_to_reg),
-      NavItem(title: 'Manajemen Gaji', icon: Icons.monetization_on)
-    ])
-  ];
-
-  void _showOutletMenu(BuildContext context) {
-    final RenderBox renderBox =
-    _outletHeaderKey.currentContext!.findRenderObject() as RenderBox;
-    final size = renderBox.size;
-    final offset = renderBox.localToGlobal(Offset.zero);
-
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: '',
-      barrierColor: Colors.transparent,
-      transitionDuration: const Duration(milliseconds: 200),
-      pageBuilder: (context, anim1, anim2) {
-        return Stack(
-          children: [
-            Positioned(
-              top: offset.dy + size.height + 5,
-              left: offset.dx,
-              child: FadeTransition(
-                opacity: anim1,
-                child: Material(
-                  type: MaterialType.transparency,
-                  child: OutletSelectionDialog(
-                    userData: widget.userData,
-                    onRefreshUserData: widget.onRefreshUserData,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOutCubic,
-      width: widget.isCollapsed ? 80 : 250,
-      color: const Color(0xFF279E9E),
-      child: Column(
-        children: [
-          _buildOutletHeader(),
-          const Divider(color: Colors.white24, height: 1),
-          const SizedBox(height: 10),
-          Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.zero,
-              itemCount: _navItems.length,
-              itemBuilder: (context, index) {
-                final item = _navItems[index];
-
-                return NavListTile(
-                  isCollapsed: widget.isCollapsed,
-                  item: item,
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  selectedItem: _selectedItem,
-                  onTap: (String title) {
-                    setState(() {
-                      _selectedItem = title;
-                    });
-                    widget.onNavigate(title);
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOutletHeader() {
-    final String businessName =
-        widget.userData?['businessName'] ?? 'Bisnis Anda';
-
-    return InkWell(
-      key: _outletHeaderKey,
-      onTap: () {
-        if (!widget.isCollapsed) {
-          _showOutletMenu(context);
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        height: 64,
-        child: widget.isCollapsed
-            ? const Center(
-            child: Icon(Icons.storefront, color: Colors.white, size: 28))
-            : Row(
-          children: [
-            const SizedBox(width: 24),
-            const Icon(Icons.storefront, color: Colors.white, size: 28),
-            const SizedBox(width: 16),
-            Expanded(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text('Outlet',
-                        style: TextStyle(
-                            color: Colors.white70, fontSize: 14)),
-                    Text(
-                      widget.isLoading ? 'Loading...' : businessName,
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const Icon(Icons.keyboard_arrow_down, color: Colors.white),
-            const SizedBox(width: 24),
-          ],
+          child: Row(children: [
+            Text(widget.text, style: const TextStyle(fontSize: 15))
+          ]),
         ),
       ),
     );
@@ -1109,11 +1197,8 @@ class OutletSelectionDialog extends StatefulWidget {
   final Map<String, dynamic>? userData;
   final VoidCallback onRefreshUserData;
 
-  const OutletSelectionDialog({
-    super.key,
-    this.userData,
-    required this.onRefreshUserData,
-  });
+  const OutletSelectionDialog(
+      {super.key, this.userData, required this.onRefreshUserData});
 
   @override
   State<OutletSelectionDialog> createState() => _OutletSelectionDialogState();
@@ -1133,9 +1218,7 @@ class _OutletSelectionDialogState extends State<OutletSelectionDialog> {
 
   Future<void> _fetchUserOutlets() async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -1176,10 +1259,9 @@ class _OutletSelectionDialogState extends State<OutletSelectionDialog> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            spreadRadius: 5,
-          ),
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 20,
+              spreadRadius: 5)
         ],
       ),
       child: Padding(
@@ -1188,13 +1270,11 @@ class _OutletSelectionDialogState extends State<OutletSelectionDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Daftar Outlet',
-              style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Colors.black),
-            ),
+            const Text('Daftar Outlet',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Colors.black)),
             const SizedBox(height: 12),
             TextField(
               decoration: InputDecoration(
@@ -1205,43 +1285,33 @@ class _OutletSelectionDialogState extends State<OutletSelectionDialog> {
                 fillColor: Colors.grey[100],
                 contentPadding: const EdgeInsets.all(10),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none),
               ),
             ),
             const SizedBox(height: 8),
             if (_isLoading)
               const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: CircularProgressIndicator(),
-                ),
-              )
+                  child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator()))
             else if (_outlets.isEmpty)
               const Padding(
-                padding:
-                EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+                padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
                 child: Center(
-                  child: Text(
-                    'Anda belum memiliki outlet.',
-                    textAlign: TextAlign.center,
-                  ),
-                ),
+                    child: Text('Anda belum memiliki outlet.',
+                        textAlign: TextAlign.center)),
               )
             else
               ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.4,
-                ),
+                    maxHeight: MediaQuery.of(context).size.height * 0.4),
                 child: ListView.builder(
                   shrinkWrap: true,
                   itemCount: _outlets.length,
                   itemBuilder: (context, index) {
                     final outletDoc = _outlets[index];
-                    final outletData =
-                    outletDoc.data() as Map<String, dynamic>;
-
+                    final outletData = outletDoc.data() as Map<String, dynamic>;
                     final outletName =
                         outletData['name'] ?? 'Outlet Tanpa Nama';
                     final outletId = outletDoc.id;
@@ -1253,13 +1323,12 @@ class _OutletSelectionDialogState extends State<OutletSelectionDialog> {
                       onChanged: (value) async {
                         if (value == null || value == _selectedOutletId) return;
 
-                        setState(() {
-                          _selectedOutletId = value;
-                        });
+                        setState(() => _selectedOutletId = value);
 
                         try {
                           final user = FirebaseAuth.instance.currentUser;
-                          if (user == null) throw Exception("No user logged in");
+                          if (user == null)
+                            throw Exception("No user logged in");
 
                           final outletDoc =
                           _outlets.firstWhere((doc) => doc.id == value);
@@ -1277,10 +1346,7 @@ class _OutletSelectionDialogState extends State<OutletSelectionDialog> {
                           });
 
                           widget.onRefreshUserData();
-
-                          if (mounted) {
-                            Navigator.of(context).pop();
-                          }
+                          if (mounted) Navigator.of(context).pop();
                         } catch (e) {
                           debugPrint("Error switching outlet: $e");
                         }

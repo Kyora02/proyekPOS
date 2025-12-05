@@ -1477,6 +1477,7 @@ class ApiService {
       rethrow;
     }
   }
+  
   Future<Map<String, dynamic>> getPurchaseSummary({
     required String outletId,
     required DateTime startDate,
@@ -1738,6 +1739,85 @@ class ApiService {
         return jsonDecode(response.body);
       } else {
         throw Exception('Gagal memuat ringkasan pengeluaran: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> createSubscription({
+    required String userId,
+    required String subscriptionType,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+
+      final response = await http.post(
+        Uri.parse('$_baseUrl/subscription/create'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'userId': userId,
+          'planType': subscriptionType,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to create subscription: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> checkSubscriptionStatus({
+    required String orderId,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      final url = Uri.parse('$_baseUrl/subscription/check-status/$orderId');
+
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Gagal cek status: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> getSubscriptionStatus({
+    required String userId,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      final url = Uri.parse('$_baseUrl/subscription/status/$userId');
+
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Gagal memuat status subscription: ${response.body}');
       }
     } catch (e) {
       rethrow;

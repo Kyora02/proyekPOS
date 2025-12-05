@@ -39,8 +39,8 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
 
   int _currentPage = 1;
   int _itemsPerPage = 10;
-  int? _sortColumnIndex;
-  bool _isAscending = true;
+  int? _sortColumnIndex = 1;
+  bool _isAscending = false;
 
   final NumberFormat _currencyFormatter =
   NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
@@ -73,6 +73,12 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
         startDate: start,
         endDate: end,
       );
+
+      data.sort((a, b) {
+        final DateTime dateA = a['timestamp'] ?? DateTime(0);
+        final DateTime dateB = b['timestamp'] ?? DateTime(0);
+        return dateB.compareTo(dateA);
+      });
 
       setState(() {
         _allData = data;
@@ -385,22 +391,26 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
     final formattedStartDate = DateFormat('dd MMM yyyy').format(_startDate);
     final formattedEndDate = DateFormat('dd MMM yyyy').format(_endDate);
 
-    final datePicker = OutlinedButton.icon(
-      onPressed: () => _selectDateRange(context),
-      icon: const Icon(Icons.calendar_today_outlined,
-          size: 18, color: Color(0xFF279E9E)),
-      label: Text('$formattedStartDate - $formattedEndDate'),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: Colors.grey[800],
-        backgroundColor: Colors.white,
-        side: BorderSide(color: Colors.grey[300]!),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    final datePicker = SizedBox(
+      height: 48,
+      child: OutlinedButton.icon(
+        onPressed: () => _selectDateRange(context),
+        icon: const Icon(Icons.calendar_today_outlined,
+            size: 18, color: Color(0xFF279E9E)),
+        label: Text('$formattedStartDate - $formattedEndDate'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.grey[800],
+          backgroundColor: Colors.white,
+          side: BorderSide(color: Colors.grey[300]!),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+        ),
       ),
     );
 
     final searchField = SizedBox(
       width: 280,
+      height: 48,
       child: TextField(
         controller: _searchController,
         onChanged: (value) => _filterData(),

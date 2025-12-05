@@ -392,22 +392,26 @@ class _DetailPembelianPageState extends State<DetailPembelianPage> {
     final formattedStartDate = DateFormat('dd MMM yyyy').format(_startDate);
     final formattedEndDate = DateFormat('dd MMM yyyy').format(_endDate);
 
-    final datePicker = OutlinedButton.icon(
-      onPressed: () => _selectDateRange(context),
-      icon: const Icon(Icons.calendar_today_outlined,
-          size: 18, color: Color(0xFF279E9E)),
-      label: Text('$formattedStartDate - $formattedEndDate'),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: Colors.grey[800],
-        backgroundColor: Colors.white,
-        side: BorderSide(color: Colors.grey[300]!),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    final datePicker = SizedBox(
+      height: 48,
+      child: OutlinedButton.icon(
+        onPressed: () => _selectDateRange(context),
+        icon: const Icon(Icons.calendar_today_outlined,
+            size: 18, color: Color(0xFF279E9E)),
+        label: Text('$formattedStartDate - $formattedEndDate'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.grey[800],
+          backgroundColor: Colors.white,
+          side: BorderSide(color: Colors.grey[300]!),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+        ),
       ),
     );
 
     final searchField = SizedBox(
       width: 280,
+      height: 48,
       child: TextField(
         controller: _searchController,
         onChanged: (value) => _filterData(),

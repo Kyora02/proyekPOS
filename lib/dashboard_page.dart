@@ -257,7 +257,7 @@ class _DashboardHostState extends State<DashboardHost> {
               ? DaftarKaryawanPage(outletId: activeOutletId)
               : noOutletSelected;
           break;
-        case 'Daftar Stok':
+        case 'Daftar Bahan Baku':
           _currentPage = (activeOutletId != null)
               ? DaftarStokPage(outletId: activeOutletId)
               : noOutletSelected;

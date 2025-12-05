@@ -511,7 +511,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
                   onSort: _onSort,
                 ),
                 DataColumn(
-                  label: const Text('HARGA BELI'),
+                  label: const Text('HARGA MODAL'),
                   numeric: true,
                   onSort: _onSort,
                 ),
