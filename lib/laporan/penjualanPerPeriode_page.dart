@@ -731,7 +731,7 @@ class _LaporanPenjualanPerPeriodePageState extends State<LaporanPenjualanPerPeri
     return DataTable(
       sortColumnIndex: _sortColumnIndex,
       sortAscending: _isAscending,
-      columnSpacing: 35,
+      columnSpacing: 60,
       horizontalMargin: 24,
       headingRowHeight: 50,
       dataRowMaxHeight: 72,

@@ -120,6 +120,7 @@ class NavListTile extends StatefulWidget {
   final Function(String) onTap;
   final int userRole;
   final String userId;
+  final VoidCallback onRefreshUserData;
 
   const NavListTile({
     super.key,
@@ -130,6 +131,7 @@ class NavListTile extends StatefulWidget {
     required this.onTap,
     required this.userRole,
     required this.userId,
+    required this.onRefreshUserData,
   });
 
   @override
@@ -155,11 +157,24 @@ class _NavListTileState extends State<NavListTile> {
     return containsSelected;
   }
 
-  void _showSubscriptionLock() {
-    showDialog(
+  void _showSubscriptionLock() async {
+    final result = await showDialog<bool>(
       context: context,
-      builder: (context) => SubscriptionDialog(userId: widget.userId),
+      builder: (context) => SubscriptionDialog(
+        userId: widget.userId,
+        onSubscriptionSuccess: () {
+          widget.onRefreshUserData();
+        },
+      ),
     );
+
+    if (result == true && mounted) {
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      if (mounted) {
+        widget.onRefreshUserData();
+      }
+    }
   }
 
   @override
@@ -323,6 +338,7 @@ class _NavListTileState extends State<NavListTile> {
             onTap: widget.onTap,
             userRole: widget.userRole,
             userId: widget.userId,
+            onRefreshUserData: widget.onRefreshUserData,
           );
         }).toList(),
       ),
@@ -571,6 +587,7 @@ class _SideNavBarState extends State<SideNavBar> {
                   },
                   userRole: userRole,
                   userId: userId,
+                  onRefreshUserData: widget.onRefreshUserData,
                 );
               },
             ),

@@ -351,7 +351,7 @@ class _DaftarKategoriPageState extends State<DaftarKategoriPage> {
             controller: _horizontalScrollController,
             scrollDirection: Axis.horizontal,
             child: DataTable(
-              columnSpacing: 230.0,
+              columnSpacing: 150.0,
               sortColumnIndex: _sortColumnIndex,
               sortAscending: _sortAscending,
               headingTextStyle: _tableHeaderStyle(),
