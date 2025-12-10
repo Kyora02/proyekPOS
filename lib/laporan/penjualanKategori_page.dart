@@ -61,9 +61,12 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
   }
 
   Future<void> _fetchData() async {
+    if (!mounted) return;
+
     setState(() {
       _isLoading = true;
     });
+
     try {
       final start = DateTime(_startDate.year, _startDate.month, _startDate.day, 0, 0, 0);
       final end = DateTime(_endDate.year, _endDate.month, _endDate.day, 23, 59, 59);
@@ -73,6 +76,8 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
         startDate: start,
         endDate: end,
       );
+
+      if (!mounted) return;
 
       setState(() {
         _allData = data;
@@ -87,16 +92,19 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Gagal memuat data: $e')),
         );
+
+        setState(() {
+          _isLoading = false;
+          _allData = [];
+          _filteredData = [];
+        });
       }
-      setState(() {
-        _isLoading = false;
-        _allData = [];
-        _filteredData = [];
-      });
     }
   }
 
   void _filterData() {
+    if (!mounted) return;
+
     final query = _searchController.text.toLowerCase();
     List<Map<String, dynamic>> filtered = _allData.where((item) {
       final kategori = (item['kategori'] ?? '').toString().toLowerCase();
@@ -153,6 +161,8 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
   }
 
   void _onSort(int columnIndex, bool ascending) {
+    if (!mounted) return;
+
     setState(() {
       _sortColumnIndex = columnIndex;
       _isAscending = ascending;
@@ -210,6 +220,8 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
     );
 
     if (newEndDate == null) return;
+
+    if (!mounted) return;
 
     setState(() {
       _startDate = newStartDate;
@@ -651,12 +663,13 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
                         color: Colors.black87,
                       ),
                       onChanged: (int? newValue) {
+                        if (!mounted) return;
                         setState(() {
                           _itemsPerPage = newValue!;
                           _currentPage = 1;
                         });
                       },
-                      items: <int>[10, 20, 50, 100]
+                      items: <int>[10, 20, 50]
                           .map<DropdownMenuItem<int>>((int value) {
                         return DropdownMenuItem<int>(
                           value: value,
@@ -690,7 +703,10 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
                   color: _currentPage > 1 ? const Color(0xFF279E9E) : Colors.grey[400],
                 ),
                 onPressed: _currentPage > 1
-                    ? () => setState(() => _currentPage--)
+                    ? () {
+                  if (!mounted) return;
+                  setState(() => _currentPage--);
+                }
                     : null,
               ),
               Container(
@@ -715,7 +731,10 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
                   color: _currentPage < totalPages ? const Color(0xFF279E9E) : Colors.grey[400],
                 ),
                 onPressed: _currentPage < totalPages
-                    ? () => setState(() => _currentPage++)
+                    ? () {
+                  if (!mounted) return;
+                  setState(() => _currentPage++);
+                }
                     : null,
               ),
             ],
@@ -747,6 +766,7 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
                     dropdownColor: Colors.white,
                     value: _itemsPerPage,
                     onChanged: (int? newValue) {
+                      if (!mounted) return;
                       setState(() {
                         _itemsPerPage = newValue!;
                         _currentPage = 1;
@@ -776,7 +796,10 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
             IconButton(
               icon: const Icon(Icons.arrow_back_ios, size: 16),
               onPressed: _currentPage > 1
-                  ? () => setState(() => _currentPage--)
+                  ? () {
+                if (!mounted) return;
+                setState(() => _currentPage--);
+              }
                   : null,
             ),
             Container(
@@ -796,7 +819,10 @@ class _PenjualanKategoriPageState extends State<PenjualanKategoriPage> {
             IconButton(
               icon: const Icon(Icons.arrow_forward_ios, size: 16),
               onPressed: _currentPage < totalPages
-                  ? () => setState(() => _currentPage++)
+                  ? () {
+                if (!mounted) return;
+                setState(() => _currentPage++);
+              }
                   : null,
             ),
           ],

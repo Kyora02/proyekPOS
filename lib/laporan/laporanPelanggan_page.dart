@@ -725,7 +725,7 @@ class _LaporanPelangganPageState extends State<LaporanPelangganPage> {
                           _currentPage = 1;
                         });
                       },
-                      items: <int>[10, 20, 50, 100]
+                      items: <int>[10, 20, 50]
                           .map<DropdownMenuItem<int>>((int value) {
                         return DropdownMenuItem<int>(
                           value: value,

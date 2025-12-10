@@ -192,6 +192,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   value: selectedType,
+                  dropdownColor: Colors.white,
                   decoration: const InputDecoration(
                     labelText: 'Tipe',
                     border: OutlineInputBorder(),
@@ -209,6 +210,7 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   value: selectedCategory,
+                  dropdownColor: Colors.white,
                   decoration: const InputDecoration(
                     labelText: 'Kategori',
                     border: OutlineInputBorder(),
@@ -254,6 +256,29 @@ class _PengeluaranPageState extends State<PengeluaranPage> {
                       initialDate: selectedDate,
                       firstDate: DateTime(2020),
                       lastDate: DateTime.now().add(const Duration(days: 365)),
+                      builder: (context, child) {
+                        return Theme(
+                          data: Theme.of(context).copyWith(
+                            colorScheme: const ColorScheme.light(
+                              primary: Color(0xFF279E9E), // Your teal color
+                              onPrimary: Colors.white,
+                              onSurface: Colors.black,
+                            ),
+                            textButtonTheme: TextButtonThemeData(
+                              style: TextButton.styleFrom(
+                                foregroundColor: const Color(0xFF279E9E), // Button text color
+                              ),
+                            ),
+                            datePickerTheme: const DatePickerThemeData(
+                              backgroundColor: Colors.white,
+                              surfaceTintColor: Colors.transparent,
+                              headerBackgroundColor: Colors.white,
+                              headerForegroundColor: Colors.black,
+                            ),
+                          ),
+                          child: child!,
+                        );
+                      },
                     );
                     if (picked != null) {
                       setDialogState(() => selectedDate = picked);

@@ -348,7 +348,7 @@ class _LaporanKaryawanPageState extends State<LaporanKaryawanPage> {
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1400),
+              constraints: const BoxConstraints(maxWidth: 1200),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -708,7 +708,7 @@ class _LaporanKaryawanPageState extends State<LaporanKaryawanPage> {
                           _currentPage = 1;
                         });
                       },
-                      items: <int>[10, 20, 50, 100]
+                      items: <int>[10, 20, 50]
                           .map<DropdownMenuItem<int>>((int value) {
                         return DropdownMenuItem<int>(
                           value: value,

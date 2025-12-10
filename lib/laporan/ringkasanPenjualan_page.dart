@@ -66,148 +66,180 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Container(
-                width: 400,
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          isSelectingStart ? 'Pilih Tanggal Mulai' : 'Pilih Tanggal Akhir',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF333333),
+            return Theme(
+              data: Theme.of(context).copyWith(
+                colorScheme: const ColorScheme.light(
+                  primary: Color(0xFF279E9E),
+                  onPrimary: Colors.white,
+                  onSurface: Colors.black,
+                ),
+                textButtonTheme: TextButtonThemeData(
+                  style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF279E9E)),
+                ),
+              ),
+              child: Dialog(
+                backgroundColor: Colors.white,
+                surfaceTintColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                child: Container(
+                  width: 400,
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            isSelectingStart
+                                ? 'Pilih Tanggal Mulai'
+                                : 'Pilih Tanggal Akhir',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF333333),
+                            ),
                           ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close, size: 20),
-                          onPressed: () => Navigator.pop(context),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () {
-                              setDialogState(() {
-                                isSelectingStart = true;
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
-                                color: isSelectingStart ? const Color(0xFF279E9E) : Colors.grey[200],
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                DateFormat('dd MMM yyyy').format(tempStartDate),
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: isSelectingStart ? Colors.white : Colors.black87,
-                                  fontWeight: FontWeight.w600,
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 20),
+                            onPressed: () => Navigator.pop(context),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                setDialogState(() {
+                                  isSelectingStart = true;
+                                });
+                              },
+                              child: Container(
+                                padding:
+                                const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: isSelectingStart
+                                      ? const Color(0xFF279E9E)
+                                      : Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  DateFormat('dd MMM yyyy')
+                                      .format(tempStartDate),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: isSelectingStart
+                                        ? Colors.white
+                                        : Colors.black87,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 8),
-                          child: Icon(Icons.arrow_forward, size: 20),
-                        ),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () {
-                              setDialogState(() {
-                                isSelectingStart = false;
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
-                                color: !isSelectingStart ? const Color(0xFF279E9E) : Colors.grey[200],
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                DateFormat('dd MMM yyyy').format(tempEndDate),
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: !isSelectingStart ? Colors.white : Colors.black87,
-                                  fontWeight: FontWeight.w600,
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 8),
+                            child: Icon(Icons.arrow_forward, size: 20),
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                setDialogState(() {
+                                  isSelectingStart = false;
+                                });
+                              },
+                              child: Container(
+                                padding:
+                                const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: !isSelectingStart
+                                      ? const Color(0xFF279E9E)
+                                      : Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  DateFormat('dd MMM yyyy')
+                                      .format(tempEndDate),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: !isSelectingStart
+                                        ? Colors.white
+                                        : Colors.black87,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    CalendarDatePicker(
-                      initialDate: isSelectingStart ? tempStartDate : tempEndDate,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2030),
-                      onDateChanged: (DateTime date) {
-                        setDialogState(() {
-                          if (isSelectingStart) {
-                            tempStartDate = date;
-                            if (tempStartDate.isAfter(tempEndDate)) {
-                              tempEndDate = tempStartDate;
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      CalendarDatePicker(
+                        initialDate:
+                        isSelectingStart ? tempStartDate : tempEndDate,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2030),
+                        onDateChanged: (DateTime date) {
+                          setDialogState(() {
+                            if (isSelectingStart) {
+                              tempStartDate = date;
+                              if (tempStartDate.isAfter(tempEndDate)) {
+                                tempEndDate = tempStartDate;
+                              }
+                            } else {
+                              tempEndDate = date;
+                              if (tempEndDate.isBefore(tempStartDate)) {
+                                tempStartDate = tempEndDate;
+                              }
                             }
-                          } else {
-                            tempEndDate = date;
-                            if (tempEndDate.isBefore(tempStartDate)) {
-                              tempStartDate = tempEndDate;
-                            }
-                          }
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text(
-                            'Batal',
-                            style: TextStyle(color: Colors.grey),
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text(
+                              'Batal',
+                              style: TextStyle(color: Colors.grey),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
 
-                            if (mounted) {
-                              setState(() {
-                                _startDate = tempStartDate;
-                                _endDate = tempEndDate;
-                              });
-                              _loadData();
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF279E9E),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                              if (mounted) {
+                                setState(() {
+                                  _startDate = tempStartDate;
+                                  _endDate = tempEndDate;
+                                });
+                                _loadData();
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF279E9E),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 24, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                             ),
+                            child: const Text('Terapkan'),
                           ),
-                          child: const Text('Terapkan'),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );

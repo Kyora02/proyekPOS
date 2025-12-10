@@ -53,7 +53,31 @@ class _LaporanNeracaPageState extends State<LaporanNeracaPage> {
       initialDate: selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF279E9E),
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF279E9E),
+              ),
+            ),
+            datePickerTheme: const DatePickerThemeData(
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              headerBackgroundColor: Colors.white,
+              headerForegroundColor: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
+
     if (picked != null && picked != selectedDate) {
       setState(() => selectedDate = picked);
       _loadBalanceSheet();
