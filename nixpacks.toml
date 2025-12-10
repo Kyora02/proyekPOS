@@ -1,0 +1,13 @@
+# nixpacks.toml
+
+[phases.setup]
+# Install Flutter SDK and Caddy from the Nix package manager
+nixPkgs = ["flutter", "caddy"]
+
+[phases.build]
+# Build the web application release
+cmds = ["flutter build web --release"]
+
+[start]
+# Start Caddy to serve the files on port 3000
+cmd = "caddy run --config Caddyfile --adapter caddyfile"

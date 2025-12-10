@@ -1,0 +1,13 @@
+:5000 {
+    # Point to the location where Flutter outputs built files
+    root * build/web
+
+    # Enable compression for faster loads (optional but recommended)
+    encode gzip
+
+    # SPA Routing: Try to find the file; if missing, serve index.html
+    try_files {path} /index.html
+
+    # Serve the files
+    file_server
+}
