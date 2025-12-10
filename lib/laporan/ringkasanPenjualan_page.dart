@@ -440,9 +440,9 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
 
     final cards = [
       {
-        'title': 'Total Pendapatan',
-        'value': _summaryData!['totalPendapatan'] ?? 0,
-        'color': const Color(0xFF279E9E),
+        'title': 'Total Penjualan',
+        'value': _summaryData!['totalPenjualan'] ?? 0,
+        'color': const Color(0xFF2196F3),
       },
       {
         'title': 'Total Biaya',
@@ -450,19 +450,9 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
         'color': const Color(0xFFFFC107),
       },
       {
-        'title': 'Total Penjualan',
-        'value': _summaryData!['totalPenjualan'] ?? 0,
-        'color': const Color(0xFF2196F3),
-      },
-      {
-        'title': 'Penjualan Bersih',
-        'value': _summaryData!['penjualanBersih'] ?? 0,
-        'color': const Color(0xFFE91E63),
-      },
-      {
-        'title': 'Total Laba Kotor',
-        'value': _summaryData!['totalLabaKotor'] ?? 0,
-        'color': const Color(0xFF9C27B0),
+        'title': 'Total Laba Bersih',
+        'value': _summaryData!['totalLabaBersih'] ?? 0,
+        'color': const Color(0xFF4CAF50),
       },
     ];
 
@@ -470,10 +460,10 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: isMobile ? 2 : 5,
+        crossAxisCount: isMobile ? 2 : 3,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
-        childAspectRatio: isMobile ? 1.0 : 1.3,
+        childAspectRatio: isMobile ? 1.5 : 2.1,
       ),
       itemCount: cards.length,
       itemBuilder: (context, index) {
@@ -497,22 +487,17 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
     return Column(
       children: [
         _Section(
-          title: 'PENDAPATAN',
+          title: 'PENJUALAN',
           formatter: _currencyFormatter,
           children: [
             _DetailRow(
-              label: 'Penjualan Kotor',
-              value: details['pendapatan']['penjualanKotor'] ?? 0,
-              formatter: _currencyFormatter,
-            ),
-            _DetailRow(
-              label: 'Pajak (10%)',
-              value: details['pendapatan']['pajak'] ?? 0,
+              label: 'Total Penjualan',
+              value: details['penjualan']['totalPenjualan'] ?? 0,
               formatter: _currencyFormatter,
             ),
           ],
-          totalValue: _summaryData!['totalPendapatan'] ?? 0,
-          totalLabel: 'TOTAL PENDAPATAN',
+          totalValue: _summaryData!['totalPenjualan'] ?? 0,
+          totalLabel: 'TOTAL PENJUALAN',
         ),
         const SizedBox(height: 24),
         _Section(
@@ -532,43 +517,29 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
         ),
         const SizedBox(height: 24),
         _Section(
-          title: 'PENJUALAN BERSIH',
+          title: 'LABA BERSIH',
           formatter: _currencyFormatter,
           children: [
             _DetailRow(
               label: 'Total Penjualan',
-              value: details['penjualanBersih']['totalPenjualan'] ?? 0,
-              formatter: _currencyFormatter,
-            ),
-            _DetailRow(
-              label: 'Pengembalian',
-              value: details['penjualanBersih']['pengembalian'] ?? 0,
-              formatter: _currencyFormatter,
-              isNegative: true,
-            ),
-          ],
-          totalValue: _summaryData!['penjualanBersih'] ?? 0,
-          totalLabel: 'TOTAL PENJUALAN BERSIH',
-        ),
-        const SizedBox(height: 24),
-        _Section(
-          title: 'LABA KOTOR',
-          formatter: _currencyFormatter,
-          children: [
-            _DetailRow(
-              label: 'Penjualan Bersih',
-              value: details['labaKotor']['penjualanBersih'] ?? 0,
+              value: details['labaBersih']['totalPenjualan'] ?? 0,
               formatter: _currencyFormatter,
             ),
             _DetailRow(
               label: 'HPP (Harga Pokok Penjualan)',
-              value: details['labaKotor']['hpp'] ?? 0,
+              value: details['labaBersih']['hpp'] ?? 0,
+              formatter: _currencyFormatter,
+              isNegative: true,
+            ),
+            _DetailRow(
+              label: 'Biaya Administrasi',
+              value: details['labaBersih']['biayaAdministrasi'] ?? 0,
               formatter: _currencyFormatter,
               isNegative: true,
             ),
           ],
-          totalValue: _summaryData!['totalLabaKotor'] ?? 0,
-          totalLabel: 'TOTAL LABA KOTOR',
+          totalValue: _summaryData!['totalLabaBersih'] ?? 0,
+          totalLabel: 'TOTAL LABA BERSIH',
         ),
       ],
     );
@@ -590,22 +561,17 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
             Expanded(
               flex: 1,
               child: _Section(
-                title: 'PENDAPATAN',
+                title: 'PENJUALAN',
                 formatter: _currencyFormatter,
                 children: [
                   _DetailRow(
-                    label: 'Penjualan Kotor',
-                    value: details['pendapatan']['penjualanKotor'] ?? 0,
-                    formatter: _currencyFormatter,
-                  ),
-                  _DetailRow(
-                    label: 'Pajak (10%)',
-                    value: details['pendapatan']['pajak'] ?? 0,
+                    label: 'Total Penjualan',
+                    value: details['penjualan']['totalPenjualan'] ?? 0,
                     formatter: _currencyFormatter,
                   ),
                 ],
-                totalValue: _summaryData!['totalPendapatan'] ?? 0,
-                totalLabel: 'TOTAL PENDAPATAN',
+                totalValue: _summaryData!['totalPenjualan'] ?? 0,
+                totalLabel: 'TOTAL PENJUALAN',
               ),
             ),
             const SizedBox(width: 24),
@@ -630,55 +596,30 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
           ],
         ),
         const SizedBox(height: 24),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        _Section(
+          title: 'LABA BERSIH',
+          formatter: _currencyFormatter,
           children: [
-            Expanded(
-              flex: 1,
-              child: _Section(
-                title: 'PENJUALAN BERSIH',
-                formatter: _currencyFormatter,
-                children: [
-                  _DetailRow(
-                    label: 'Total Penjualan',
-                    value: details['penjualanBersih']['totalPenjualan'] ?? 0,
-                    formatter: _currencyFormatter,
-                  ),
-                  _DetailRow(
-                    label: 'Pengembalian',
-                    value: details['penjualanBersih']['pengembalian'] ?? 0,
-                    formatter: _currencyFormatter,
-                    isNegative: true,
-                  ),
-                ],
-                totalValue: _summaryData!['penjualanBersih'] ?? 0,
-                totalLabel: 'TOTAL PENJUALAN BERSIH',
-              ),
+            _DetailRow(
+              label: 'Total Penjualan',
+              value: details['labaBersih']['totalPenjualan'] ?? 0,
+              formatter: _currencyFormatter,
             ),
-            const SizedBox(width: 24),
-            Expanded(
-              flex: 1,
-              child: _Section(
-                title: 'LABA KOTOR',
-                formatter: _currencyFormatter,
-                children: [
-                  _DetailRow(
-                    label: 'Penjualan Bersih',
-                    value: details['labaKotor']['penjualanBersih'] ?? 0,
-                    formatter: _currencyFormatter,
-                  ),
-                  _DetailRow(
-                    label: 'HPP (Harga Pokok Penjualan)',
-                    value: details['labaKotor']['hpp'] ?? 0,
-                    formatter: _currencyFormatter,
-                    isNegative: true,
-                  ),
-                ],
-                totalValue: _summaryData!['totalLabaKotor'] ?? 0,
-                totalLabel: 'TOTAL LABA KOTOR',
-              ),
+            _DetailRow(
+              label: 'HPP (Harga Pokok Penjualan)',
+              value: details['labaBersih']['hpp'] ?? 0,
+              formatter: _currencyFormatter,
+              isNegative: true,
+            ),
+            _DetailRow(
+              label: 'Biaya Administrasi',
+              value: details['labaBersih']['biayaAdministrasi'] ?? 0,
+              formatter: _currencyFormatter,
+              isNegative: true,
             ),
           ],
+          totalValue: _summaryData!['totalLabaBersih'] ?? 0,
+          totalLabel: 'TOTAL LABA BERSIH',
         ),
       ],
     );

@@ -697,7 +697,7 @@ class _DashboardContentState extends State<DashboardContent> {
         maxCrossAxisExtent: 320,
         mainAxisSpacing: 20,
         crossAxisSpacing: 20,
-        childAspectRatio: 1.2,
+        childAspectRatio: 1.8,
       ),
       itemCount: stats.length,
       itemBuilder: (context, index) {
@@ -794,7 +794,7 @@ class StatCard extends StatelessWidget {
             child: Text(
               value,
               style: TextStyle(
-                fontSize: isBigNumber ? 32 : 22,
+                fontSize: isBigNumber ? 32 : 28,
                 fontWeight: FontWeight.bold,
                 color: const Color(0xFF333333),
               ),
