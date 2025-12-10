@@ -1,6 +1,9 @@
 # nixpacks.toml
 
 [phases.setup]
+# 👇 ADD THIS LINE to use the latest packages (Unstable Channel)
+archive = "https://github.com/NixOS/nixpkgs/archive/nixos-unstable.tar.gz"
+
 # Install Flutter SDK and Caddy from the Nix package manager
 nixPkgs = ["flutter", "caddy"]
 
