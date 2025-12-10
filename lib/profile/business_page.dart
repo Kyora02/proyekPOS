@@ -245,7 +245,7 @@ class _BusinessPageState extends State<BusinessPage> {
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             value: value,
-            dropdownColor: const Color(0xFFE0F7FA),
+            dropdownColor: Colors.white,
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.white,

@@ -18,9 +18,22 @@ class SubscriptionDialog extends StatefulWidget {
   State<SubscriptionDialog> createState() => _SubscriptionDialogState();
 }
 
-class _SubscriptionDialogState extends State<SubscriptionDialog> {
+class _SubscriptionDialogState extends State<SubscriptionDialog> with SingleTickerProviderStateMixin {
   final ApiService _apiService = ApiService();
   bool _isLoading = false;
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   Future<void> _handleSubscribe(String type) async {
     setState(() => _isLoading = true);
@@ -143,6 +156,11 @@ class _SubscriptionDialogState extends State<SubscriptionDialog> {
         ),
         actions: [
           TextButton(
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.grey.shade700,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
             onPressed: () {
               Navigator.pop(context);
               Navigator.pop(context, false);
@@ -150,6 +168,11 @@ class _SubscriptionDialogState extends State<SubscriptionDialog> {
             child: const Text('Batalkan'),
           ),
           TextButton(
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: const Color(0xFF4DB8B8),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
             onPressed: () {
               Navigator.pop(context);
               _showMobilePaymentStatusDialog(orderId);
@@ -173,14 +196,57 @@ class _SubscriptionDialogState extends State<SubscriptionDialog> {
     );
   }
 
+  Map<String, dynamic> _getPackageData(int tabIndex) {
+    if (tabIndex == 0) {
+      return {
+        'title': 'Pro Package',
+        'type': 'pro',
+        'price': 'Rp 25.000',
+        'description': 'Tingkatkan bisnis Anda dengan fitur-fitur profesional untuk manajemen yang lebih efisien dan laporan yang lebih detail.',
+        'features': [
+          {'text': 'Manajemen Bahan Baku', 'included': true},
+          {'text': 'Laporan Lengkap', 'included': true},
+          {'text': 'Manajemen Pelanggan', 'included': true},
+          {'text': 'Manajemen Karyawan', 'included': true},
+          {'text': 'Multi-Outlet', 'included': false},
+          {'text': 'Absensi & Gaji', 'included': false},
+        ],
+      };
+    } else {
+      return {
+        'title': 'Enterprise Package',
+        'type': 'enterprise',
+        'price': 'Rp 50.000',
+        'description': 'Solusi lengkap untuk bisnis berskala besar dengan fitur enterprise yang komprehensif dan dukungan multi-outlet.',
+        'features': [
+          {'text': 'Manajemen Bahan Baku', 'included': true},
+          {'text': 'Laporan Lengkap', 'included': true},
+          {'text': 'Manajemen Pelanggan', 'included': true},
+          {'text': 'Manajemen Karyawan', 'included': true},
+          {'text': 'Multi-Outlet', 'included': true},
+          {'text': 'Absensi & Gaji', 'included': true},
+        ],
+      };
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
     return Dialog(
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 40,
+        vertical: isMobile ? 24 : 40,
+      ),
       child: Container(
-        padding: const EdgeInsets.all(24),
-        width: 650,
+        width: isMobile ? double.infinity : 500,
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -188,104 +254,195 @@ class _SubscriptionDialogState extends State<SubscriptionDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Upgrade Paket Kashierku',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Dapatkan akses fitur premium untuk bisnis Anda',
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 24),
-            if (_isLoading)
-              Column(
+            Padding(
+              padding: EdgeInsets.all(isMobile ? 16 : 24),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const CircularProgressIndicator(color: Color(0xFF279E9E)),
-                  const SizedBox(height: 16),
                   Text(
-                    kIsWeb
-                        ? 'Membuka halaman pembayaran...'
-                        : 'Memproses pembayaran...',
-                    style: const TextStyle(fontSize: 14, color: Colors.grey),
-                    textAlign: TextAlign.center,
+                    'Subscriptions',
+                    style: TextStyle(
+                      fontSize: isMobile ? 18 : 20,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
                   ),
-                ],
-              )
-            else
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildPlanCard(
-                    'PRO',
-                    'Rp 25.000',
-                    ['Manajemen Bahan Baku', 'Laporan Lengkap', 'Manajemen Pelanggan', 'Manajemen Karyawan'],
-                    Colors.blue,
-                        () => _handleSubscribe('pro'),
-                  ),
-                  const SizedBox(width: 16),
-                  _buildPlanCard(
-                    'ENTERPRISE',
-                    'Rp 50.000',
-                    ['Semua Fitur Pro', 'Multi-Outlet', 'Absensi & Gaji', 'Laporan Neraca'],
-                    const Color(0xFF279E9E),
-                        () => _handleSubscribe('enterprise'),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.grey),
+                    onPressed: _isLoading ? null : () => Navigator.pop(context, false),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
                 ],
               ),
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: _isLoading ? null : () {
-                Navigator.pop(context, false);
-              },
-              child: Text(
-                'Batal',
-                style: TextStyle(
-                  color: _isLoading ? Colors.grey.shade400 : Colors.grey,
+            ),
+            Container(
+              margin: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 24),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: TabBar(
+                controller: _tabController,
+                indicator: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                labelColor: Colors.black87,
+                unselectedLabelColor: Colors.grey.shade600,
+                labelStyle: TextStyle(
+                  fontSize: isMobile ? 14 : 15,
+                  fontWeight: FontWeight.w600,
+                ),
+                unselectedLabelStyle: TextStyle(
+                  fontSize: isMobile ? 14 : 15,
+                  fontWeight: FontWeight.w500,
+                ),
+                dividerColor: Colors.transparent,
+                indicatorSize: TabBarIndicatorSize.tab,
+                onTap: (index) {
+                  setState(() {});
+                },
+                tabs: const [
+                  Tab(text: 'Pro'),
+                  Tab(text: 'Enterprise'),
+                ],
+              ),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(isMobile ? 16 : 24),
+                child: AnimatedBuilder(
+                  animation: _tabController,
+                  builder: (context, child) {
+                    final packageData = _getPackageData(_tabController.index);
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          packageData['title'],
+                          style: TextStyle(
+                            fontSize: isMobile ? 20 : 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        SizedBox(height: isMobile ? 8 : 12),
+                        Text(
+                          packageData['description'],
+                          style: TextStyle(
+                            fontSize: isMobile ? 13 : 14,
+                            color: Colors.grey.shade700,
+                            height: 1.5,
+                          ),
+                        ),
+                        SizedBox(height: isMobile ? 20 : 24),
+                        ...List.generate(
+                          packageData['features'].length,
+                              (index) {
+                            final feature = packageData['features'][index];
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    feature['included'] ? Icons.check : Icons.close,
+                                    size: 20,
+                                    color: feature['included']
+                                        ? const Color(0xFF4DB8B8)
+                                        : Colors.grey.shade400,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      feature['text'],
+                                      style: TextStyle(
+                                        fontSize: isMobile ? 13 : 14,
+                                        color: feature['included']
+                                            ? Colors.black87
+                                            : Colors.grey.shade500,
+                                        fontWeight: feature['included']
+                                            ? FontWeight.w500
+                                            : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                        SizedBox(height: isMobile ? 20 : 24),
+                        if (_isLoading)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4DB8B8).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              children: [
+                                const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 3,
+                                    color: Color(0xFF4DB8B8),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  kIsWeb
+                                      ? 'Membuka halaman pembayaran...'
+                                      : 'Memproses pembayaran...',
+                                  style: TextStyle(
+                                    fontSize: isMobile ? 13 : 14,
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4DB8B8),
+                              foregroundColor: Colors.white,
+                              minimumSize: Size(double.infinity, isMobile ? 48 : 52),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
+                            ),
+                            onPressed: () => _handleSubscribe(packageData['type']),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Continue',
+                                  style: TextStyle(
+                                    fontSize: isMobile ? 15 : 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  '${packageData['price']} IDR',
+                                  style: TextStyle(
+                                    fontSize: isMobile ? 15 : 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    );
+                  },
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPlanCard(String title, String price, List<String> features, Color color, VoidCallback onTap) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          border: Border.all(color: color.withOpacity(0.3), width: 2),
-          borderRadius: BorderRadius.circular(12),
-          color: Colors.white,
-        ),
-        child: Column(
-          children: [
-            Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 10),
-            Text(price, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            const Text('/ bulan', style: TextStyle(fontSize: 12, color: Colors.grey)),
-            const Divider(height: 30),
-            ...features.map((f) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  Icon(Icons.check_circle, size: 16, color: color),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(f, style: const TextStyle(fontSize: 13))),
-                ],
-              ),
-            )),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: color,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 45),
-              ),
-              onPressed: _isLoading ? null : onTap,
-              child: const Text('Pilih & Bayar'),
             ),
           ],
         ),
@@ -438,6 +595,7 @@ class _SubscriptionStatusDialogState extends State<SubscriptionStatusDialog> {
                 Expanded(
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(
+                      backgroundColor: Colors.white,
                       foregroundColor: Colors.grey.shade700,
                       side: BorderSide(color: Colors.grey.shade300),
                       shape: RoundedRectangleBorder(

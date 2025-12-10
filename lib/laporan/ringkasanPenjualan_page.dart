@@ -25,6 +25,8 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
   }
 
   Future<void> _loadData() async {
+    if (!mounted) return;
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -37,12 +39,16 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
         endDate: _endDate,
       );
 
+      if (!mounted) return;
+
       setState(() {
         _summaryData = data;
         _lastUpdated = DateTime.now();
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
+
       setState(() {
         _errorMessage = e.toString();
         _isLoading = false;
@@ -179,12 +185,15 @@ class _RingkasanPenjualanPageState extends State<RingkasanPenjualanPage> {
                         const SizedBox(width: 8),
                         ElevatedButton(
                           onPressed: () {
-                            setState(() {
-                              _startDate = tempStartDate;
-                              _endDate = tempEndDate;
-                            });
                             Navigator.pop(context);
-                            _loadData();
+
+                            if (mounted) {
+                              setState(() {
+                                _startDate = tempStartDate;
+                                _endDate = tempEndDate;
+                              });
+                              _loadData();
+                            }
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF279E9E),

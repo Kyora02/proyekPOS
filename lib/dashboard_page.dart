@@ -17,7 +17,7 @@ import 'package:proyekpos2/laporan/penjualanPerPeriode_page.dart';
 import 'package:proyekpos2/laporan/penjualanProduk_page.dart';
 import 'package:proyekpos2/laporan/ringkasanPembelian_page.dart';
 import 'package:proyekpos2/laporan/ringkasanPenjualan_page.dart';
-import 'package:proyekpos2/laporan/pengeluaran_page.dart';
+import 'package:proyekpos2/daftarMaster/pengeluaran_page.dart';
 import 'package:proyekpos2/service/api_service.dart';
 import 'template/dashboard_layout.dart';
 import 'profile/profile_page.dart';
@@ -456,17 +456,11 @@ class _DashboardContentState extends State<DashboardContent> {
         endDate = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
       }
 
-      print('Fetching dashboard data for:');
-      print('Start: ${startDate.toIso8601String()}');
-      print('End: ${endDate.toIso8601String()}');
-
       final transactions = await _apiService.getSalesDetail(
         outletId: widget.outletId,
         startDate: startDate,
         endDate: endDate,
       );
-
-      print('Transactions loaded: ${transactions.length}');
 
       double tempRevenue = 0;
       int tempTxCount = 0;
@@ -522,9 +516,7 @@ class _DashboardContentState extends State<DashboardContent> {
         }
       }
 
-      print('Fetching raw materials...');
       final rawMaterials = await _apiService.getRawMaterials(widget.outletId);
-      print('Raw materials loaded: ${rawMaterials.length}');
 
       double tempExpenses = 0;
       Map<int, double> purchasesByHour = {};
@@ -533,8 +525,6 @@ class _DashboardContentState extends State<DashboardContent> {
       }
 
       for (var material in rawMaterials) {
-        print('Processing material: ${material['name']}, date: ${material['date']}, price: ${material['price']}');
-
         if (material['date'] != null) {
           try {
             DateTime matDate;
@@ -544,34 +534,20 @@ class _DashboardContentState extends State<DashboardContent> {
             } else if (material['date'] is DateTime) {
               matDate = material['date'];
             } else {
-              print('Unknown date format for material: ${material['name']}');
               continue;
             }
 
-            print('Material date parsed: ${matDate.toIso8601String()}');
-            print('Checking if between ${startDate.toIso8601String()} and ${endDate.toIso8601String()}');
-
-            // Convert to UTC for accurate comparison
             final matDateOnly = DateTime.utc(matDate.year, matDate.month, matDate.day);
             final startDateOnly = DateTime.utc(startDate.year, startDate.month, startDate.day);
             final endDateOnly = DateTime.utc(endDate.year, endDate.month, endDate.day);
 
-            print('Comparing dates:');
-            print('  Material date: $matDateOnly');
-            print('  Start date: $startDateOnly');
-            print('  End date: $endDateOnly');
-            print('  matDateOnly >= startDateOnly: ${matDateOnly.millisecondsSinceEpoch >= startDateOnly.millisecondsSinceEpoch}');
-            print('  matDateOnly <= endDateOnly: ${matDateOnly.millisecondsSinceEpoch <= endDateOnly.millisecondsSinceEpoch}');
-
             final isInRange = matDateOnly.millisecondsSinceEpoch >= startDateOnly.millisecondsSinceEpoch &&
                 matDateOnly.millisecondsSinceEpoch <= endDateOnly.millisecondsSinceEpoch;
 
-            print('Is in range: $isInRange');
 
             if (isInRange) {
               double price = _parseSafeDouble(material['price']);
               tempExpenses += price;
-              print('Added expense: $price, total now: $tempExpenses');
 
               int hour = matDate.hour;
               purchasesByHour[hour] = (purchasesByHour[hour] ?? 0) + (price / 1000000);
@@ -580,11 +556,8 @@ class _DashboardContentState extends State<DashboardContent> {
             debugPrint("Error parsing material date: $e");
           }
         } else {
-          print('Material has no date: ${material['name']}');
         }
       }
-
-      print('Final tempExpenses: $tempExpenses');
 
       List<FlSpot> salesSpots = [];
       List<FlSpot> purchasesSpots = [];

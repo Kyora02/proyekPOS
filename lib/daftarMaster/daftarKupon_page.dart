@@ -344,20 +344,21 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
 
     final button = ElevatedButton.icon(
       onPressed: _navigateToAddKupon,
-      icon: const Icon(Icons.add_rounded, size: 20),
-      label: const Text('Tambah Kupon', style: TextStyle(fontSize: 15)),
+      icon: const Icon(Icons.add_rounded, size: 18),
+      label: const Text('Tambah Kupon', style: TextStyle(fontSize: 14)),
       style: ElevatedButton.styleFrom(
         backgroundColor: const Color(0xFF279E9E),
         foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         title,
+        const Spacer(),
         button,
       ],
     );
@@ -581,53 +582,176 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
       const TextStyle(fontSize: 14, color: Colors.black87);
 
   Widget _buildPagination(int totalItems, int totalPages) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            const Text('Tampilkan:', style: TextStyle(color: Colors.grey)),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<int>(
-                  value: _itemsPerPage,
-                  onChanged: (int? newValue) {
-                    setState(() {
-                      _itemsPerPage = newValue!;
-                      _currentPage = 1;
-                    });
-                  },
-                  items: <int>[10, 20, 50, 100]
-                      .map<DropdownMenuItem<int>>((int value) {
-                    return DropdownMenuItem<int>(
-                      value: value,
-                      child: Text(value.toString()),
-                    );
-                  }).toList(),
+    if (totalItems == 0) return const SizedBox.shrink();
+
+    final bool isMobile = MediaQuery.of(context).size.width < 600;
+    final int startItem = ((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems);
+    final int endItem = math.min(_currentPage * _itemsPerPage, totalItems);
+
+    if (isMobile) {
+      return Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Tampilkan:',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 12,
+                  ),
                 ),
-              ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int>(
+                      dropdownColor: Colors.white,
+                      value: _itemsPerPage,
+                      isDense: true,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black87,
+                      ),
+                      onChanged: (int? newValue) {
+                        setState(() {
+                          _itemsPerPage = newValue!;
+                          _currentPage = 1;
+                        });
+                      },
+                      items: <int>[10, 20, 50]
+                          .map<DropdownMenuItem<int>>((int value) {
+                        return DropdownMenuItem<int>(
+                          value: value,
+                          child: Text(value.toString()),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 16),
-            Text(
-              'Ditampilkan ${((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems)} - ${math.min(_currentPage * _itemsPerPage, totalItems)} dari $totalItems data',
-              style: const TextStyle(color: Colors.grey),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Ditampilkan $startItem - $endItem dari $totalItems data',
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
             ),
-          ],
-        ),
-        Row(
-          children: [
-            IconButton(
-                icon: const Icon(Icons.arrow_back_ios, size: 16),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: Icon(
+                  Icons.arrow_back_ios,
+                  size: 16,
+                  color: _currentPage > 1 ? const Color(0xFF279E9E) : Colors.grey[400],
+                ),
                 onPressed: _currentPage > 1
                     ? () => setState(() => _currentPage--)
-                    : null),
+                    : null,
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF279E9E),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$_currentPage',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: _currentPage < totalPages ? const Color(0xFF279E9E) : Colors.grey[400],
+                ),
+                onPressed: _currentPage < totalPages
+                    ? () => setState(() => _currentPage++)
+                    : null,
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Wrap(
+            spacing: 8.0,
+            runSpacing: 8.0,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              const Text('Tampilkan:', style: TextStyle(color: Colors.grey)),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<int>(
+                    dropdownColor: Colors.white,
+                    value: _itemsPerPage,
+                    onChanged: (int? newValue) {
+                      setState(() {
+                        _itemsPerPage = newValue!;
+                        _currentPage = 1;
+                      });
+                    },
+                    items: <int>[10, 20, 50]
+                        .map<DropdownMenuItem<int>>((int value) {
+                      return DropdownMenuItem<int>(
+                        value: value,
+                        child: Text(value.toString()),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Text(
+                'Ditampilkan $startItem - $endItem dari $totalItems data',
+                style: const TextStyle(color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back_ios, size: 16),
+              onPressed:
+              _currentPage > 1 ? () => setState(() => _currentPage--) : null,
+            ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
@@ -638,10 +762,11 @@ class _DaftarKuponPageState extends State<DaftarKuponPage> {
                       color: Colors.white, fontWeight: FontWeight.bold)),
             ),
             IconButton(
-                icon: const Icon(Icons.arrow_forward_ios, size: 16),
-                onPressed: _currentPage < totalPages
-                    ? () => setState(() => _currentPage++)
-                    : null),
+              icon: const Icon(Icons.arrow_forward_ios, size: 16),
+              onPressed: _currentPage < totalPages
+                  ? () => setState(() => _currentPage++)
+                  : null,
+            ),
           ],
         ),
       ],

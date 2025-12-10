@@ -231,89 +231,85 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       body: SingleChildScrollView(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isMobile = constraints.maxWidth < 600;
-            return Padding(
-              padding: EdgeInsets.all(isMobile ? 16.0 : 32.0),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(isMobile),
-                      const SizedBox(height: 24),
-                      _buildFilterActions(),
-                      const SizedBox(height: 24),
-                      if (_isLoading)
-                        const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(48.0),
-                            child: CircularProgressIndicator(),
-                          ),
-                        )
-                      else if (_error != null)
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(48.0),
-                            child: Text('Gagal memuat data: $_error',
-                                style: const TextStyle(color: Colors.red)),
-                          ),
-                        )
-                      else
-                        _buildPelangganTable(itemsOnCurrentPage),
-                      const SizedBox(height: 24),
-                      if (!_isLoading && _error == null)
-                        _buildPagination(totalItems, totalPages),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
+        padding: const EdgeInsets.fromLTRB(16.0, 40.0, 16.0, 16.0),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1200),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(),
+                const SizedBox(height: 24),
+                _buildFilterActions(),
+                const SizedBox(height: 24),
+                if (_isLoading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(48.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else if (_error != null)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(48.0),
+                      child: Text('Gagal memuat data: $_error',
+                          style: const TextStyle(color: Colors.red)),
+                    ),
+                  )
+                else
+                  _buildPelangganTable(itemsOnCurrentPage),
+                const SizedBox(height: 24),
+                if (!_isLoading && _error == null)
+                  _buildPagination(totalItems, totalPages),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader(bool isMobile) {
-    final title = const Text(
-      'Daftar Pelanggan',
-      style: TextStyle(
-          fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
-    );
+  Widget _buildHeader() {
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
-    final button = ElevatedButton.icon(
-      onPressed: _navigateToAddPelanggan,
-      icon: const Icon(Icons.add_rounded, size: 20),
-      label: const Text('Tambah Pelanggan', style: TextStyle(fontSize: 15)),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF279E9E),
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Text(
+            'Daftar Pelanggan',
+            style: TextStyle(
+              fontSize: isMobile ? 20 : 24,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF333333),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        isMobile
+            ? IconButton(
+          onPressed: _navigateToAddPelanggan,
+          icon: const Icon(Icons.add_rounded),
+          style: IconButton.styleFrom(
+            backgroundColor: const Color(0xFF279E9E),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.all(12),
+          ),
+        )
+            : ElevatedButton.icon(
+          onPressed: _navigateToAddPelanggan,
+          icon: const Icon(Icons.add_rounded, size: 18),
+          label: const Text('Tambah Pelanggan', style: TextStyle(fontSize: 14)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF279E9E),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+      ],
     );
-
-    if (isMobile) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          title,
-          const SizedBox(height: 16),
-          SizedBox(width: double.infinity, child: button),
-        ],
-      );
-    } else {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          title,
-          button,
-        ],
-      );
-    }
   }
 
   Widget _buildFilterActions() {
@@ -402,7 +398,7 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
                         if (value == 'ubah') {
                           _navigateToEditPelanggan(item);
                         }
-                        else if (value == 'etail') {
+                        else if (value == 'detail') {
                           Navigator.of(context, rootNavigator: true).push(
                             MaterialPageRoute(
                               builder: (context) =>
@@ -426,7 +422,7 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
                         _buildPopupMenuItem(
                             value: 'detail',
                             text: 'Detail',
-                            icon: Icons.details_outlined),
+                            icon: Icons.info_outline),
                         _buildPopupMenuItem(
                             value: 'hapus',
                             text: 'Hapus',
@@ -475,6 +471,120 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
   Widget _buildPagination(int totalItems, int totalPages) {
     if (totalItems == 0) return const SizedBox.shrink();
 
+    final bool isMobile = MediaQuery.of(context).size.width < 600;
+    final int startItem = ((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems);
+    final int endItem = math.min(_currentPage * _itemsPerPage, totalItems);
+
+    if (isMobile) {
+      return Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Tampilkan:',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int>(
+                      dropdownColor: Colors.white,
+                      value: _itemsPerPage,
+                      isDense: true,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black87,
+                      ),
+                      onChanged: (int? newValue) {
+                        setState(() {
+                          _itemsPerPage = newValue!;
+                          _currentPage = 1;
+                        });
+                      },
+                      items: <int>[10, 20, 50, 100]
+                          .map<DropdownMenuItem<int>>((int value) {
+                        return DropdownMenuItem<int>(
+                          value: value,
+                          child: Text(value.toString()),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Ditampilkan $startItem - $endItem dari $totalItems data',
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: Icon(
+                  Icons.arrow_back_ios,
+                  size: 16,
+                  color: _currentPage > 1 ? const Color(0xFF279E9E) : Colors.grey[400],
+                ),
+                onPressed: _currentPage > 1
+                    ? () => setState(() => _currentPage--)
+                    : null,
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF279E9E),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$_currentPage',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: _currentPage < totalPages ? const Color(0xFF279E9E) : Colors.grey[400],
+                ),
+                onPressed: _currentPage < totalPages
+                    ? () => setState(() => _currentPage++)
+                    : null,
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -491,6 +601,7 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<int>(
+                  dropdownColor: Colors.white,
                   value: _itemsPerPage,
                   onChanged: (int? newValue) {
                     setState(() {
@@ -498,7 +609,7 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
                       _currentPage = 1;
                     });
                   },
-                  items: <int>[10, 20, 50, 100]
+                  items: <int>[10, 20, 50]
                       .map<DropdownMenuItem<int>>((int value) {
                     return DropdownMenuItem<int>(
                       value: value,
@@ -510,7 +621,7 @@ class _DaftarPelangganPageState extends State<DaftarPelangganPage> {
             ),
             const SizedBox(width: 16),
             Text(
-              'Ditampilkan ${((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems)} - ${math.min(_currentPage * _itemsPerPage, totalItems)} dari $totalItems data',
+              'Ditampilkan $startItem - $endItem dari $totalItems data',
               style: const TextStyle(color: Colors.grey),
             ),
           ],

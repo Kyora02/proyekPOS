@@ -89,7 +89,31 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
       (isStartDate ? _tanggalMulai : _tanggalSelesai) ?? DateTime.now(),
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
       lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF279E9E),
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF279E9E),
+              ),
+            ),
+            datePickerTheme: const DatePickerThemeData(
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              headerBackgroundColor: Colors.white,
+              headerForegroundColor: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
+
     if (picked != null) {
       setState(() {
         if (isStartDate) {

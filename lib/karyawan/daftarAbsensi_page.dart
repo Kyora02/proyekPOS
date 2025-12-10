@@ -48,8 +48,10 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
     });
 
     try {
-      final absensiData = await _apiService.getAbsensi(outletId: widget.outletId);
-      final karyawanData = await _apiService.getKaryawan(outletId: widget.outletId);
+      final absensiData = await _apiService.getAbsensi(
+          outletId: widget.outletId);
+      final karyawanData = await _apiService.getKaryawan(
+          outletId: widget.outletId);
 
       setState(() {
         _allAbsensi = absensiData;
@@ -110,7 +112,8 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
       }
 
       if (aValue is String && bValue is String) {
-        return _sortAscending ? aValue.compareTo(bValue) : bValue.compareTo(aValue);
+        return _sortAscending ? aValue.compareTo(bValue) : bValue.compareTo(
+            aValue);
       }
       return 0;
     });
@@ -134,7 +137,8 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
     final jamMasukStr = item['jamMasuk'];
     if (jamMasukStr != null) {
       final jamMasuk = DateTime.parse(jamMasukStr);
-      final standardJamMasuk = DateTime(jamMasuk.year, jamMasuk.month, jamMasuk.day, 8, 0);
+      final standardJamMasuk = DateTime(
+          jamMasuk.year, jamMasuk.month, jamMasuk.day, 8, 0);
 
       if (jamMasuk.isAfter(standardJamMasuk.add(const Duration(minutes: 15)))) {
         return 'Telat';
@@ -159,104 +163,114 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Absen Manual'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(
-                    labelText: 'Karyawan',
-                    border: OutlineInputBorder(),
+      builder: (context) =>
+          StatefulBuilder(
+            builder: (context, setDialogState) =>
+                AlertDialog(
+                  title: const Text('Absen Manual'),
+                  content: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        DropdownButtonFormField<String>(
+                          decoration: const InputDecoration(
+                            labelText: 'Karyawan',
+                            border: OutlineInputBorder(),
+                          ),
+                          value: selectedKaryawanId,
+                          items: _karyawanList.map<DropdownMenuItem<String>>((
+                              k) {
+                            return DropdownMenuItem<String>(
+                              value: k['id'].toString(),
+                              child: Text(k['nama']?.toString() ?? ''),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            setDialogState(() {
+                              selectedKaryawanId = val;
+                              selectedKaryawanName =
+                              _karyawanList.firstWhere((k) => k['id']
+                                  .toString() == val)['nama'];
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        ListTile(
+                          title: const Text('Tanggal'),
+                          subtitle: Text(
+                              DateFormat('dd MMM yyyy').format(selectedDate)),
+                          trailing: const Icon(Icons.calendar_today),
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: selectedDate,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime.now(),
+                            );
+                            if (picked != null) {
+                              setDialogState(() => selectedDate = picked);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        ListTile(
+                          title: const Text('Jam Masuk'),
+                          subtitle: Text(jamMasuk.format(context)),
+                          trailing: const Icon(Icons.access_time),
+                          onTap: () async {
+                            final picked = await showTimePicker(
+                              context: context,
+                              initialTime: jamMasuk,
+                            );
+                            if (picked != null) {
+                              setDialogState(() => jamMasuk = picked);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        ListTile(
+                          title: const Text('Jam Keluar (Opsional)'),
+                          subtitle: Text(
+                              jamKeluar?.format(context) ?? 'Belum diisi'),
+                          trailing: const Icon(Icons.access_time),
+                          onTap: () async {
+                            final picked = await showTimePicker(
+                              context: context,
+                              initialTime: jamKeluar ??
+                                  const TimeOfDay(hour: 17, minute: 0),
+                            );
+                            if (picked != null) {
+                              setDialogState(() => jamKeluar = picked);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                  value: selectedKaryawanId,
-                  items: _karyawanList.map<DropdownMenuItem<String>>((k) {
-                    return DropdownMenuItem<String>(
-                      value: k['id'].toString(),
-                      child: Text(k['nama']?.toString() ?? ''),
-                    );
-                  }).toList(),
-                  onChanged: (val) {
-                    setDialogState(() {
-                      selectedKaryawanId = val;
-                      selectedKaryawanName = _karyawanList.firstWhere((k) => k['id'].toString() == val)['nama'];
-                    });
-                  },
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Batal'),
+                    ),
+                    ElevatedButton(
+                      onPressed: selectedKaryawanId == null
+                          ? null
+                          : () => Navigator.pop(context, true),
+                      child: const Text('Simpan'),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                ListTile(
-                  title: const Text('Tanggal'),
-                  subtitle: Text(DateFormat('dd MMM yyyy').format(selectedDate)),
-                  trailing: const Icon(Icons.calendar_today),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime.now(),
-                    );
-                    if (picked != null) {
-                      setDialogState(() => selectedDate = picked);
-                    }
-                  },
-                ),
-                const SizedBox(height: 16),
-                ListTile(
-                  title: const Text('Jam Masuk'),
-                  subtitle: Text(jamMasuk.format(context)),
-                  trailing: const Icon(Icons.access_time),
-                  onTap: () async {
-                    final picked = await showTimePicker(
-                      context: context,
-                      initialTime: jamMasuk,
-                    );
-                    if (picked != null) {
-                      setDialogState(() => jamMasuk = picked);
-                    }
-                  },
-                ),
-                const SizedBox(height: 16),
-                ListTile(
-                  title: const Text('Jam Keluar (Opsional)'),
-                  subtitle: Text(jamKeluar?.format(context) ?? 'Belum diisi'),
-                  trailing: const Icon(Icons.access_time),
-                  onTap: () async {
-                    final picked = await showTimePicker(
-                      context: context,
-                      initialTime: jamKeluar ?? const TimeOfDay(hour: 17, minute: 0),
-                    );
-                    if (picked != null) {
-                      setDialogState(() => jamKeluar = picked);
-                    }
-                  },
-                ),
-              ],
-            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Batal'),
-            ),
-            ElevatedButton(
-              onPressed: selectedKaryawanId == null
-                  ? null
-                  : () => Navigator.pop(context, true),
-              child: const Text('Simpan'),
-            ),
-          ],
-        ),
-      ),
     );
 
     if (result == true && selectedKaryawanId != null) {
       try {
         final dateStr = DateFormat('yyyy-MM-dd').format(selectedDate);
-        final jamMasukStr = '${jamMasuk.hour.toString().padLeft(2, '0')}:${jamMasuk.minute.toString().padLeft(2, '0')}';
+        final jamMasukStr = '${jamMasuk.hour.toString().padLeft(
+            2, '0')}:${jamMasuk.minute.toString().padLeft(2, '0')}';
         final jamKeluarStr = jamKeluar != null
-            ? '${jamKeluar!.hour.toString().padLeft(2, '0')}:${jamKeluar!.minute.toString().padLeft(2, '0')}'
+            ? '${jamKeluar!.hour.toString().padLeft(2, '0')}:${jamKeluar!.minute
+            .toString().padLeft(2, '0')}'
             : null;
 
         await _apiService.createManualAbsensi(
@@ -285,40 +299,49 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
   }
 
   Future<void> _showDetailDialog(Map<String, dynamic> item) async {
-    final jamMasuk = item['jamMasuk'] != null ? DateTime.parse(item['jamMasuk']) : null;
-    final jamKeluar = item['jamKeluar'] != null ? DateTime.parse(item['jamKeluar']) : null;
+    final jamMasuk = item['jamMasuk'] != null
+        ? DateTime.parse(item['jamMasuk'])
+        : null;
+    final jamKeluar = item['jamKeluar'] != null ? DateTime.parse(
+        item['jamKeluar']) : null;
     final totalJamKerja = item['totalJamKerja'];
 
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(item['karyawanName'] ?? ''),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildDetailRow('Tanggal', item['date'] ?? '-'),
-            _buildDetailRow('Jam Masuk', jamMasuk != null ? DateFormat('HH:mm').format(jamMasuk) : '-'),
-            _buildDetailRow('Jam Keluar', jamKeluar != null ? DateFormat('HH:mm').format(jamKeluar) : '-'),
-            _buildDetailRow('Total Jam Kerja', totalJamKerja != null ? '$totalJamKerja jam' : '-'),
-            _buildDetailRow('Status', _getStatusFromData(item)),
-            if (item['isManual'] == true)
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Chip(
-                  label: Text('Manual Entry'),
-                  backgroundColor: Colors.orange,
-                ),
+      builder: (context) =>
+          AlertDialog(
+            title: Text(item['karyawanName'] ?? ''),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildDetailRow('Tanggal', item['date'] ?? '-'),
+                _buildDetailRow('Jam Masuk', jamMasuk != null
+                    ? DateFormat('HH:mm').format(jamMasuk)
+                    : '-'),
+                _buildDetailRow('Jam Keluar', jamKeluar != null
+                    ? DateFormat('HH:mm').format(jamKeluar)
+                    : '-'),
+                _buildDetailRow('Total Jam Kerja',
+                    totalJamKerja != null ? '$totalJamKerja jam' : '-'),
+                _buildDetailRow('Status', _getStatusFromData(item)),
+                if (item['isManual'] == true)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Chip(
+                      label: Text('Manual Entry'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Tutup'),
               ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Tutup'),
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -338,21 +361,23 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
   Future<void> _deleteAbsensi(String id) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Konfirmasi'),
-        content: const Text('Apakah Anda yakin ingin menghapus absensi ini?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
+      builder: (context) =>
+          AlertDialog(
+            title: const Text('Konfirmasi'),
+            content: const Text(
+                'Apakah Anda yakin ingin menghapus absensi ini?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Batal'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Hapus'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Hapus'),
-          ),
-        ],
-      ),
     );
 
     if (confirm == true) {
@@ -408,21 +433,23 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
                             child: Padding(
                                 padding: EdgeInsets.all(48),
                                 child: CircularProgressIndicator()))
-                      else if (_error != null)
-                        Center(
-                            child: Column(
-                              children: [
-                                Text('Error: $_error',
-                                    style: const TextStyle(color: Colors.red)),
-                                const SizedBox(height: 16),
-                                ElevatedButton(
-                                  onPressed: _loadData,
-                                  child: const Text('Coba Lagi'),
-                                ),
-                              ],
-                            ))
                       else
-                        _buildTable(itemsOnCurrentPage),
+                        if (_error != null)
+                          Center(
+                              child: Column(
+                                children: [
+                                  Text('Error: $_error',
+                                      style: const TextStyle(
+                                          color: Colors.red)),
+                                  const SizedBox(height: 16),
+                                  ElevatedButton(
+                                    onPressed: _loadData,
+                                    child: const Text('Coba Lagi'),
+                                  ),
+                                ],
+                              ))
+                        else
+                          _buildTable(itemsOnCurrentPage),
                       const SizedBox(height: 24),
                       _buildPagination(totalItems, totalPages),
                     ],
@@ -437,41 +464,44 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
   }
 
   Widget _buildHeader(bool isMobile) {
-    final title = const Text(
-      'Daftar Absensi',
-      style: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-          color: Color(0xFF333333)),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Text(
+            'Daftar Absensi',
+            style: TextStyle(
+              fontSize: isMobile ? 20 : 24,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF333333),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        isMobile
+            ? IconButton(
+          onPressed: _showManualAbsensiDialog,
+          icon: const Icon(Icons.add_rounded),
+          style: IconButton.styleFrom(
+            backgroundColor: const Color(0xFF279E9E),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.all(12),
+          ),
+        )
+            : ElevatedButton.icon(
+          onPressed: _showManualAbsensiDialog,
+          icon: const Icon(Icons.add_rounded, size: 18),
+          label: const Text('Absen Manual', style: TextStyle(fontSize: 14)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF279E9E),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+      ],
     );
-
-    final button = ElevatedButton.icon(
-      onPressed: _showManualAbsensiDialog,
-      icon: const Icon(Icons.add_rounded, size: 20),
-      label: const Text('Absen Manual', style: TextStyle(fontSize: 15)),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF279E9E),
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
-
-    if (isMobile) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          title,
-          const SizedBox(height: 16),
-          SizedBox(width: double.infinity, child: button)
-        ],
-      );
-    } else {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [title, button],
-      );
-    }
   }
 
   Widget _buildFilterActions() {
@@ -488,10 +518,11 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
           fillColor: Colors.white,
           contentPadding: const EdgeInsets.symmetric(vertical: 10),
         ),
-        onChanged: (value) => setState(() {
-          _searchQuery = value;
-          _currentPage = 1;
-        }),
+        onChanged: (value) =>
+            setState(() {
+              _searchQuery = value;
+              _currentPage = 1;
+            }),
       ),
     );
   }
@@ -573,7 +604,8 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
                           _deleteAbsensi(item['id']);
                         }
                       },
-                      itemBuilder: (context) => [
+                      itemBuilder: (context) =>
+                      [
                         const PopupMenuItem(
                             value: 'detail',
                             child: Row(children: [
@@ -645,46 +677,183 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
 
   Widget _buildPagination(int totalItems, int totalPages) {
     if (totalItems == 0) return const SizedBox.shrink();
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            const Text('Tampilkan:', style: TextStyle(color: Colors.grey)),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[300]!)),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<int>(
-                  value: _itemsPerPage,
-                  items: [10, 20, 50]
-                      .map((e) => DropdownMenuItem(
-                      value: e, child: Text(e.toString())))
-                      .toList(),
-                  onChanged: (val) => setState(() {
-                    _itemsPerPage = val!;
-                    _currentPage = 1;
-                  }),
-                ),
-              ),
+
+    final bool isMobile = MediaQuery
+        .of(context)
+        .size
+        .width < 600;
+    final int startItem = ((_currentPage - 1) * _itemsPerPage + 1).clamp(
+        1, totalItems);
+    final int endItem = math.min(_currentPage * _itemsPerPage, totalItems);
+
+    if (isMobile) {
+      return Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey[300]!),
             ),
-            const SizedBox(width: 16),
-            Text(
-                'Ditampilkan ${((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems)} - ${math.min(_currentPage * _itemsPerPage, totalItems)} dari $totalItems data',
-                style: const TextStyle(color: Colors.grey)),
-          ],
-        ),
-        Row(
-          children: [
-            IconButton(
-                icon: const Icon(Icons.chevron_left),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Tampilkan:',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int>(
+                      dropdownColor: Colors.white,
+                      value: _itemsPerPage,
+                      isDense: true,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black87,
+                      ),
+                      onChanged: (int? newValue) {
+                        setState(() {
+                          _itemsPerPage = newValue!;
+                          _currentPage = 1;
+                        });
+                      },
+                      items: <int>[10, 20, 50]
+                          .map<DropdownMenuItem<int>>((int value) {
+                        return DropdownMenuItem<int>(
+                          value: value,
+                          child: Text(value.toString()),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Ditampilkan $startItem - $endItem dari $totalItems data',
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: Icon(
+                  Icons.arrow_back_ios,
+                  size: 16,
+                  color: _currentPage > 1 ? const Color(0xFF279E9E) : Colors
+                      .grey[400],
+                ),
                 onPressed: _currentPage > 1
                     ? () => setState(() => _currentPage--)
-                    : null),
+                    : null,
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF279E9E),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$_currentPage',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: _currentPage < totalPages
+                      ? const Color(0xFF279E9E)
+                      : Colors.grey[400],
+                ),
+                onPressed: _currentPage < totalPages
+                    ? () => setState(() => _currentPage++)
+                    : null,
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Wrap(
+            spacing: 8.0,
+            runSpacing: 8.0,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              const Text('Tampilkan:', style: TextStyle(color: Colors.grey)),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<int>(
+                    dropdownColor: Colors.white,
+                    value: _itemsPerPage,
+                    onChanged: (int? newValue) {
+                      setState(() {
+                        _itemsPerPage = newValue!;
+                        _currentPage = 1;
+                      });
+                    },
+                    items: <int>[10, 20, 50]
+                        .map<DropdownMenuItem<int>>((int value) {
+                      return DropdownMenuItem<int>(
+                        value: value,
+                        child: Text(value.toString()),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Text(
+                'Ditampilkan $startItem - $endItem dari $totalItems data',
+                style: const TextStyle(color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back_ios, size: 16),
+              onPressed:
+              _currentPage > 1 ? () => setState(() => _currentPage--) : null,
+            ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
@@ -695,10 +864,11 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
                       color: Colors.white, fontWeight: FontWeight.bold)),
             ),
             IconButton(
-                icon: const Icon(Icons.chevron_right),
-                onPressed: _currentPage < totalPages
-                    ? () => setState(() => _currentPage++)
-                    : null),
+              icon: const Icon(Icons.arrow_forward_ios, size: 16),
+              onPressed: _currentPage < totalPages
+                  ? () => setState(() => _currentPage++)
+                  : null,
+            ),
           ],
         ),
       ],

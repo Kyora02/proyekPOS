@@ -464,35 +464,42 @@ class _LaporanPenjualanPerPeriodePageState extends State<LaporanPenjualanPerPeri
   }
 
   Widget _buildHeader(BuildContext context, bool isMobile) {
+    final isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
+
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Row(
-          children: [
-            if (isMobile)
-              IconButton(
-                icon: const Icon(Icons.menu, color: Color(0xFF333333)),
-                onPressed: () => Scaffold.of(context).openDrawer(),
-              ),
-            const Text(
-              'Laporan Penjualan Per Periode',
-              style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF333333)),
+        Expanded(
+          child: Text(
+            'Laporan Penjualan Per Periode',
+            style: TextStyle(
+              fontSize: isMobile ? 20 : 24,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF333333),
             ),
-          ],
+          ),
         ),
-        ElevatedButton.icon(
+        const SizedBox(width: 8),
+        isPortrait
+            ? IconButton(
+          onPressed: _periodData.isEmpty ? null : () => _exportToPdf(),
+          icon: const Icon(Icons.cloud_download_outlined),
+          style: IconButton.styleFrom(
+            backgroundColor: const Color(0xFF279E9E),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.all(12),
+            disabledBackgroundColor: Colors.grey[300],
+          ),
+        )
+            : ElevatedButton.icon(
           onPressed: _periodData.isEmpty ? null : () => _exportToPdf(),
           icon: const Icon(Icons.cloud_download_outlined, size: 18),
-          label: const Text('Ekspor Laporan'),
+          label: const Text('Ekspor Laporan', style: TextStyle(fontSize: 14)),
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF279E9E),
             foregroundColor: Colors.white,
-            shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         ),
       ],

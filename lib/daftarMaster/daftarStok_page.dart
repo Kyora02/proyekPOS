@@ -268,39 +268,50 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
     final int endIndex = (startIndex + _itemsPerPage).clamp(0, totalItems);
     final List<Map<String, dynamic>> stockOnCurrentPage =
     currentStockList.sublist(startIndex, endIndex);
+    final bool isMobile = MediaQuery.of(context).size.width < 600;
 
     return SingleChildScrollView(
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
           child: Padding(
-            padding: const EdgeInsets.all(32.0),
+            padding: EdgeInsets.all(isMobile ? 16.0 : 32.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const Text(
-                      'Daftar Bahan Baku',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF333333),
+                    Expanded(
+                      child: Text(
+                        'Daftar Bahan Baku',
+                        style: TextStyle(
+                          fontSize: isMobile ? 20 : 24,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF333333),
+                        ),
                       ),
                     ),
-                    ElevatedButton.icon(
+                    const SizedBox(width: 8),
+                    isMobile
+                        ? IconButton(
                       onPressed: _navigateToAddStock,
-                      icon: const Icon(Icons.add, size: 20),
-                      label: const Text('Tambah Bahan Baku'),
+                      icon: const Icon(Icons.add_rounded),
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFF279E9E),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.all(12),
+                      ),
+                    )
+                        : ElevatedButton.icon(
+                      onPressed: _navigateToAddStock,
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('Tambah Bahan Baku', style: TextStyle(fontSize: 14)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF279E9E),
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 15),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                     ),
                   ],
@@ -321,6 +332,71 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
   }
 
   Widget _buildSearchAndFilter() {
+    final bool isMobile = MediaQuery.of(context).size.width < 600;
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 250,
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Cari bahan baku...',
+                prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: () => _selectFilterDate(context),
+            child: Container(
+              width: 200,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.calendar_today,
+                      color: _filterDate != null ? const Color(0xFF279E9E) : Colors.grey,
+                      size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    _filterDate != null
+                        ? DateFormat('dd/MM/yyyy').format(_filterDate!)
+                        : 'Tanggal',
+                    style: TextStyle(
+                      color: _filterDate != null ? const Color(0xFF279E9E) : Colors.grey[700],
+                      fontWeight: _filterDate != null ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  if (_filterDate != null) ...[
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: _clearDateFilter,
+                      child: const Icon(Icons.close, size: 16, color: Colors.grey),
+                    )
+                  ]
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Row(
       children: [
         SizedBox(
@@ -349,7 +425,7 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.transparent),
+              border: Border.all(color: Colors.grey[300]!),
             ),
             child: Row(
               children: [
@@ -549,6 +625,120 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
   Widget _buildPagination(int totalItems, int totalPages) {
     if (totalItems == 0) return const SizedBox.shrink();
 
+    final bool isMobile = MediaQuery.of(context).size.width < 600;
+    final int startItem = ((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems);
+    final int endItem = math.min(_currentPage * _itemsPerPage, totalItems);
+
+    if (isMobile) {
+      return Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Tampilkan:',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int>(
+                      dropdownColor: Colors.white,
+                      value: _itemsPerPage,
+                      isDense: true,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black87,
+                      ),
+                      onChanged: (int? newValue) {
+                        setState(() {
+                          _itemsPerPage = newValue!;
+                          _currentPage = 1;
+                        });
+                      },
+                      items: <int>[10, 20, 50]
+                          .map<DropdownMenuItem<int>>((int value) {
+                        return DropdownMenuItem<int>(
+                          value: value,
+                          child: Text(value.toString()),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Ditampilkan $startItem - $endItem dari $totalItems data',
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: Icon(
+                  Icons.arrow_back_ios,
+                  size: 16,
+                  color: _currentPage > 1 ? const Color(0xFF279E9E) : Colors.grey[400],
+                ),
+                onPressed: _currentPage > 1
+                    ? () => setState(() => _currentPage--)
+                    : null,
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF279E9E),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$_currentPage',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: _currentPage < totalPages ? const Color(0xFF279E9E) : Colors.grey[400],
+                ),
+                onPressed: _currentPage < totalPages
+                    ? () => setState(() => _currentPage++)
+                    : null,
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -572,7 +762,7 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
                       _currentPage = 1;
                     });
                   },
-                  items: <int>[10, 20, 50, 100]
+                  items: <int>[10, 20, 50]
                       .map<DropdownMenuItem<int>>((int value) {
                     return DropdownMenuItem<int>(
                       value: value,
@@ -584,7 +774,7 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
             ),
             const SizedBox(width: 16),
             Text(
-              'Ditampilkan ${((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems)} - ${math.min(_currentPage * _itemsPerPage, totalItems)} dari $totalItems data',
+              'Ditampilkan $startItem - $endItem dari $totalItems data',
               style: const TextStyle(color: Colors.grey),
             ),
           ],
@@ -600,11 +790,16 @@ class _DaftarStokPageState extends State<DaftarStokPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                  color: const Color(0xFF279E9E),
-                  borderRadius: BorderRadius.circular(8)),
-              child: Text('$_currentPage',
-                  style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
+                color: const Color(0xFF279E9E),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '$_currentPage',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
             IconButton(
               icon: const Icon(Icons.arrow_forward_ios, size: 16),
