@@ -22,7 +22,6 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
 
-
   late TextEditingController _editNameCtr;
   late TextEditingController _editPhoneCtr;
   late TextEditingController _passwordCtr;
@@ -163,9 +162,9 @@ class _ProfilePageState extends State<ProfilePage> {
             const SizedBox(height: 16),
             _buildPasswordFields(),
             const SizedBox(height: 24),
-            _buildSectionHeader('Informasi Hak Akses'),
+            _buildSectionHeader('Informasi Berlangganan'),
             const SizedBox(height: 16),
-            _buildAccessInfoField(),
+            _buildSubscriptionInfoField(),
             const SizedBox(height: 32),
             Align(
               alignment: Alignment.centerRight,
@@ -338,22 +337,25 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildAccessInfoField() {
+  Widget _buildSubscriptionInfoField() {
     final roleValue = widget.userData['role'];
-    String roleDisplayText;
+    String subscriptionText;
     switch (roleValue) {
       case 1:
-        roleDisplayText = 'Owner';
+        subscriptionText = 'Free';
         break;
       case 2:
-        roleDisplayText = 'Karyawan';
+        subscriptionText = 'Pro';
+        break;
+      case 3:
+        subscriptionText = 'Enterprise';
         break;
       default:
-        roleDisplayText = 'Tidak Diketahui';
+        subscriptionText = 'Tidak Diketahui';
     }
     return _buildTextField(
-      label: 'Hak Akses',
-      initialValue: roleDisplayText,
+      label: 'Paket Langganan',
+      initialValue: subscriptionText,
       enabled: false,
     );
   }

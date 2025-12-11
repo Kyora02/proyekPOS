@@ -697,7 +697,7 @@ class _DashboardContentState extends State<DashboardContent> {
         maxCrossAxisExtent: 320,
         mainAxisSpacing: 20,
         crossAxisSpacing: 20,
-        childAspectRatio: 1.8,
+        childAspectRatio: 1.4,
       ),
       itemCount: stats.length,
       itemBuilder: (context, index) {

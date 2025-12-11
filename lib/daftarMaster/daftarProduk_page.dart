@@ -448,7 +448,7 @@ class _DaftarProdukPageState extends State<DaftarProdukPage> {
               items: const [
                 DropdownMenuItem(value: 'all', child: Text('Semua Status', overflow: TextOverflow.ellipsis)),
                 DropdownMenuItem(value: 'show', child: Text('Tampil di Menu', overflow: TextOverflow.ellipsis)),
-                DropdownMenuItem(value: 'hide', child: Text('Sembunyi', overflow: TextOverflow.ellipsis)),
+                DropdownMenuItem(value: 'hide', child: Text('Non-Aktif', overflow: TextOverflow.ellipsis)),
               ],
             ),
           ),
