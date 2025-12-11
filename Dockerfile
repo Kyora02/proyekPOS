@@ -22,11 +22,6 @@ COPY --from=builder /app/build/web /srv
 
 # Create a Caddyfile on the fly to handle SPA routing (or copy your own)
 # This tells Caddy: "Serve files from /srv. If file missing, serve index.html"
-RUN echo ":5000 { \
-    root * /srv \n \
-    encode gzip \n \
-    try_files {path} /index.html \n \
-    file_server \n \
-}" > /etc/caddy/Caddyfile
+RUN printf ':5000 {\n    root * /srv\n    encode gzip\n    try_files {path} /index.html\n    file_server\n}' > /etc/caddy/Caddyfile
 
 EXPOSE 5000
