@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:proyekpos2/service/api_service.dart';
-import 'package:proyekpos2/crud/tambahkupon_page.dart';
+import 'package:proyekpos2/crud/tambahKupon_page.dart';
 import 'dart:math' as math;
 
 class DaftarKuponPage extends StatefulWidget {
