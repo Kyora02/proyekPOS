@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 
 class ApiService {
-  final String _baseUrl = 'https://kashierku.ngelantour.cloud';
+  final String _baseUrl = 'https://kashierku.ngelantour.cloud/api';
 
   Future<String> _getAuthToken() async {
     final user = FirebaseAuth.instance.currentUser;
