@@ -170,6 +170,10 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
     _sortList(_filteredData, columnIndex, ascending);
   }
 
+  double _calculateTotalPenjualan() {
+    return _filteredData.fold(0.0, (sum, item) => sum + ((item['totalPenjualan'] ?? 0) as num).toDouble());
+  }
+
   Future<void> _exportToPdf() async {
     try {
       final doc = pw.Document();
@@ -232,7 +236,7 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
                 mainAxisAlignment: pw.MainAxisAlignment.end,
                 children: [
                   pw.Text(
-                    'Total Periode Ini: ${_currencyFormatter.format(_filteredData.fold(0.0, (sum, item) => sum + (item['totalPenjualan'] ?? 0)))}',
+                    'Total Periode Ini: ${_currencyFormatter.format(_calculateTotalPenjualan())}',
                     style: pw.TextStyle(font: fontBold, fontSize: 14),
                   ),
                 ],
@@ -349,13 +353,47 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
                     ),
                   )
                       : _buildResponsiveTable(dataOnCurrentPage),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
+                  if (!_isLoading && totalItems > 0) _buildTotalPenjualan(),
+                  const SizedBox(height: 8),
                   if (!_isLoading && totalItems > 0) _buildPagination(totalItems, totalPages),
                 ],
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTotalPenjualan() {
+    final total = _calculateTotalPenjualan();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF279E9E).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF279E9E).withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.receipt_long,
+            color: Color(0xFF279E9E),
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Total Penjualan: ${_currencyFormatter.format(total)}',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF279E9E),
+            ),
+          ),
+        ],
       ),
     );
   }

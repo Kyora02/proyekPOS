@@ -1087,7 +1087,7 @@ class UserProfile extends StatelessWidget {
   }
 }
 
-class ProfileMenuDialog extends StatelessWidget {
+class ProfileMenuDialog extends StatefulWidget {
   final Map<String, dynamic>? userData;
   final bool isLoading;
   final VoidCallback onProfileSettingsTap;
@@ -1102,9 +1102,44 @@ class ProfileMenuDialog extends StatelessWidget {
   });
 
   @override
+  State<ProfileMenuDialog> createState() => _ProfileMenuDialogState();
+}
+
+class _ProfileMenuDialogState extends State<ProfileMenuDialog> {
+  bool _isLoggingOut = false;
+
+  Future<void> _handleLogout(BuildContext context) async {
+    if (_isLoggingOut) return;
+
+    setState(() => _isLoggingOut = true);
+
+    try {
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      await FirebaseAuth.instance.signOut();
+
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (context.mounted) {
+        setState(() => _isLoggingOut = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal logout: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final String businessName = userData?['businessName'] ?? 'Bisnis Anda';
-    final String userName = userData?['name'] ?? 'Pengguna';
+    final String businessName = widget.userData?['businessName'] ?? 'Bisnis Anda';
+    final String userName = widget.userData?['name'] ?? 'Pengguna';
 
     return Container(
       width: 300,
@@ -1134,11 +1169,11 @@ class ProfileMenuDialog extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(isLoading ? 'Loading...' : businessName,
+                      Text(widget.isLoading ? 'Loading...' : businessName,
                           style: const TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 16),
                           overflow: TextOverflow.ellipsis),
-                      Text(isLoading ? '...' : userName,
+                      Text(widget.isLoading ? '...' : userName,
                           style:
                           TextStyle(color: Colors.grey[600], fontSize: 14),
                           overflow: TextOverflow.ellipsis),
@@ -1151,25 +1186,26 @@ class ProfileMenuDialog extends StatelessWidget {
           const Divider(height: 1),
           _ProfileMenuItem(
             text: 'Pengaturan Profil',
+            isEnabled: !_isLoggingOut,
             onTap: () {
               Navigator.of(context).pop();
-              onProfileSettingsTap();
+              widget.onProfileSettingsTap();
             },
           ),
           _ProfileMenuItem(
             text: 'Pengaturan Bisnis',
+            isEnabled: !_isLoggingOut,
             onTap: () {
               Navigator.of(context).pop();
-              onBusinessSettingsTap();
+              widget.onBusinessSettingsTap();
             },
           ),
           const Divider(height: 1),
           _ProfileMenuItem(
-            text: 'Keluar',
-            onTap: () {
-              Navigator.of(context).pop();
-              FirebaseAuth.instance.signOut();
-            },
+            text: _isLoggingOut ? 'Logging out...' : 'Keluar',
+            isEnabled: !_isLoggingOut,
+            showLoading: _isLoggingOut,
+            onTap: () => _handleLogout(context),
           ),
         ],
       ),
@@ -1180,7 +1216,15 @@ class ProfileMenuDialog extends StatelessWidget {
 class _ProfileMenuItem extends StatefulWidget {
   final String text;
   final VoidCallback onTap;
-  const _ProfileMenuItem({required this.text, required this.onTap});
+  final bool isEnabled;
+  final bool showLoading;
+
+  const _ProfileMenuItem({
+    required this.text,
+    required this.onTap,
+    this.isEnabled = true,
+    this.showLoading = false,
+  });
 
   @override
   State<_ProfileMenuItem> createState() => _ProfileMenuItemState();
@@ -1195,15 +1239,34 @@ class _ProfileMenuItemState extends State<_ProfileMenuItem> {
       onEnter: (_) => setState(() => _isHovering = true),
       onExit: (_) => setState(() => _isHovering = false),
       child: InkWell(
-        onTap: widget.onTap,
+        onTap: widget.isEnabled ? widget.onTap : null,
         child: Container(
-          color: _isHovering
+          color: _isHovering && widget.isEnabled
               ? const Color(0xFF279E9E).withValues(alpha: 0.1)
               : Colors.transparent,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(children: [
-            Text(widget.text, style: const TextStyle(fontSize: 15))
-          ]),
+          child: Row(
+            children: [
+              Text(
+                widget.text,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: widget.isEnabled ? Colors.black : Colors.grey,
+                ),
+              ),
+              if (widget.showLoading) ...[
+                const SizedBox(width: 12),
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF279E9E)),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
