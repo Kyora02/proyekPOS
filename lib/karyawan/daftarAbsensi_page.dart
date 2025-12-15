@@ -104,6 +104,10 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
           bValue = b['jamKeluar'] ?? '';
           break;
         case 4:
+          aValue = a['totalJamKerja'] ?? 0;
+          bValue = b['totalJamKerja'] ?? 0;
+          break;
+        case 5:
           aValue = a['status'] ?? '';
           bValue = b['status'] ?? '';
           break;
@@ -112,8 +116,10 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
       }
 
       if (aValue is String && bValue is String) {
-        return _sortAscending ? aValue.compareTo(bValue) : bValue.compareTo(
-            aValue);
+        return _sortAscending ? aValue.compareTo(bValue) : bValue.compareTo(aValue);
+      }
+      if (aValue is num && bValue is num) {
+        return _sortAscending ? aValue.compareTo(bValue) : bValue.compareTo(aValue);
       }
       return 0;
     });
@@ -127,174 +133,17 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
   }
 
   String _getStatusFromData(Map<String, dynamic> item) {
-    final status = item['status'] ?? 'Bekerja';
-    final totalJamKerja = item['totalJamKerja'];
-
-    if (totalJamKerja == null) {
-      return status;
-    }
-
-    final jamMasukStr = item['jamMasuk'];
-    if (jamMasukStr != null) {
-      final jamMasuk = DateTime.parse(jamMasukStr);
-      final standardJamMasuk = DateTime(
-          jamMasuk.year, jamMasuk.month, jamMasuk.day, 8, 0);
-
-      if (jamMasuk.isAfter(standardJamMasuk.add(const Duration(minutes: 15)))) {
-        return 'Telat';
-      }
-    }
-
-    if (totalJamKerja > 8) {
-      return 'Lembur';
-    } else if (totalJamKerja < 8 && item['jamKeluar'] != null) {
-      return 'Pulang Awal';
-    }
-
+    final status = item['status'] ?? 'Hadir';
     return status;
   }
 
-  Future<void> _showManualAbsensiDialog() async {
-    String? selectedKaryawanId;
-    String? selectedKaryawanName;
-    DateTime selectedDate = DateTime.now();
-    TimeOfDay jamMasuk = const TimeOfDay(hour: 8, minute: 0);
-    TimeOfDay? jamKeluar;
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) =>
-          StatefulBuilder(
-            builder: (context, setDialogState) =>
-                AlertDialog(
-                  title: const Text('Absen Manual'),
-                  content: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        DropdownButtonFormField<String>(
-                          decoration: const InputDecoration(
-                            labelText: 'Karyawan',
-                            border: OutlineInputBorder(),
-                          ),
-                          value: selectedKaryawanId,
-                          items: _karyawanList.map<DropdownMenuItem<String>>((
-                              k) {
-                            return DropdownMenuItem<String>(
-                              value: k['id'].toString(),
-                              child: Text(k['nama']?.toString() ?? ''),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            setDialogState(() {
-                              selectedKaryawanId = val;
-                              selectedKaryawanName =
-                              _karyawanList.firstWhere((k) => k['id']
-                                  .toString() == val)['nama'];
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        ListTile(
-                          title: const Text('Tanggal'),
-                          subtitle: Text(
-                              DateFormat('dd MMM yyyy').format(selectedDate)),
-                          trailing: const Icon(Icons.calendar_today),
-                          onTap: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: selectedDate,
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime.now(),
-                            );
-                            if (picked != null) {
-                              setDialogState(() => selectedDate = picked);
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        ListTile(
-                          title: const Text('Jam Masuk'),
-                          subtitle: Text(jamMasuk.format(context)),
-                          trailing: const Icon(Icons.access_time),
-                          onTap: () async {
-                            final picked = await showTimePicker(
-                              context: context,
-                              initialTime: jamMasuk,
-                            );
-                            if (picked != null) {
-                              setDialogState(() => jamMasuk = picked);
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        ListTile(
-                          title: const Text('Jam Keluar (Opsional)'),
-                          subtitle: Text(
-                              jamKeluar?.format(context) ?? 'Belum diisi'),
-                          trailing: const Icon(Icons.access_time),
-                          onTap: () async {
-                            final picked = await showTimePicker(
-                              context: context,
-                              initialTime: jamKeluar ??
-                                  const TimeOfDay(hour: 17, minute: 0),
-                            );
-                            if (picked != null) {
-                              setDialogState(() => jamKeluar = picked);
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Batal'),
-                    ),
-                    ElevatedButton(
-                      onPressed: selectedKaryawanId == null
-                          ? null
-                          : () => Navigator.pop(context, true),
-                      child: const Text('Simpan'),
-                    ),
-                  ],
-                ),
-          ),
-    );
-
-    if (result == true && selectedKaryawanId != null) {
-      try {
-        final dateStr = DateFormat('yyyy-MM-dd').format(selectedDate);
-        final jamMasukStr = '${jamMasuk.hour.toString().padLeft(
-            2, '0')}:${jamMasuk.minute.toString().padLeft(2, '0')}';
-        final jamKeluarStr = jamKeluar != null
-            ? '${jamKeluar!.hour.toString().padLeft(2, '0')}:${jamKeluar!.minute
-            .toString().padLeft(2, '0')}'
-            : null;
-
-        await _apiService.createManualAbsensi(
-          karyawanId: selectedKaryawanId!,
-          karyawanName: selectedKaryawanName!,
-          outletId: widget.outletId,
-          date: dateStr,
-          jamMasuk: jamMasukStr,
-          jamKeluar: jamKeluarStr,
-        );
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Absen manual berhasil dibuat')),
-          );
-          _loadData();
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e')),
-          );
-        }
-      }
+  String _formatDate(String? dateStr) {
+    if (dateStr == null) return '-';
+    try {
+      final date = DateTime.parse(dateStr);
+      return DateFormat('dd MMM yyyy', 'id_ID').format(date);
+    } catch (e) {
+      return dateStr;
     }
   }
 
@@ -315,7 +164,7 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildDetailRow('Tanggal', item['date'] ?? '-'),
+                _buildDetailRow('Tanggal', _formatDate(item['date'])),
                 _buildDetailRow('Jam Masuk', jamMasuk != null
                     ? DateFormat('HH:mm').format(jamMasuk)
                     : '-'),
@@ -477,29 +326,6 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
             ),
           ),
         ),
-        const SizedBox(width: 8),
-        isMobile
-            ? IconButton(
-          onPressed: _showManualAbsensiDialog,
-          icon: const Icon(Icons.add_rounded),
-          style: IconButton.styleFrom(
-            backgroundColor: const Color(0xFF279E9E),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.all(12),
-          ),
-        )
-            : ElevatedButton.icon(
-          onPressed: _showManualAbsensiDialog,
-          icon: const Icon(Icons.add_rounded, size: 18),
-          label: const Text('Absen Manual', style: TextStyle(fontSize: 14)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF279E9E),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8)),
-          ),
-        ),
       ],
     );
   }
@@ -558,7 +384,7 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
           controller: _horizontalScrollController,
           scrollDirection: Axis.horizontal,
           child: DataTable(
-            columnSpacing: 80.0,
+            columnSpacing: 50.0,
             sortColumnIndex: _sortColumnIndex,
             sortAscending: _sortAscending,
             headingTextStyle: const TextStyle(
@@ -570,6 +396,7 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
               DataColumn(label: const Text('TANGGAL'), onSort: _onSort),
               DataColumn(label: const Text('JAM MASUK'), onSort: _onSort),
               DataColumn(label: const Text('JAM KELUAR'), onSort: _onSort),
+              DataColumn(label: const Text('TOTAL JAM KERJA'), onSort: _onSort),
               DataColumn(label: const Text('STATUS'), onSort: _onSort),
               const DataColumn(label: Text('AKSI')),
             ],
@@ -580,18 +407,20 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
               final jamKeluar = item['jamKeluar'] != null
                   ? DateTime.parse(item['jamKeluar'])
                   : null;
+              final totalJamKerja = item['totalJamKerja'];
               final status = _getStatusFromData(item);
 
               return DataRow(
                 cells: [
                   DataCell(Text(item['karyawanName'] ?? '-')),
-                  DataCell(Text(item['date'] ?? '-')),
+                  DataCell(Text(_formatDate(item['date']))),
                   DataCell(Text(jamMasuk != null
                       ? DateFormat('HH:mm').format(jamMasuk)
                       : '-')),
                   DataCell(Text(jamKeluar != null
                       ? DateFormat('HH:mm').format(jamKeluar)
                       : '-')),
+                  DataCell(Text(totalJamKerja != null ? '$totalJamKerja jam' : '-')),
                   DataCell(_buildStatusChip(status)),
                   DataCell(
                     PopupMenuButton<String>(
@@ -648,18 +477,6 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
         bgColor = Colors.orange.shade50;
         textColor = Colors.orange;
         break;
-      case 'bekerja':
-        bgColor = Colors.blue.shade50;
-        textColor = Colors.blue;
-        break;
-      case 'lembur':
-        bgColor = Colors.purple.shade50;
-        textColor = Colors.purple;
-        break;
-      case 'pulang awal':
-        bgColor = Colors.red.shade50;
-        textColor = Colors.red;
-        break;
       default:
         bgColor = Colors.grey.shade100;
         textColor = Colors.grey;
@@ -678,12 +495,8 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
   Widget _buildPagination(int totalItems, int totalPages) {
     if (totalItems == 0) return const SizedBox.shrink();
 
-    final bool isMobile = MediaQuery
-        .of(context)
-        .size
-        .width < 600;
-    final int startItem = ((_currentPage - 1) * _itemsPerPage + 1).clamp(
-        1, totalItems);
+    final bool isMobile = MediaQuery.of(context).size.width < 600;
+    final int startItem = ((_currentPage - 1) * _itemsPerPage + 1).clamp(1, totalItems);
     final int endItem = math.min(_currentPage * _itemsPerPage, totalItems);
 
     if (isMobile) {
@@ -759,16 +572,14 @@ class _DaftarAbsensiPageState extends State<DaftarAbsensiPage> {
                 icon: Icon(
                   Icons.arrow_back_ios,
                   size: 16,
-                  color: _currentPage > 1 ? const Color(0xFF279E9E) : Colors
-                      .grey[400],
+                  color: _currentPage > 1 ? const Color(0xFF279E9E) : Colors.grey[400],
                 ),
                 onPressed: _currentPage > 1
                     ? () => setState(() => _currentPage--)
                     : null,
               ),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   color: const Color(0xFF279E9E),
                   borderRadius: BorderRadius.circular(8),
