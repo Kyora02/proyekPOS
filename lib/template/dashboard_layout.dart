@@ -508,6 +508,11 @@ class _SideNavBarState extends State<SideNavBar> {
               icon: Icons.monetization_on,
               minRole: 3)
         ]),
+    NavItem(
+        title: 'Pengaturan Meja',
+        icon: Icons.desk_outlined,
+        minRole: 3,
+    )
   ];
 
   void _showOutletMenu(BuildContext context) {
@@ -1078,7 +1083,7 @@ class UserProfile extends StatelessWidget {
             Text(isLoading ? 'Loading...' : userName,
                 style:
                 const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            Text('Owner',
+            Text('Super Admin',
                 style: TextStyle(color: Colors.grey[600], fontSize: 12)),
           ],
         )
@@ -1114,17 +1119,21 @@ class _ProfileMenuDialogState extends State<ProfileMenuDialog> {
     setState(() => _isLoggingOut = true);
 
     try {
-      await Future.delayed(const Duration(milliseconds: 100));
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+      }
+
+      await Future.delayed(const Duration(milliseconds: 200));
 
       await FirebaseAuth.instance.signOut();
-
-      if (context.mounted) {
-        Navigator.of(context).pop();
-      }
     } catch (e) {
-      if (context.mounted) {
-        setState(() => _isLoggingOut = false);
+      debugPrint('Logout error: $e');
 
+      if (mounted) {
+        setState(() => _isLoggingOut = false);
+      }
+
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Gagal logout: ${e.toString()}'),

@@ -181,70 +181,89 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
       final font = await PdfGoogleFonts.nunitoExtraLight();
       final fontBold = await PdfGoogleFonts.nunitoExtraBold();
 
-      doc.addPage(
-        pw.MultiPage(
-          pageFormat: PdfPageFormat.a4,
-          build: (pw.Context context) {
-            return [
-              pw.Header(
-                level: 0,
-                child: pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text('Laporan Penjualan', style: pw.TextStyle(font: fontBold, fontSize: 24)),
-                    pw.Text(
-                      '${DateFormat('dd MMM yyyy').format(_startDate)} - ${DateFormat('dd MMM yyyy').format(_endDate)}',
-                      style: pw.TextStyle(font: font, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              pw.SizedBox(height: 20),
-              pw.Table.fromTextArray(
-                headers: ['No. Transaksi', 'Tanggal', 'Karyawan', 'Customer', 'Metode Bayar', 'Total'],
-                data: _filteredData.map((item) {
-                  final DateTime dateVal = item['timestamp'] is DateTime
-                      ? item['timestamp']
-                      : DateTime.now();
+      const int rowsPerPage = 25;
+      final totalPages = (_filteredData.length / rowsPerPage).ceil();
 
-                  return [
-                    item['noTransaksi'] ?? '-',
-                    _dateFormatter.format(dateVal),
-                    item['namaKaryawan'] ?? '-',
-                    item['namaCustomer'] ?? '-',
-                    item['metodePembayaran'] ?? '-',
-                    _currencyFormatter.format(item['totalPenjualan'] ?? 0),
-                  ];
-                }).toList(),
-                headerStyle: pw.TextStyle(font: fontBold, color: PdfColors.white),
-                headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF279E9E)),
-                rowDecoration: const pw.BoxDecoration(
-                  border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.5)),
-                ),
-                cellStyle: pw.TextStyle(font: font, fontSize: 10),
-                cellAlignments: {
-                  0: pw.Alignment.centerLeft,
-                  1: pw.Alignment.centerLeft,
-                  2: pw.Alignment.centerLeft,
-                  3: pw.Alignment.centerLeft,
-                  4: pw.Alignment.centerLeft,
-                  5: pw.Alignment.centerRight,
-                },
-              ),
-              pw.SizedBox(height: 20),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.end,
+      for (int pageIndex = 0; pageIndex < totalPages; pageIndex++) {
+        final startIndex = pageIndex * rowsPerPage;
+        final endIndex = math.min(startIndex + rowsPerPage, _filteredData.length);
+        final pageData = _filteredData.sublist(startIndex, endIndex);
+
+        doc.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.a4,
+            margin: const pw.EdgeInsets.all(20),
+            build: (pw.Context context) {
+              return pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Text(
-                    'Total Periode Ini: ${_currencyFormatter.format(_calculateTotalPenjualan())}',
-                    style: pw.TextStyle(font: fontBold, fontSize: 14),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text('Laporan Penjualan', style: pw.TextStyle(font: fontBold, fontSize: 24)),
+                      pw.Text(
+                        '${DateFormat('dd MMM yyyy').format(_startDate)} - ${DateFormat('dd MMM yyyy').format(_endDate)}',
+                        style: pw.TextStyle(font: font, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                  pw.SizedBox(height: 10),
+                  pw.Divider(thickness: 2, color: const PdfColor.fromInt(0xFF279E9E)),
+                  pw.SizedBox(height: 10),
+                  pw.Expanded(
+                    child: pw.Table.fromTextArray(
+                      headers: ['No. Transaksi', 'Tanggal', 'Karyawan', 'Customer', 'Metode', 'Total'],
+                      data: pageData.map((item) {
+                        final DateTime dateVal = item['timestamp'] is DateTime
+                            ? item['timestamp']
+                            : DateTime.now();
+
+                        return [
+                          item['noTransaksi'] ?? '-',
+                          _dateFormatter.format(dateVal),
+                          item['namaKaryawan'] ?? '-',
+                          item['namaCustomer'] ?? '-',
+                          item['metodePembayaran'] ?? '-',
+                          _currencyFormatter.format(item['totalPenjualan'] ?? 0),
+                        ];
+                      }).toList(),
+                      headerStyle: pw.TextStyle(font: fontBold, color: PdfColors.white, fontSize: 9),
+                      headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF279E9E)),
+                      rowDecoration: const pw.BoxDecoration(
+                        border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.5)),
+                      ),
+                      cellStyle: pw.TextStyle(font: font, fontSize: 8),
+                      cellAlignments: {
+                        0: pw.Alignment.centerLeft,
+                        1: pw.Alignment.centerLeft,
+                        2: pw.Alignment.centerLeft,
+                        3: pw.Alignment.centerLeft,
+                        4: pw.Alignment.centerLeft,
+                        5: pw.Alignment.centerRight,
+                      },
+                    ),
+                  ),
+                  pw.SizedBox(height: 10),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text(
+                        'Halaman ${pageIndex + 1} dari $totalPages',
+                        style: pw.TextStyle(font: font, fontSize: 9, color: PdfColors.grey700),
+                      ),
+                      if (pageIndex == totalPages - 1)
+                        pw.Text(
+                          'Total: ${_currencyFormatter.format(_calculateTotalPenjualan())}',
+                          style: pw.TextStyle(font: fontBold, fontSize: 12, color: const PdfColor.fromInt(0xFF279E9E)),
+                        ),
+                    ],
                   ),
                 ],
-              ),
-            ];
-          },
-        ),
-      );
+              );
+            },
+          ),
+        );
+      }
 
       await Printing.layoutPdf(
         onLayout: (PdfPageFormat format) async => doc.save(),

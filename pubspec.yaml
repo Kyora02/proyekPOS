@@ -46,16 +46,25 @@ dependencies:
   path: ^1.8.3
   uuid: ^4.2.2
   sqflite: ^2.3.0
+  universal_io: ^2.2.2
   shared_preferences: ^2.2.0
   share_plus: ^7.2.0
   flutter_bloc: ^8.1.5
   equatable: ^2.0.5
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
   syncfusion_flutter_datepicker: ^25.1.35
+  path_provider: ^2.1.1
+  universal_html: ^2.2.4
+  device_info_plus: ^10.1.0
   webview_flutter_web: ^0.2.3+4
   webview_flutter_android: ^4.10.6
   url_launcher: ^6.3.2
-  pdf: ^3.10.0
+  open_filex: ^4.3.2
+  pdf: ^3.10.4
+  permission_handler: ^11.0.1
   printing: ^5.11.0
+  idb_shim: ^2.4.1+1
 dev_dependencies:
   flutter_test:
     sdk: flutter

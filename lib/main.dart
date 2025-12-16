@@ -3,14 +3,19 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'bloc/cart/cart_bloc.dart';
+import 'bloc/menu/menu_bloc.dart';
 import 'profile/business_page.dart';
 import 'dashboard_page.dart';
 import 'service/firebase_options.dart';
 import 'registration/login_page.dart';
 import 'registration/register_page.dart';
 import 'karyawan/karyawan_dashboard_page.dart';
-import 'connectivity_monitor_widget.dart';
+import 'sync-transaction/connectivity_monitor_widget.dart';
+import 'self_order/self_order_page.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +24,8 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  await Hive.initFlutter();
+  await Hive.openBox('pending_transactions');
   await initializeDateFormatting('id_ID', null);
 
   SystemChrome.setEnabledSystemUIMode(
@@ -34,64 +41,72 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Kashierku',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.cyan,
-        scaffoldBackgroundColor: const Color(0xFFF0F4F8),
-        fontFamily: 'Inter',
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8.0),
-            borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8.0),
-            borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
-          ),
-          contentPadding:
-          const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.cyan,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (_) => CartBloc()),
+        BlocProvider(create: (_) => MenuBloc()),
+      ],
+      child: MaterialApp(
+        title: 'Kashierku',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          primarySwatch: Colors.cyan,
+          scaffoldBackgroundColor: const Color(0xFFF0F4F8),
+          fontFamily: 'Inter',
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8.0),
+              borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
             ),
-            padding: const EdgeInsets.symmetric(vertical: 16.0),
-            textStyle: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Inter',
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8.0),
+              borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+            ),
+            contentPadding:
+            const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
+          ),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.cyan,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 16.0),
+              textStyle: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Inter',
+              ),
             ),
           ),
         ),
+        home: const ConnectivityMonitor(
+          child: AuthWrapper(),
+        ),
+        onGenerateRoute: (settings) {
+          switch (settings.name) {
+            case '/login':
+              return MaterialPageRoute(builder: (_) => const LoginPage());
+            case '/register':
+              return MaterialPageRoute(builder: (_) => const RegisterPage());
+            case '/business':
+              return MaterialPageRoute(builder: (_) => const BusinessPage());
+            case '/dashboard':
+              return MaterialPageRoute(builder: (_) => const DashboardPage());
+            case '/self-order':
+              return MaterialPageRoute(builder: (_) => const SelfOrderPage());
+            default:
+              return MaterialPageRoute(
+                builder: (_) => const Scaffold(
+                  body: Center(child: Text('Page not found')),
+                ),
+              );
+          }
+        },
       ),
-      home: const ConnectivityMonitor(
-        child: AuthWrapper(),
-      ),
-      onGenerateRoute: (settings) {
-        switch (settings.name) {
-          case '/login':
-            return MaterialPageRoute(builder: (_) => const LoginPage());
-          case '/register':
-            return MaterialPageRoute(builder: (_) => const RegisterPage());
-          case '/business':
-            return MaterialPageRoute(builder: (_) => const BusinessPage());
-          case '/dashboard':
-            return MaterialPageRoute(builder: (_) => const DashboardPage());
-          default:
-            return MaterialPageRoute(
-              builder: (_) => const Scaffold(
-                body: Center(child: Text('Page not found')),
-              ),
-            );
-        }
-      },
     );
   }
 }

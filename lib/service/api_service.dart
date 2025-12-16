@@ -3,6 +3,11 @@ import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:universal_html/html.dart' as html;
+import 'package:device_info_plus/device_info_plus.dart';
 
 class ApiService {
   final String _baseUrl = 'https://kashierku.ngelantour.cloud/api';
@@ -1875,6 +1880,173 @@ class ApiService {
       };
     } else {
       throw Exception('Failed to sync transaction: ${response.body}');
+    }
+  }
+  Future<List<Map<String, dynamic>>> getTables({required String outletId}) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/meja?outletId=$outletId'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((item) => item as Map<String, dynamic>).toList();
+      } else {
+        throw Exception('Failed to load tables: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching tables: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> createTable(Map<String, dynamic> tableData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/meja'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(tableData),
+      );
+
+      if (response.statusCode == 201) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Failed to create table: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Error creating table: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> updateTable(String tableId, Map<String, dynamic> tableData) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$_baseUrl/meja/$tableId'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(tableData),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Failed to update table: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Error updating table: $e');
+    }
+  }
+
+  Future<void> deleteTable(String tableId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/meja/$tableId'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to delete table: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Error deleting table: $e');
+    }
+  }
+
+  Future<Map<String, String>> _getHeaders() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('User not authenticated');
+    }
+
+    final token = await user.getIdToken();
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+  }
+
+  Future<String> downloadTableQR(String tableId, String tableName) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/meja/$tableId/qr/download'),
+        headers: await _getHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final cleanName = tableName.replaceAll(RegExp(r'[^\w\s-]'), '').replaceAll(' ', '_');
+        final filename = 'QR_${cleanName}_$timestamp.png';
+
+        if (kIsWeb) {
+          final blob = html.Blob([response.bodyBytes]);
+          final url = html.Url.createObjectUrlFromBlob(blob);
+          final anchor = html.AnchorElement(href: url)
+            ..setAttribute("download", filename)
+            ..click();
+          html.Url.revokeObjectUrl(url);
+          return 'File diunduh (Cek folder download browser)';
+        }
+
+        if (Platform.isAndroid) {
+          final androidInfo = await DeviceInfoPlugin().androidInfo;
+          if (androidInfo.version.sdkInt <= 32) {
+            var status = await Permission.storage.request();
+            if (!status.isGranted) throw Exception('Izin penyimpanan ditolak');
+          }
+        }
+
+        Directory? directory;
+
+        if (Platform.isAndroid) {
+          directory = Directory('/storage/emulated/0/Download');
+          if (!await directory.exists()) {
+            directory = await getExternalStorageDirectory();
+          }
+        } else if (Platform.isIOS) {
+          directory = await getApplicationDocumentsDirectory();
+        }
+
+        if (directory == null) {
+          throw Exception('Tidak dapat menemukan folder penyimpanan');
+        }
+
+        final filePath = '${directory.path}/$filename';
+        final file = File(filePath);
+        await file.writeAsBytes(response.bodyBytes);
+
+        return filePath;
+      } else {
+        throw Exception('Gagal mengunduh QR code: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error mengunduh QR code: $e');
+    }
+  }
+
+  Future<void> submitSelfOrder({
+    required String outletId,
+    required String tableId,
+    required String tableNumber,
+    required String customerName,
+    required List<Map<String, dynamic>> items,
+    required double totalAmount,
+  }) async {
+    final url = Uri.parse('$_baseUrl/public/order');
+
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'outletId': outletId,
+        'tableId': tableId,
+        'tableNumber': tableNumber,
+        'customerName': customerName,
+        'items': items,
+        'totalAmount': totalAmount,
+      }),
+    );
+
+    if (response.statusCode != 201) {
+      throw Exception('Gagal membuat pesanan: ${response.body}');
     }
   }
 }

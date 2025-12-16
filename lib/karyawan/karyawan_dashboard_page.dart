@@ -5,8 +5,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import 'package:proyekpos2/service/api_service.dart';
-import 'package:proyekpos2/local_database_service.dart';
-import 'package:proyekpos2/sync_manager_service.dart';
+import 'package:proyekpos2/sync-transaction/local_database_service.dart';
+import 'package:proyekpos2/sync-transaction/sync_manager_service.dart';
 import '../../registration/login_page.dart';
 import '../../payment/payment_webview_page.dart';
 
