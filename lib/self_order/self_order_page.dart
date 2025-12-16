@@ -8,39 +8,36 @@ import 'package:proyekpos2/service/api_service.dart';
 final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
 class SelfOrderPage extends StatefulWidget {
-  const SelfOrderPage({super.key});
+  final String? outletId;
+  final String? tableId;
+  final String? tableNumber;
+
+  const SelfOrderPage({
+    super.key,
+    this.outletId,
+    this.tableId,
+    this.tableNumber
+  });
 
   @override
   State<SelfOrderPage> createState() => _SelfOrderPageState();
 }
 
 class _SelfOrderPageState extends State<SelfOrderPage> {
-  String? outletId;
-  String? tableId;
-  String? tableNumber;
 
   final TextEditingController _nameController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    // 1. Ambil Parameter dari URL Browser
-    // Contoh URL: http://domain.com/self-order?outletId=123&tableId=456&tableNumber=12
-    final uri = Uri.base;
-    outletId = uri.queryParameters['outletId'];
-    tableId = uri.queryParameters['tableId'];
-    tableNumber = uri.queryParameters['tableNumber'];
-
-    // 2. Panggil MenuBloc jika outletId ada
-    if (outletId != null) {
-      context.read<MenuBloc>().add(FetchMenu(outletId!));
+    if (widget.outletId != null) {
+      context.read<MenuBloc>().add(FetchMenu(widget.outletId!));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Jika dibuka tanpa scan QR yang valid
-    if (outletId == null || tableId == null) {
+    if (widget.outletId == null || widget.tableId == null) {
       return const Scaffold(
         body: Center(child: Text("QR Code tidak valid atau URL salah.")),
       );
@@ -60,7 +57,6 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
           return const SizedBox();
         },
       ),
-      // Tombol Keranjang Melayang di Bawah
       bottomNavigationBar: _buildBottomCartBar(context),
     );
   }
@@ -68,8 +64,8 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
   Widget _buildContent(BuildContext context, MenuLoaded state) {
     return CustomScrollView(
       slivers: [
-        // Header Restoran & Meja
         SliverAppBar(
+          automaticallyImplyLeading: false,
           expandedHeight: 120.0,
           floating: false,
           pinned: true,
@@ -88,7 +84,7 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
                 children: [
                   const Icon(Icons.table_restaurant, color: Colors.teal),
                   const SizedBox(width: 8),
-                  Text("Meja No. $tableNumber",
+                  Text("Meja No. ${widget.tableNumber}",
                       style: const TextStyle(fontSize: 14, color: Colors.teal)),
                 ],
               ),
@@ -105,7 +101,7 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: state.categories.length + 1, // +1 untuk "Semua"
+              itemCount: state.categories.length + 1,
               itemBuilder: (context, index) {
                 if (index == 0) {
                   // Tombol "Semua"
@@ -148,7 +144,6 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
           ),
         ),
 
-        // Spacer agar konten tidak tertutup bottom bar
         const SliverToBoxAdapter(child: SizedBox(height: 80)),
       ],
     );
@@ -329,7 +324,7 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
                     TextField(
                       controller: noteController,
                       decoration: InputDecoration(
-                        hintText: "Contoh: Jangan pedas, es dikit...",
+                        hintText: "",
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                       maxLines: 2,
@@ -511,9 +506,9 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
       }).toList();
 
       await ApiService().submitSelfOrder(
-          outletId: outletId!,
-          tableId: tableId!,
-          tableNumber: tableNumber ?? '-',
+          outletId: widget.outletId!,
+          tableId: widget.tableId!,
+          tableNumber: widget.tableNumber ?? '-',
           customerName: _nameController.text,
           items: itemsMap,
           totalAmount: state.totalAmount

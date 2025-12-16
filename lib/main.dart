@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'bloc/cart/cart_bloc.dart';
 import 'bloc/menu/menu_bloc.dart';
 import 'profile/business_page.dart';
@@ -15,11 +17,10 @@ import 'registration/register_page.dart';
 import 'karyawan/karyawan_dashboard_page.dart';
 import 'sync-transaction/connectivity_monitor_widget.dart';
 import 'self_order/self_order_page.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  usePathUrlStrategy();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -83,18 +84,40 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
-        home: const ConnectivityMonitor(
-          child: AuthWrapper(),
-        ),
+        initialRoute: '/',
         onGenerateRoute: (settings) {
           if (settings.name != null) {
-            final Uri uri = Uri.parse(settings.name!);
+            var uri = Uri.parse(settings.name!);
 
-            if (uri.path == '/self-order') {
-              return MaterialPageRoute(builder: (_) => const SelfOrderPage());
+            if (settings.name!.startsWith('http')) {
+              uri = Uri.parse(settings.name!);
+            }
+
+            if (uri.pathSegments.contains('self-order') || uri.path == '/self-order') {
+              print("Self Order Detected: ${uri.queryParameters}");
+
+              final outletId = uri.queryParameters['outletId'];
+              final tableId = uri.queryParameters['tableId'];
+              final tableNumber = uri.queryParameters['tableNumber'];
+
+              return MaterialPageRoute(
+                settings: settings,
+                builder: (_) => SelfOrderPage(
+                  outletId: outletId,
+                  tableId: tableId,
+                  tableNumber: tableNumber,
+                ),
+              );
             }
           }
+
           switch (settings.name) {
+            case '/':
+              return MaterialPageRoute(
+                builder: (_) => const ConnectivityMonitor(
+                  child: AuthWrapper(),
+                ),
+              );
             case '/login':
               return MaterialPageRoute(builder: (_) => const LoginPage());
             case '/register':
@@ -103,8 +126,6 @@ class MyApp extends StatelessWidget {
               return MaterialPageRoute(builder: (_) => const BusinessPage());
             case '/dashboard':
               return MaterialPageRoute(builder: (_) => const DashboardPage());
-            // case '/self-order':
-            //   return MaterialPageRoute(builder: (_) => const SelfOrderPage());
             default:
               return MaterialPageRoute(
                 builder: (_) => const Scaffold(
@@ -138,6 +159,7 @@ class AuthWrapper extends StatelessWidget {
       }
     }
 
+    // 2. Cek Karyawan Collection
     final karyawanQuery = await FirebaseFirestore.instance
         .collection('karyawan')
         .where('authUid', isEqualTo: user.uid)

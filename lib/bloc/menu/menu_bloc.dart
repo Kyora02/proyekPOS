@@ -63,7 +63,7 @@ class MenuBloc extends Bloc<MenuEvent, MenuState> {
   Future<void> _onFetchMenu(FetchMenu event, Emitter<MenuState> emit) async {
     emit(MenuLoading());
     try {
-      final baseUrl = "http://localhost:8080";
+      final baseUrl = "http://localhost:3000";
 
       final responses = await Future.wait([
         http.get(Uri.parse('$baseUrl/public/outlet/${event.outletId}')),
