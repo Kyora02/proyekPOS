@@ -23,19 +23,15 @@ class SyncManagerService {
       final hasConnection = results.any((result) =>
       result == ConnectivityResult.mobile ||
           result == ConnectivityResult.wifi ||
-          result == ConnectivityResult.ethernet
-      );
+          result == ConnectivityResult.ethernet);
 
       if (hasConnection && !_isSyncing) {
-        Future.delayed(const Duration(seconds: 2), () {
+        print("🌐 Koneksi terdeteksi, mencoba sinkronisasi...");
+        Future.delayed(const Duration(seconds: 3), () {
           syncPendingTransactions();
         });
       }
     });
-  }
-
-  void stopListening() {
-    _connectivitySubscription?.cancel();
   }
 
   Future<bool> isOnline() async {
@@ -43,8 +39,7 @@ class SyncManagerService {
     return results.any((result) =>
     result == ConnectivityResult.mobile ||
         result == ConnectivityResult.wifi ||
-        result == ConnectivityResult.ethernet
-    );
+        result == ConnectivityResult.ethernet);
   }
 
   Future<void> syncPendingTransactions() async {
@@ -56,7 +51,7 @@ class SyncManagerService {
     _isSyncing = true;
 
     try {
-      final pendingTransactions = await _localDb.getPendingTransactions();
+      final pendingTransactions = _localDb.getPendingTransactions();
 
       if (pendingTransactions.isEmpty) {
         _isSyncing = false;
@@ -68,144 +63,84 @@ class SyncManagerService {
         totalPending: pendingTransactions.length,
         successCount: 0,
         failedCount: 0,
-        message: 'Sinkronisasi dimulai...',
+        message: 'Mulai sinkronisasi ${pendingTransactions.length} transaksi...',
       ));
 
       int successCount = 0;
       int failedCount = 0;
-      List<String> failedReasons = [];
 
       for (var transaction in pendingTransactions) {
         try {
-          final result = await _syncSingleTransaction(transaction);
+          print("⏳ Syncing: ${transaction['clientTransactionId']}");
 
-          if (result['success'] == true) {
-            successCount++;
-            _syncStatusController.add(SyncStatus(
-              isActive: true,
-              totalPending: pendingTransactions.length,
-              successCount: successCount,
-              failedCount: failedCount,
-              message: 'Berhasil: $successCount/${pendingTransactions.length}',
-            ));
-          } else if (result['isDuplicate'] == true) {
+          final result = await _apiService.syncOfflineTransaction(
+            clientTransactionId: transaction['clientTransactionId'],
+            amount: (transaction['grossAmount'] as num).toDouble(),
+            // Pastikan items dikirim sebagai List<Map>
+            items: List<Map<String, dynamic>>.from(transaction['items']),
+            customerName: transaction['customerName'],
+            customerPhone: transaction['customerPhone'],
+            paymentMethod: transaction['paymentMethod'],
+            karyawanId: transaction['karyawanId'],
+            outletId: transaction['outletId'],
+            createdAt: transaction['createdAt'],
+          ).timeout(const Duration(seconds: 20));
+
+          if (result['success'] == true || result['isDuplicate'] == true) {
+            // Jika sukses atau duplikat (sudah ada di server), tandai synced
             await _localDb.updateSyncStatus(
               clientTransactionId: transaction['clientTransactionId'],
               status: 'synced',
             );
             successCount++;
-            _syncStatusController.add(SyncStatus(
-              isActive: true,
-              totalPending: pendingTransactions.length,
-              successCount: successCount,
-              failedCount: failedCount,
-              message: 'Duplikat diabaikan: $successCount/${pendingTransactions.length}',
-            ));
           } else {
             throw Exception(result['message'] ?? 'Sync failed');
           }
-
         } catch (e) {
           failedCount++;
-          final reason = e.toString();
-          failedReasons.add(reason);
-
-          String errorMessage = reason;
-          if (reason.contains('SocketException') || reason.contains('Network')) {
-            errorMessage = 'Koneksi bermasalah, akan dicoba lagi nanti';
-          } else if (reason.contains('Stock') || reason.contains('stok')) {
-            errorMessage = 'Stok tidak mencukupi';
-          }
+          print("❌ Gagal sync: $e");
 
           await _localDb.updateSyncStatus(
             clientTransactionId: transaction['clientTransactionId'],
             status: 'failed',
-            errorMessage: errorMessage,
+            errorMessage: e.toString(),
           );
-
-          _syncStatusController.add(SyncStatus(
-            isActive: true,
-            totalPending: pendingTransactions.length,
-            successCount: successCount,
-            failedCount: failedCount,
-            message: 'Gagal: $failedCount',
-          ));
         }
+
+        _syncStatusController.add(SyncStatus(
+          isActive: true,
+          totalPending: pendingTransactions.length,
+          successCount: successCount,
+          failedCount: failedCount,
+          message: 'Proses: $successCount Sukses, $failedCount Gagal',
+        ));
       }
 
-      final String finalMessage = successCount > 0
-          ? 'Sinkronisasi selesai: $successCount berhasil${failedCount > 0 ? ', $failedCount gagal' : ''}'
-          : 'Sinkronisasi gagal untuk semua transaksi';
+      await _localDb.deleteAllSynced();
 
       _syncStatusController.add(SyncStatus(
         isActive: false,
         totalPending: 0,
         successCount: successCount,
         failedCount: failedCount,
-        message: finalMessage,
+        message: 'Sync Selesai: $successCount terkirim.',
         isComplete: true,
         hasErrors: failedCount > 0,
       ));
 
     } catch (e) {
-      _syncStatusController.add(SyncStatus(
-        isActive: false,
-        totalPending: 0,
-        successCount: 0,
-        failedCount: 0,
-        message: 'Error sinkronisasi: ${e.toString()}',
-        isComplete: true,
-        hasErrors: true,
-      ));
+      print("Error Global Sync: $e");
     } finally {
       _isSyncing = false;
-      await _localDb.deleteAllSynced();
-    }
-  }
-
-  Future<Map<String, dynamic>> _syncSingleTransaction(Map<String, dynamic> transaction) async {
-    await _localDb.incrementSyncAttempts(transaction['clientTransactionId']);
-
-    try {
-      final result = await _apiService.syncOfflineTransaction(
-        clientTransactionId: transaction['clientTransactionId'],
-        amount: transaction['grossAmount'],
-        items: transaction['items'],
-        customerName: transaction['customerName'],
-        customerPhone: transaction['customerPhone'],
-        paymentMethod: transaction['paymentMethod'],
-        karyawanId: transaction['karyawanId'],
-        outletId: transaction['outletId'],
-        createdAt: transaction['createdAt'],
-      ).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          throw Exception('Request timeout - koneksi lambat');
-        },
-      );
-
-      if (result['success'] == true) {
-        await _localDb.updateSyncStatus(
-          clientTransactionId: transaction['clientTransactionId'],
-          status: 'synced',
-        );
-        return {'success': true};
-      } else if (result['isDuplicate'] == true) {
-        return {'success': true, 'isDuplicate': true};
-      } else {
-        throw Exception(result['message'] ?? 'Sync failed');
-      }
-    } catch (e) {
-      throw Exception(e.toString());
     }
   }
 
   Future<int> getPendingCount() async {
-    return await _localDb.getPendingCount();
+    return _localDb.getPendingCount();
   }
 
   void dispose() {
-    stopListening();
+    _connectivitySubscription?.cancel();
     _syncStatusController.close();
   }
 }

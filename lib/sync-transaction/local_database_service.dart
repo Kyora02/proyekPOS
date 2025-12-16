@@ -1,53 +1,17 @@
-import 'dart:convert';
-import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 class LocalDatabaseService {
   static final LocalDatabaseService instance = LocalDatabaseService._init();
-  static Database? _database;
+
+  static const String _boxName = 'pending_transactions';
 
   LocalDatabaseService._init();
 
-  Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDB('pos_offline.db');
-    return _database!;
+  Box get _box {
+    return Hive.box(_boxName);
   }
 
-  Future<Database> _initDB(String filePath) async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, filePath);
-
-    return await openDatabase(
-      path,
-      version: 1,
-      onCreate: _createDB,
-    );
-  }
-
-  Future<void> _createDB(Database db, int version) async {
-    await db.execute('''
-      CREATE TABLE pending_transactions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        clientTransactionId TEXT UNIQUE NOT NULL,
-        grossAmount REAL NOT NULL,
-        items TEXT NOT NULL,
-        tax REAL NOT NULL,
-        customerName TEXT NOT NULL,
-        customerPhone TEXT NOT NULL,
-        paymentMethod TEXT NOT NULL,
-        karyawanId TEXT NOT NULL,
-        outletId TEXT NOT NULL,
-        createdAt TEXT NOT NULL,
-        syncStatus TEXT NOT NULL,
-        syncAttempts INTEGER DEFAULT 0,
-        lastSyncAttempt TEXT,
-        errorMessage TEXT
-      )
-    ''');
-  }
-
-  Future<String> insertPendingTransaction({
+  Future<void> insertPendingTransaction({
     required String clientTransactionId,
     required double grossAmount,
     required List<Map<String, dynamic>> items,
@@ -58,12 +22,10 @@ class LocalDatabaseService {
     required String karyawanId,
     required String outletId,
   }) async {
-    final db = await database;
-
     final data = {
       'clientTransactionId': clientTransactionId,
       'grossAmount': grossAmount,
-      'items': jsonEncode(items),
+      'items': items,
       'tax': tax,
       'customerName': customerName,
       'customerPhone': customerPhone,
@@ -73,35 +35,29 @@ class LocalDatabaseService {
       'createdAt': DateTime.now().toIso8601String(),
       'syncStatus': 'pending',
       'syncAttempts': 0,
+      'errorMessage': '',
     };
 
-    await db.insert('pending_transactions', data);
-    return clientTransactionId;
+    await _box.put(clientTransactionId, data);
   }
 
-  Future<List<Map<String, dynamic>>> getPendingTransactions() async {
-    final db = await database;
-    final results = await db.query(
-      'pending_transactions',
-      where: 'syncStatus = ?',
-      whereArgs: ['pending'],
-      orderBy: 'createdAt ASC',
-    );
+  List<Map<String, dynamic>> getPendingTransactions() {
+    final allData = _box.values.toList();
 
-    return results.map((row) {
-      final Map<String, dynamic> transaction = Map.from(row);
-      transaction['items'] = jsonDecode(row['items'] as String);
-      return transaction;
-    }).toList();
+    final pending = allData.where((item) {
+      if (item is! Map) return false;
+      final mapItem = Map<String, dynamic>.from(item);
+      return mapItem['syncStatus'] == 'pending' || mapItem['syncStatus'] == 'failed';
+    }).map((item) => Map<String, dynamic>.from(item as Map)).toList();
+
+    pending.sort((a, b) => (a['createdAt'] as String).compareTo(b['createdAt'] as String));
+
+    return pending;
   }
 
-  Future<int> getPendingCount() async {
-    final db = await database;
-    final result = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM pending_transactions WHERE syncStatus = ?',
-      ['pending'],
-    );
-    return Sqflite.firstIntValue(result) ?? 0;
+  /// Menghitung jumlah antrian sync
+  int getPendingCount() {
+    return getPendingTransactions().length;
   }
 
   Future<void> updateSyncStatus({
@@ -109,48 +65,43 @@ class LocalDatabaseService {
     required String status,
     String? errorMessage,
   }) async {
-    final db = await database;
-    await db.update(
-      'pending_transactions',
-      {
-        'syncStatus': status,
-        'syncAttempts': status == 'synced' ? 0 : 1,
-        'lastSyncAttempt': DateTime.now().toIso8601String(),
-        'errorMessage': errorMessage,
-      },
-      where: 'clientTransactionId = ?',
-      whereArgs: [clientTransactionId],
-    );
-  }
+    final rawData = _box.get(clientTransactionId);
+    if (rawData != null) {
+      final data = Map<String, dynamic>.from(rawData as Map);
+      data['syncStatus'] = status;
+      data['lastSyncAttempt'] = DateTime.now().toIso8601String();
+      if (errorMessage != null) {
+        data['errorMessage'] = errorMessage;
+      }
+      if (status == 'synced') {
+        data['syncAttempts'] = 0;
+      } else {
+        data['syncAttempts'] = (data['syncAttempts'] ?? 0) + 1;
+      }
 
-  Future<void> incrementSyncAttempts(String clientTransactionId) async {
-    final db = await database;
-    await db.rawUpdate(
-      'UPDATE pending_transactions SET syncAttempts = syncAttempts + 1, lastSyncAttempt = ? WHERE clientTransactionId = ?',
-      [DateTime.now().toIso8601String(), clientTransactionId],
-    );
+      await _box.put(clientTransactionId, data);
+    }
   }
 
   Future<void> deleteSyncedTransaction(String clientTransactionId) async {
-    final db = await database;
-    await db.delete(
-      'pending_transactions',
-      where: 'clientTransactionId = ? AND syncStatus = ?',
-      whereArgs: [clientTransactionId, 'synced'],
-    );
+    await _box.delete(clientTransactionId);
   }
 
   Future<void> deleteAllSynced() async {
-    final db = await database;
-    await db.delete(
-      'pending_transactions',
-      where: 'syncStatus = ?',
-      whereArgs: ['synced'],
-    );
-  }
+    final keysToDelete = <String>[];
 
-  Future<void> close() async {
-    final db = await database;
-    await db.close();
+    for (var i = 0; i < _box.length; i++) {
+      final item = _box.getAt(i);
+      if (item != null && item is Map) {
+        final mapItem = Map<String, dynamic>.from(item);
+        if (mapItem['syncStatus'] == 'synced') {
+          if (mapItem['clientTransactionId'] != null) {
+            keysToDelete.add(mapItem['clientTransactionId']);
+          }
+        }
+      }
+    }
+
+    await _box.deleteAll(keysToDelete);
   }
 }

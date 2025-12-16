@@ -15,6 +15,7 @@ import 'registration/register_page.dart';
 import 'karyawan/karyawan_dashboard_page.dart';
 import 'sync-transaction/connectivity_monitor_widget.dart';
 import 'self_order/self_order_page.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +24,8 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  await Hive.initFlutter();
+  await Hive.openBox('pending_transactions');
   await initializeDateFormatting('id_ID', null);
 
   SystemChrome.setEnabledSystemUIMode(
