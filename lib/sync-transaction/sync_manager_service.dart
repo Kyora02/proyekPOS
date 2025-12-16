@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'local_database_service.dart';
-import 'service/api_service.dart';
+import '../service/api_service.dart';
 
 class SyncManagerService {
   static final SyncManagerService instance = SyncManagerService._init();

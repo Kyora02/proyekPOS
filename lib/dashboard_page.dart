@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:proyekpos2/daftarMaster/daftarMeja.dart';
 import 'package:proyekpos2/karyawan/daftarAbsensi_page.dart';
 import 'package:proyekpos2/daftarMaster/daftarKaryawan_page.dart';
 import 'package:proyekpos2/daftarMaster/daftarStok_page.dart';
@@ -27,6 +28,7 @@ import 'daftarMaster/daftarPelanggan_page.dart';
 import 'daftarMaster/daftarKupon_page.dart';
 import 'daftarMaster/daftarOutlet_page.dart';
 import 'profile/profileBusiness_page.dart';
+import 'daftarMaster/daftarMeja.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -347,6 +349,11 @@ class _DashboardHostState extends State<DashboardHost> {
         case 'Manajemen Gaji':
           _currentPage = (activeOutletId != null)
               ? ManajemenGajiPage(outletId: activeOutletId)
+              : noOutletSelected;
+          break;
+        case 'Pengaturan Meja':
+          _currentPage = (activeOutletId != null)
+              ? DaftarMejaPage(outletId: activeOutletId)
               : noOutletSelected;
           break;
         default:
