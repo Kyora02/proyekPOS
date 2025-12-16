@@ -14,6 +14,8 @@ class ApiService {
       ? 'http://localhost:3000/api'
       : 'https://kashierku.ngelantour.cloud/api';
 
+  static const String publicBaseUrl = "http://localhost:3000/public";
+
   Future<String> _getAuthToken() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -2024,7 +2026,7 @@ class ApiService {
     }
   }
 
-  Future<void> submitSelfOrder({
+  Future<Map<String, dynamic>> submitSelfOrder({
     required String outletId,
     required String tableId,
     required String tableNumber,
@@ -2032,23 +2034,67 @@ class ApiService {
     required List<Map<String, dynamic>> items,
     required double totalAmount,
   }) async {
-    final url = Uri.parse('$_baseUrl/public/order');
+    final url = Uri.parse("$publicBaseUrl/order");
 
     final response = await http.post(
       url,
-      headers: {'Content-Type': 'application/json'},
+      headers: {"Content-Type": "application/json"},
       body: jsonEncode({
-        'outletId': outletId,
-        'tableId': tableId,
-        'tableNumber': tableNumber,
-        'customerName': customerName,
-        'items': items,
-        'totalAmount': totalAmount,
+        "outletId": outletId,
+        "tableId": tableId,
+        "tableNumber": tableNumber,
+        "customerName": customerName,
+        "items": items,
+        "totalAmount": totalAmount,
       }),
     );
 
-    if (response.statusCode != 201) {
-      throw Exception('Gagal membuat pesanan: ${response.body}');
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception("Gagal membuat pesanan: ${response.body}");
+    }
+  }
+  Future<void> confirmSelfOrderPayment(String orderId) async {
+    final url = Uri.parse("$publicBaseUrl/confirm-payment");
+
+    final response = await http.post(
+      url,
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"orderId": orderId}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception("Gagal konfirmasi pembayaran: ${response.body}");
+    }
+  }
+
+  Future<void> completeOrder(String transactionId) async {
+    final url = Uri.parse("$_baseUrl/karyawan/complete-order/$transactionId");
+
+    final response = await http.put(
+      url,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception("Gagal menyelesaikan pesanan: ${response.body}");
+    }
+  }
+
+  Future<Map<String, dynamic>> checkPublicTransactionStatus(String orderId) async {
+    final url = Uri.parse("$publicBaseUrl/check-status/$orderId");
+
+    final response = await http.get(url, headers: {
+      "Content-Type": "application/json",
+    });
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception("Gagal cek status: ${response.body}");
     }
   }
 }

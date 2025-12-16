@@ -4,6 +4,9 @@ import 'package:intl/intl.dart';
 import 'package:proyekpos2/bloc/cart/cart_bloc.dart';
 import 'package:proyekpos2/bloc/menu/menu_bloc.dart';
 import 'package:proyekpos2/service/api_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:proyekpos2/payment/payment_webview_page.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
@@ -91,8 +94,6 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
             ),
           ),
         ),
-
-        // Kategori Selector
         SliverToBoxAdapter(
           child: Container(
             height: 60,
@@ -104,7 +105,6 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
               itemCount: state.categories.length + 1,
               itemBuilder: (context, index) {
                 if (index == 0) {
-                  // Tombol "Semua"
                   final isSelected = state.selectedCategoryId == 'all';
                   return _buildCategoryChip(
                     label: 'Semua',
@@ -123,13 +123,11 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
             ),
           ),
         ),
-
-        // Daftar Produk Grid
         SliverPadding(
           padding: const EdgeInsets.all(16),
           sliver: SliverGrid(
             gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 200, // Responsive grid
+              maxCrossAxisExtent: 200,
               childAspectRatio: 0.75,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
@@ -143,7 +141,6 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
             ),
           ),
         ),
-
         const SliverToBoxAdapter(child: SizedBox(height: 80)),
       ],
     );
@@ -181,7 +178,6 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Gambar Produk
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -198,7 +194,6 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
                     : null,
               ),
             ),
-            // Info Produk
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
@@ -218,7 +213,6 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
                 ],
               ),
             ),
-            // Tombol Add (Kecil)
             Align(
               alignment: Alignment.bottomRight,
               child: Padding(
@@ -280,7 +274,6 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
     );
   }
 
-
   void _showProductDetail(BuildContext context, dynamic product) {
     final noteController = TextEditingController();
 
@@ -296,7 +289,6 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Gambar Header
               Container(
                 height: 200,
                 width: double.infinity,
@@ -500,12 +492,12 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
         'id': e.id,
         'name': e.name,
         'quantity': e.quantity,
-        'price': e.price,
+        'sellingPrice': e.price,
         'total': e.total,
         'note': e.note
       }).toList();
 
-      await ApiService().submitSelfOrder(
+      final result = await ApiService().submitSelfOrder(
           outletId: widget.outletId!,
           tableId: widget.tableId!,
           tableNumber: widget.tableNumber ?? '-',
@@ -517,25 +509,93 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
       if (mounted) {
         Navigator.pop(context);
         Navigator.pop(context);
-        context.read<CartBloc>().add(ClearCart());
 
-        showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (_) => AlertDialog(
-              title: const Icon(Icons.check_circle, color: Colors.green, size: 60),
-              content: const Text("Pesanan berhasil dikirim ke dapur! Mohon tunggu pesanan Anda.", textAlign: TextAlign.center),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
-              ],
-            )
-        );
+        String redirectUrl = result['redirectUrl'];
+        String orderId = result['orderId'];
+
+        if (kIsWeb) {
+          final Uri uri = Uri.parse(redirectUrl);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+            _showCheckStatusDialog(context, orderId);
+          }
+        } else {
+          final bool? paymentSuccess = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PaymentWebviewPage(url: redirectUrl, orderId: orderId),
+            ),
+          );
+
+          if (paymentSuccess == true) {
+            context.read<CartBloc>().add(ClearCart());
+            _showSuccessDialog();
+          } else {
+            _showCheckStatusDialog(context, orderId);
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context); // Tutup Loading
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Gagal: $e"), backgroundColor: Colors.red));
       }
     }
+  }
+
+  void _showCheckStatusDialog(BuildContext context, String orderId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text("Menunggu Pembayaran"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 20),
+                  const Text("Silakan selesaikan pembayaran Anda."),
+                  const SizedBox(height: 10),
+                  ElevatedButton(
+                    onPressed: () async {
+                      try {
+                        final status = await ApiService().checkPublicTransactionStatus(orderId);
+                        if (status['status'] == 'processing' || status['status'] == 'success') {
+                          Navigator.pop(context);
+                          context.read<CartBloc>().add(ClearCart());
+                          _showSuccessDialog();
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Pembayaran belum terkonfirmasi/selesai.")));
+                        }
+                      } catch(e) {
+                        print(e);
+                      }
+                    },
+                    child: const Text("Saya Sudah Bayar"),
+                  )
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showSuccessDialog() {
+    showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AlertDialog(
+          title: const Icon(Icons.check_circle, color: Colors.green, size: 60),
+          content: const Text("Pembayaran Berhasil!\nPesanan Anda masuk ke dapur.", textAlign: TextAlign.center),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+          ],
+        )
+    );
   }
 }
