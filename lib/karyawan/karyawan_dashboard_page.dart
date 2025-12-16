@@ -9,6 +9,7 @@ import 'package:proyekpos2/sync-transaction/local_database_service.dart';
 import 'package:proyekpos2/sync-transaction/sync_manager_service.dart';
 import '../../registration/login_page.dart';
 import '../../payment/payment_webview_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class KaryawanDashboardPage extends StatefulWidget {
   final Map<String, dynamic> karyawanData;
@@ -1030,6 +1031,117 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
           );
         },
       ),
+    );
+  }
+  void _showIncomingOrders(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.8,
+          maxChildSize: 0.9,
+          minChildSize: 0.5,
+          expand: false,
+          builder: (context, scrollController) {
+            return Column(
+              children: [
+                AppBar(
+                  title: const Text("Pesanan Masuk (Self Order)"),
+                  automaticallyImplyLeading: false,
+                  actions: [IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context))],
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black,
+                  elevation: 0,
+                ),
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('transactions')
+                        .where('outletId', isEqualTo: widget.karyawanData['outletId'])
+                        .where('orderStatus', whereIn: ['pending_payment', 'processing'])
+                        .orderBy('createdAt', descending: false)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
+                      if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+
+                      final docs = snapshot.data!.docs;
+                      if (docs.isEmpty) return const Center(child: Text("Tidak ada pesanan aktif"));
+
+                      return ListView.builder(
+                        controller: scrollController,
+                        itemCount: docs.length,
+                        padding: const EdgeInsets.all(16),
+                        itemBuilder: (context, index) {
+                          final data = docs[index].data() as Map<String, dynamic>;
+                          final String docId = docs[index].id;
+                          final String status = data['orderStatus'] ?? '';
+                          final List items = data['items'] ?? [];
+
+                          Color statusColor = status == 'processing' ? Colors.green : Colors.orange;
+                          String statusText = status == 'processing' ? 'Siapkan Pesanan' : 'Menunggu Bayar';
+
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            shape: RoundedRectangleBorder(side: BorderSide(color: statusColor, width: 1.5), borderRadius: BorderRadius.circular(8)),
+                            child: ExpansionTile(
+                              leading: CircleAvatar(
+                                backgroundColor: statusColor,
+                                child: Icon(status == 'processing' ? Icons.soup_kitchen : Icons.hourglass_bottom, color: Colors.white),
+                              ),
+                              title: Text("${data['customerName']} - Meja ${data['tableNumber']}"),
+                              subtitle: Text(statusText, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
+                              trailing: Text(_currencyFormat.format(data['totalAmount'])),
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text("Detail Pesanan:", style: TextStyle(fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 8),
+                                      ...items.map((item) => Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text("${item['quantity']}x ${item['name']}"),
+                                          if(item['note'] != null && item['note'] != "")
+                                            Text("(${item['note']})", style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                        ],
+                                      )),
+                                      const SizedBox(height: 16),
+                                      if (status == 'processing')
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: ElevatedButton(
+                                            style: ElevatedButton.styleFrom(backgroundColor: _primaryColor, foregroundColor: Colors.white),
+                                            onPressed: () async {
+                                              await _apiService.completeOrder(docId);
+                                              if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Pesanan Selesai")));
+                                            },
+                                            child: const Text("Tandai Selesai & Antar"),
+                                          ),
+                                        ),
+                                      if (status == 'pending_payment')
+                                        const Center(child: Text("Menunggu pelanggan konfirmasi bayar di HP mereka...", style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey))),
+                                    ],
+                                  ),
+                                )
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
