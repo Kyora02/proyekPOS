@@ -98,7 +98,6 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      // 5. Cek Outlet ID
       final outletId = karyawanData['outletId'] as String?;
       if (outletId == null || outletId.isEmpty) {
         await FirebaseAuth.instance.signOut();
@@ -265,6 +264,7 @@ class _LoginPageState extends State<LoginPage> {
                             decoration: const InputDecoration(
                                 hintText: 'Masukkan Alamat Email'),
                             keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
                             enabled: !_isLoading,
                             validator: (value) {
                               if (value == null || value.isEmpty) {
@@ -312,6 +312,8 @@ class _LoginPageState extends State<LoginPage> {
                             controller: _passwordTxt,
                             obscureText: _isPasswordObscured,
                             enabled: !_isLoading,
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: (_) => _login(),
                             decoration: InputDecoration(
                               hintText: 'Masukkan Password',
                               suffixIcon: IconButton(

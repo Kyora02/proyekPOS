@@ -1066,28 +1066,18 @@ class ApiService {
     }
   }
 
-  Future<void> createManualAbsensi({
+  Future<Map<String, dynamic>> createAbsensi({
     required String karyawanId,
     required String karyawanName,
     required String outletId,
-    required String date,
-    required String jamMasuk,
-    String? jamKeluar,
-    String? status,
+    required String type,
+    required String timestamp,
+    double? latitude,
+    double? longitude,
   }) async {
     try {
       final token = await _getAuthToken();
-      final url = Uri.parse('$_baseUrl/absensi/manual');
-
-      final body = jsonEncode({
-        'karyawanId': karyawanId,
-        'karyawanName': karyawanName,
-        'outletId': outletId,
-        'date': date,
-        'jamMasuk': jamMasuk,
-        'jamKeluar': jamKeluar,
-        'status': status,
-      });
+      final url = Uri.parse('$_baseUrl/absensi');
 
       final response = await http.post(
         url,
@@ -1095,14 +1085,25 @@ class ApiService {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: body,
+        body: jsonEncode({
+          'karyawanId': karyawanId,
+          'karyawanName': karyawanName,
+          'outletId': outletId,
+          'type': type,
+          'timestamp': timestamp,
+          if (latitude != null) 'latitude': latitude,
+          if (longitude != null) 'longitude': longitude,
+        }),
       );
 
-      if (response.statusCode != 201) {
-        throw Exception('Gagal membuat absen manual: ${response.body}');
+      if (response.statusCode == 201) {
+        return jsonDecode(response.body);
+      } else {
+        final errorBody = jsonDecode(response.body);
+        throw Exception(errorBody['message'] ?? 'Failed to create absensi');
       }
     } catch (e) {
-      rethrow;
+      throw Exception('Error creating absensi: $e');
     }
   }
 
@@ -1113,7 +1114,10 @@ class ApiService {
 
       final response = await http.delete(
         url,
-        headers: {'Authorization': 'Bearer $token'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
       );
 
       if (response.statusCode != 200) {
@@ -1819,6 +1823,58 @@ class ApiService {
       }
     } catch (e) {
       rethrow;
+    }
+  }
+  Future<Map<String, dynamic>> syncOfflineTransaction({
+    required String clientTransactionId,
+    required double amount,
+    required List<Map<String, dynamic>> items,
+    required String customerName,
+    required String customerPhone,
+    required String paymentMethod,
+    required String karyawanId,
+    required String outletId,
+    required String createdAt,
+  }) async {
+    final token = await _getAuthToken();
+    final url = Uri.parse('$_baseUrl/payment/sync-offline');
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'clientTransactionId': clientTransactionId,
+        'grossAmount': amount,
+        'items': items,
+        'customerName': customerName,
+        'customerPhone': customerPhone,
+        'paymentMethod': paymentMethod,
+        'karyawanId': karyawanId,
+        'outletId': outletId,
+        'createdAt': createdAt,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else if (response.statusCode == 409) {
+      return {
+        'success': false,
+        'message': 'Transaksi sudah ada di server',
+        'isDuplicate': true,
+      };
+    } else if (response.statusCode == 400) {
+      final errorBody = jsonDecode(response.body);
+      return {
+        'success': false,
+        'message': errorBody['message'] ?? 'Stock tidak mencukupi',
+        'isStockError': true,
+      };
+    } else {
+      throw Exception('Failed to sync transaction: ${response.body}');
     }
   }
 }

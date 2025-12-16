@@ -10,6 +10,7 @@ import 'service/firebase_options.dart';
 import 'registration/login_page.dart';
 import 'registration/register_page.dart';
 import 'karyawan/karyawan_dashboard_page.dart';
+import 'connectivity_monitor_widget.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -70,7 +71,9 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const AuthWrapper(),
+      home: const ConnectivityMonitor(
+        child: AuthWrapper(),
+      ),
       onGenerateRoute: (settings) {
         switch (settings.name) {
           case '/login':
