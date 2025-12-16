@@ -551,6 +551,7 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
+              backgroundColor: Colors.white,
               title: const Text("Menunggu Pembayaran"),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -591,7 +592,7 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
         barrierDismissible: false,
         builder: (_) => AlertDialog(
           title: const Icon(Icons.check_circle, color: Colors.green, size: 60),
-          content: const Text("Pembayaran Berhasil!\nPesanan Anda masuk ke dapur.", textAlign: TextAlign.center),
+          content: const Text("Pembayaran Berhasil!\nPesanan Anda sedang di proses.", textAlign: TextAlign.center),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
           ],

@@ -1049,7 +1049,7 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
             return Column(
               children: [
                 AppBar(
-                  title: const Text("Pesanan Masuk (Self Order)"),
+                  title: const Text("Pesanan Masuk"),
                   automaticallyImplyLeading: false,
                   actions: [IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context))],
                   backgroundColor: Colors.white,
@@ -1292,6 +1292,56 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
         backgroundColor: _primaryColor,
         foregroundColor: Colors.white,
         actions: [
+          // ADDED: Notification Icon for Incoming Orders with Badge
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('transactions')
+                .where('outletId', isEqualTo: widget.karyawanData['outletId'])
+                .where('orderStatus', whereIn: ['pending_payment', 'processing'])
+                .snapshots(),
+            builder: (context, snapshot) {
+              int orderCount = 0;
+              if (snapshot.hasData) {
+                orderCount = snapshot.data!.docs.length;
+              }
+
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.receipt_long),
+                    tooltip: 'Pesanan Masuk',
+                    onPressed: () => _showIncomingOrders(context),
+                  ),
+                  if (orderCount > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          '$orderCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+          // END ADDED
           Stack(
             children: [
               IconButton(
@@ -1771,12 +1821,12 @@ class WebPaymentStatusDialog extends StatefulWidget {
   final VoidCallback onFailed;
 
   const WebPaymentStatusDialog({
-  super.key,
-  required this.orderId,
-  required this.apiService,
-  required this.cartItems,
-  required this.onSuccess,
-  required this.onFailed,
+    super.key,
+    required this.orderId,
+    required this.apiService,
+    required this.cartItems,
+    required this.onSuccess,
+    required this.onFailed,
   });
 
   @override
