@@ -87,6 +87,13 @@ class MyApp extends StatelessWidget {
           child: AuthWrapper(),
         ),
         onGenerateRoute: (settings) {
+          if (settings.name != null) {
+            final Uri uri = Uri.parse(settings.name!);
+
+            if (uri.path == '/self-order') {
+              return MaterialPageRoute(builder: (_) => const SelfOrderPage());
+            }
+          }
           switch (settings.name) {
             case '/login':
               return MaterialPageRoute(builder: (_) => const LoginPage());
@@ -96,8 +103,8 @@ class MyApp extends StatelessWidget {
               return MaterialPageRoute(builder: (_) => const BusinessPage());
             case '/dashboard':
               return MaterialPageRoute(builder: (_) => const DashboardPage());
-            case '/self-order':
-              return MaterialPageRoute(builder: (_) => const SelfOrderPage());
+            // case '/self-order':
+            //   return MaterialPageRoute(builder: (_) => const SelfOrderPage());
             default:
               return MaterialPageRoute(
                 builder: (_) => const Scaffold(
