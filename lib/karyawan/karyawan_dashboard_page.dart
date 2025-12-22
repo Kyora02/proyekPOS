@@ -10,6 +10,8 @@ import 'package:proyekpos2/sync-transaction/sync_manager_service.dart';
 import '../../registration/login_page.dart';
 import '../../payment/payment_webview_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:html' as html;
+import 'package:flutter/services.dart';
 
 class KaryawanDashboardPage extends StatefulWidget {
   final Map<String, dynamic> karyawanData;
@@ -38,6 +40,7 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
   List<Map<String, dynamic>> _cartItems = [];
   List<Map<String, dynamic>> _availableCoupons = [];
   Map<String, dynamic>? _appliedCoupon;
+  Map<String, dynamic>? _outletData;
 
   bool _isLoading = true;
   bool _isOnline = true;
@@ -45,6 +48,11 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
   String _selectedCategoryId = 'all';
   String _selectedPaymentMethod = 'QRIS';
   String? _currentOrderId;
+  String? _lastSuccessfulOrderId;
+  String? _lastCustomerName;
+  String? _lastPaymentMethod;
+  List<Map<String, dynamic>>? _lastCartItems;
+  double? _lastTotal;
 
   Map<String, dynamic>? _todayAttendance;
   bool _isLoadingAttendance = false;
@@ -61,20 +69,189 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
   @override
   void initState() {
     super.initState();
+    _fetchOutletData();
     _fetchData();
     _checkTodayAttendance();
     _initializeSync();
   }
 
+  Future<void> _fetchOutletData() async {
+    try {
+      final String outletId = widget.karyawanData['outletId'] ?? '';
+      if (outletId.isEmpty) return;
+
+      final outletDoc = await FirebaseFirestore.instance.collection('outlets').doc(outletId).get();
+
+      if (outletDoc.exists && mounted) {
+        setState(() {
+          _outletData = outletDoc.data();
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching outlet data: $e');
+    }
+  }
+
+  void _updateQuantityDirectly(int index, String value) {
+    if (value.isEmpty) return;
+
+    int? newQty = int.tryParse(value);
+    if (newQty == null) return;
+
+    final productId = _cartItems[index]['id'];
+    final product = _allProducts.firstWhere(
+          (p) => (p['_id'] ?? p['id']) == productId,
+      orElse: () => {},
+    );
+
+    int availableStock = product['stok'] ?? 0;
+
+    setState(() {
+      if (newQty > availableStock) {
+        _cartItems[index]['quantity'] = availableStock;
+
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Stok terbatas! Maksimal: $availableStock'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      } else if (newQty < 1) {
+        _cartItems[index]['quantity'] = 1;
+      } else {
+        _cartItems[index]['quantity'] = newQty;
+      }
+      _calculateTotals();
+    });
+  }
+
+  void _printReceipt() {
+    if (_lastSuccessfulOrderId == null || _lastCartItems == null) return;
+
+    final outletName = _outletData?['name'] ?? widget.karyawanData['outlet'];
+    final outletAddress = _outletData?['alamat'] ?? '';
+    final transactionId = _lastSuccessfulOrderId;
+    final date = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
+    final employeeName = widget.karyawanData['nama'] ?? 'Karyawan';
+    final customerName = _lastCustomerName ?? 'Customer';
+
+    int totalQty = 0;
+    for (var item in _lastCartItems!) {
+      totalQty += (item['quantity'] as int);
+    }
+
+    String receiptHtml = '''
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Struk Pembayaran</title>
+  <style>
+    @page {
+      size: 80mm auto;
+      margin: 0;
+    }
+    body {
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      width: 80mm;
+      margin: 0 auto;
+      padding: 10mm;
+    }
+    .center {
+      text-align: center;
+    }
+    .bold {
+      font-weight: bold;
+    }
+    .line {
+      border-top: 1px dashed #000;
+      margin: 5px 0;
+    }
+    .item-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 3px 0;
+    }
+    .total-section {
+      margin-top: 10px;
+      border-top: 2px solid #000;
+      padding-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="center bold" style="font-size: 14px;">$outletName</div>
+  <div class="center" style="font-size: 10px; margin-bottom: 5px;">$outletAddress</div>
+  <div class="line"></div>
+  <div>No. Transaksi: $transactionId</div>
+  <div>Tanggal: $date</div>
+  <div>Kasir: $employeeName</div>
+  <div>Pelanggan: $customerName</div>
+  <div class="line"></div>
+''';
+
+    for (var item in _lastCartItems!) {
+      final name = item['nama'] ?? '';
+      final qty = item['quantity'] ?? 1;
+      final price = (item['harga'] ?? 0).toDouble();
+      final subtotal = price * qty;
+
+      receiptHtml += '''
+  <div class="item-row">
+    <span>${qty}x $name</span>
+    <span>${_currencyFormat.format(subtotal)}</span>
+  </div>
+''';
+    }
+
+    receiptHtml += '''
+  <div class="line"></div>
+  <div class="item-row">
+    <span>Total Item ($totalQty)</span>
+    <span></span>
+  </div>
+  <div class="item-row">
+    <span>Subtotal</span>
+    <span>${_currencyFormat.format(_subtotal)}</span>
+  </div>
+  <div class="item-row">
+    <span>Pajak (10%)</span>
+    <span>${_currencyFormat.format(_pajak)}</span>
+  </div>
+  <div class="total-section">
+    <div class="item-row bold" style="font-size: 14px;">
+      <span>TOTAL</span>
+      <span>${_currencyFormat.format(_lastTotal ?? 0)}</span>
+    </div>
+  </div>
+  <div class="line"></div>
+  <div class="center">Metode Pembayaran: $_lastPaymentMethod</div>
+  <div class="center" style="margin-top: 10px;">Terima Kasih!</div>
+  <script>
+    window.onload = function() {
+      window.print();
+    }
+  </script>
+</body>
+</html>
+''';
+
+    if (kIsWeb) {
+      final blob = html.Blob([receiptHtml], 'text/html');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      html.window.open(url, '_blank');
+      html.Url.revokeObjectUrl(url);
+    }
+  }
+
   void _initializeSync() async {
     _syncManager.startListening();
-
     _isOnline = await _syncManager.isOnline();
     _pendingSyncCount = await _syncManager.getPendingCount();
-
-    if (mounted) {
-      setState(() {});
-    }
+    if (mounted) setState(() {});
 
     _syncManager.syncStatusStream.listen((status) {
       if (mounted) {
@@ -86,14 +263,10 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
               duration: const Duration(seconds: 3),
             ),
           );
-
           _updatePendingCount();
         } else if (status.isActive) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(status.message),
-              duration: const Duration(seconds: 1),
-            ),
+            SnackBar(content: Text(status.message), duration: const Duration(seconds: 1)),
           );
         }
       }
@@ -106,11 +279,7 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
 
   Future<void> _updatePendingCount() async {
     final count = await _syncManager.getPendingCount();
-    if (mounted) {
-      setState(() {
-        _pendingSyncCount = count;
-      });
-    }
+    if (mounted) setState(() => _pendingSyncCount = count);
   }
 
   @override
@@ -124,7 +293,6 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
     setState(() => _isLoading = true);
     try {
       final String outletId = widget.karyawanData['outletId'] ?? '';
-
       if (outletId.isEmpty) throw Exception("Outlet ID tidak ditemukan");
 
       final results = await Future.wait([
@@ -135,12 +303,10 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
 
       setState(() {
         _categories = results[0];
-
         List<Map<String, dynamic>> rawProducts = results[1];
         _allProducts = rawProducts.where((product) {
           return product['showInMenu'] == true || product['showInMenu'] == null;
         }).toList();
-
         _filteredProducts = _allProducts;
         _availableCoupons = results[2];
         _isLoading = false;
@@ -157,18 +323,15 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
 
   Future<void> _checkTodayAttendance() async {
     setState(() => _isLoadingAttendance = true);
-
     try {
       final String outletId = widget.karyawanData['outletId'] ?? '';
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-
       final absensiList = await _apiService.getAbsensi(
         outletId: outletId,
         karyawanId: widget.karyawanId,
         startDate: today,
         endDate: today,
       );
-
       setState(() {
         _todayAttendance = absensiList.isNotEmpty ? absensiList.first : null;
         _isLoadingAttendance = false;
@@ -217,13 +380,11 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
     );
 
     if (confirmed != true) return;
-
     setState(() => _isLoadingAttendance = true);
 
     try {
       final String karyawanName = widget.karyawanData['nama'] ?? 'Karyawan';
       final String outletId = widget.karyawanData['outletId'] ?? '';
-
       final now = DateTime.now();
 
       await _apiService.createAbsensi(
@@ -246,13 +407,9 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
       }
     } catch (e) {
       setState(() => _isLoadingAttendance = false);
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -407,12 +564,7 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
       if (index != -1) {
         _cartItems[index]['quantity']++;
       } else {
-        _cartItems.add({
-          'id': id,
-          'nama': name,
-          'harga': price,
-          'quantity': 1,
-        });
+        _cartItems.add({'id': id, 'nama': name, 'harga': price, 'quantity': 1});
       }
       _calculateTotals();
     });
@@ -453,9 +605,7 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
         discountAmount = couponValue;
       }
 
-      if (discountAmount > subtotal) {
-        discountAmount = subtotal;
-      }
+      if (discountAmount > subtotal) discountAmount = subtotal;
     }
 
     setState(() {
@@ -520,9 +670,7 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                     ),
                     const SizedBox(width: 8),
                     ElevatedButton(
-                      onPressed: () {
-                        _applyCouponByCode(codeController.text);
-                      },
+                      onPressed: () => _applyCouponByCode(codeController.text),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _primaryColor,
                         foregroundColor: Colors.white,
@@ -668,6 +816,14 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
         outletId: widget.karyawanData['outletId'] ?? '',
       );
 
+      setState(() {
+        _lastSuccessfulOrderId = result['orderId'];
+        _lastCustomerName = customerName;
+        _lastPaymentMethod = apiPaymentMethod;
+        _lastCartItems = List.from(_cartItems);
+        _lastTotal = _total;
+      });
+
       if (_selectedPaymentMethod == 'EDC' || _selectedPaymentMethod == 'Tunai') {
         await _apiService.updateTransactionStatus(result['orderId'], 'success');
         await _apiService.reduceStock(items: _cartItems);
@@ -803,6 +959,14 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
         outletId: widget.karyawanData['outletId'] ?? '',
       );
 
+      setState(() {
+        _lastSuccessfulOrderId = clientTransactionId;
+        _lastCustomerName = customerName;
+        _lastPaymentMethod = _selectedPaymentMethod;
+        _lastCartItems = List.from(_cartItems);
+        _lastTotal = _total;
+      });
+
       await _updatePendingCount();
 
       _finishTransaction();
@@ -896,6 +1060,48 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
   void _finishTransaction() async {
     await _fetchData();
 
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        title: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.green, size: 28),
+            const SizedBox(width: 8),
+            const Text('Transaksi Berhasil!'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Pembayaran telah berhasil diproses.'),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                _printReceipt();
+              },
+              icon: const Icon(Icons.print),
+              label: const Text('Cetak Struk'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primaryColor,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 48),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+
     setState(() {
       _cartItems.clear();
       _appliedCoupon = null;
@@ -906,19 +1112,6 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
       _currentOrderId = null;
       _isLoading = false;
     });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('✅ Transaksi Berhasil!'),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-        action: SnackBarAction(
-          label: 'OK',
-          textColor: Colors.white,
-          onPressed: () {},
-        ),
-      ),
-    );
   }
 
   void _showPaymentDialog() {
@@ -1033,6 +1226,7 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
       ),
     );
   }
+
   void _showIncomingOrders(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -1257,42 +1451,49 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
   @override
   Widget build(BuildContext context) {
     final String namaKaryawan = widget.karyawanData['nama'] ?? 'Karyawan';
+    final String outletDisplay = _outletData?['name'] ?? widget.karyawanData['outlet'] ?? 'Loading...';
     final bool hasCheckedIn = _todayAttendance != null && _todayAttendance!['jamMasuk'] != null;
     final bool hasCheckedOut = _todayAttendance != null && _todayAttendance!['jamKeluar'] != null;
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Kasir : $namaKaryawan'),
-            if (!_isOnline) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.orange,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text('OFFLINE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-              ),
-            ],
-            if (_pendingSyncCount > 0) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.blue,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text('$_pendingSyncCount Pending', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-              ),
-            ],
+            Text(outletDisplay, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold)),
+            Row(
+              children: [
+                Text('Karyawan : $namaKaryawan', style: const TextStyle(fontSize: 15)),
+                if (!_isOnline) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.orange,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text('OFFLINE', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+                if (_pendingSyncCount > 0) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.blue,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text('$_pendingSyncCount Pending', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ],
+            ),
           ],
         ),
+        centerTitle: true,
         backgroundColor: _primaryColor,
         foregroundColor: Colors.white,
         actions: [
-          // ADDED: Notification Icon for Incoming Orders with Badge
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('transactions')
@@ -1341,7 +1542,6 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
               );
             },
           ),
-          // END ADDED
           Stack(
             children: [
               IconButton(
@@ -1580,9 +1780,22 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                                 onPressed: () => _decrementQuantity(index),
                                 constraints: const BoxConstraints(),
                               ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
-                                child: Text('${item['quantity']}'),
+                              SizedBox(
+                                width: 40,
+                                child: TextFormField(
+                                  key: ValueKey('qty_desktop_${item['id']}_${item['quantity']}'),
+                                  initialValue: item['quantity'].toString(),
+                                  textAlign: TextAlign.center,
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(vertical: 8),
+                                    border: InputBorder.none,
+                                  ),
+                                  onFieldSubmitted: (val) => _updateQuantityDirectly(index, val),
+                                ),
                               ),
                               IconButton(
                                 icon: Icon(Icons.add_circle_outline, color: _primaryColor),
