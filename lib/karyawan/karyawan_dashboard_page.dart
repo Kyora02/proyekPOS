@@ -13,6 +13,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:html' as html;
 import 'package:flutter/services.dart';
 import 'dart:convert';
+import 'package:proyekpos2/karyawan/denah_meja_page.dart';
 
 class KaryawanDashboardPage extends StatefulWidget {
   final Map<String, dynamic> karyawanData;
@@ -26,6 +27,7 @@ class KaryawanDashboardPage extends StatefulWidget {
 
   @override
   State<KaryawanDashboardPage> createState() => _KaryawanDashboardPageState();
+
 }
 
 class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
@@ -76,6 +78,8 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
     _checkTodayAttendance();
     _initializeSync();
   }
+
+
 
   Future<void> _fetchOutletData() async {
     try {
@@ -571,6 +575,22 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                       ),
                     ),
                     onPressed: () {
+                      // Validation: Check if all variants are selected
+                      for (var group in variantsList) {
+                        if (group != null && group['groupName'] != null) {
+                          String groupName = group['groupName'].toString();
+                          if (!selections.containsKey(groupName)) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text("Silakan pilih $groupName terlebih dahulu"),
+                                backgroundColor: Colors.orange,
+                              ),
+                            );
+                            return; // Stop execution if selection is missing
+                          }
+                        }
+                      }
+
                       _addToCartDetailed(product, selections, noteController.text.trim());
                       Navigator.pop(context);
                     },
@@ -1937,6 +1957,28 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
         backgroundColor: _primaryColor,
         foregroundColor: Colors.white,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.grid_view_rounded),
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DenahMejaPage(
+                    outletId: widget.karyawanData['outletId'] ?? '',
+                  ),
+                ),
+              );
+
+              if (result != null && result is Map<String, dynamic>) {
+                setState(() {
+                  _cartItems = List<Map<String, dynamic>>.from(result['items']);
+                  _customerNameController.text = result['customerName'] ?? '';
+                  _calculateTotals();
+                });
+                _showPaymentDialog();
+              }
+            },
+          ),
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('transactions')
@@ -2413,7 +2455,6 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
     final int stock = product['stok'] ?? 0;
     final bool isOutOfStock = stock <= 0;
 
-    // Check if product has variants
     bool hasVariants = false;
     var variantsRaw = product['variants'];
     if (variantsRaw is List && variantsRaw.isNotEmpty) {
@@ -2444,7 +2485,7 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
               if (hasVariants) {
                 _showVariantSelection(product);
               } else {
-                _addToCart(product);
+                _showNoteDialog(product);
               }
             },
             child: Opacity(
@@ -2460,39 +2501,17 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                           imageUrl,
                           fit: BoxFit.cover,
                           width: double.infinity,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              color: Colors.grey[100],
-                              width: double.infinity,
-                              child: const Icon(Icons.broken_image, color: Colors.grey),
-                            );
-                          },
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            color: Colors.grey[100],
+                            width: double.infinity,
+                            child: const Icon(Icons.broken_image, color: Colors.grey),
+                          ),
                         )
                             : Container(
                           color: Colors.grey[100],
                           width: double.infinity,
                           child: const Icon(Icons.fastfood, size: 40, color: Colors.grey),
-                        ),
-                        if (hasVariants)
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: _primaryColor,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Text(
-                                'Varian',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
+                        )
                       ],
                     ),
                   ),
@@ -2514,11 +2533,7 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                             Expanded(
                               child: Text(
                                 _currencyFormat.format(price),
-                                style: TextStyle(
-                                  color: _primaryColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
+                                style: TextStyle(color: _primaryColor, fontWeight: FontWeight.bold, fontSize: 12),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -2544,14 +2559,7 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
               child: Container(
                 color: Colors.black.withOpacity(0.6),
                 child: const Center(
-                  child: Text(
-                    'HABIS',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
+                  child: Text('HABIS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
               ),
             ),
@@ -2559,6 +2567,8 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
       ),
     );
   }
+
+
 
   Widget _buildCartSummary() {
     return Container(

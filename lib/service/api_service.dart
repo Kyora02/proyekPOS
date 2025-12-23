@@ -2038,8 +2038,9 @@ class ApiService {
     required String customerName,
     required List<Map<String, dynamic>> items,
     required double totalAmount,
+    required String paymentType,
   }) async {
-    final url = Uri.parse("$publicBaseUrl/order");
+    final url = Uri.parse("$publicBaseUrl/submit-self-order");
 
     final response = await http.post(
       url,
@@ -2051,15 +2052,17 @@ class ApiService {
         "customerName": customerName,
         "items": items,
         "totalAmount": totalAmount,
+        'paymentType': paymentType,
       }),
     );
 
-    if (response.statusCode == 201) {
+    if (response.statusCode == 200 || response.statusCode == 201) {
       return jsonDecode(response.body);
     } else {
       throw Exception("Gagal membuat pesanan: ${response.body}");
     }
   }
+
   Future<void> confirmSelfOrderPayment(String orderId) async {
     final url = Uri.parse("$publicBaseUrl/confirm-payment");
 
@@ -2100,6 +2103,23 @@ class ApiService {
       return jsonDecode(response.body);
     } else {
       throw Exception("Gagal cek status: ${response.body}");
+    }
+  }
+
+  Future<void> completeOrderAndClearTable(String orderId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/complete-order-and-clear-table'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'orderId': orderId}),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to complete order and clear table');
+      }
+    } catch (e) {
+      print('Error in completeOrderAndClearTable: $e');
+      rethrow;
     }
   }
 }
