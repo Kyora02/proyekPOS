@@ -7,6 +7,7 @@ import 'package:proyekpos2/service/api_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:proyekpos2/payment/payment_webview_page.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:convert';
 
 final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
@@ -276,6 +277,20 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
 
   void _showProductDetail(BuildContext context, dynamic product) {
     final noteController = TextEditingController();
+    Map<String, String> selectedVariants = {};
+
+    List<dynamic> variantsList = [];
+    var variantsRaw = product['variants'];
+
+    if (variantsRaw is List) {
+      variantsList = variantsRaw;
+    } else if (variantsRaw is String && variantsRaw.isNotEmpty) {
+      try {
+        variantsList = json.decode(variantsRaw);
+      } catch (e) {
+        variantsList = [];
+      }
+    }
 
     showModalBottomSheet(
       context: context,
@@ -283,72 +298,119 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                height: 200,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                  image: product['imageUrl'] != null && product['imageUrl'] != ''
-                      ? DecorationImage(
-                      image: NetworkImage(product['imageUrl']), fit: BoxFit.cover)
-                      : null,
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(20),
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+              child: SingleChildScrollView(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(product['name'], style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    Text(currencyFormatter.format(product['sellingPrice']),
-                        style: const TextStyle(fontSize: 18, color: Colors.teal, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 16),
-                    const Text("Catatan Pesanan (Opsional)", style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: noteController,
-                      decoration: InputDecoration(
-                        hintText: "",
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
+                    Container(
+                      height: 200,
                       width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.teal,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
-                        ),
-                        onPressed: () {
-                          context.read<CartBloc>().add(AddCartItem(
-                            product: product,
-                            note: noteController.text,
-                          ));
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Masuk keranjang"), duration: Duration(seconds: 1)),
-                          );
-                        },
-                        child: const Text("Tambah ke Pesanan", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                        image: product['imageUrl'] != null && product['imageUrl'] != ''
+                            ? DecorationImage(image: NetworkImage(product['imageUrl']), fit: BoxFit.cover)
+                            : null,
                       ),
-                    )
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(product['name'], style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          Text(currencyFormatter.format(product['sellingPrice']),
+                              style: const TextStyle(fontSize: 18, color: Colors.teal, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 16),
+
+                          ...variantsList.map((group) {
+                            if (group == null || group['groupName'] == null) return const SizedBox.shrink();
+
+                            String groupName = group['groupName'].toString();
+                            String optionsStr = (group['options'] ?? '').toString();
+                            List<String> options = optionsStr.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+
+                            if (options.isEmpty) return const SizedBox.shrink();
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(groupName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: options.map((opt) {
+                                    bool isSelected = selectedVariants[groupName] == opt;
+                                    return ChoiceChip(
+                                      label: Text(opt),
+                                      selected: isSelected,
+                                      selectedColor: Colors.teal.withOpacity(0.2),
+                                      onSelected: (val) {
+                                        setModalState(() {
+                                          selectedVariants[groupName] = opt;
+                                        });
+                                      },
+                                      labelStyle: TextStyle(
+                                        color: isSelected ? Colors.teal : Colors.black87,
+                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+                            );
+                          }).toList(),
+
+                          const Text("Catatan Pesanan", style: TextStyle(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: noteController,
+                            decoration: InputDecoration(
+                              hintText: "",
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            maxLines: 2,
+                          ),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.teal,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+                              ),
+                              onPressed: () {
+                                context.read<CartBloc>().add(AddCartItem(
+                                  product: product,
+                                  note: noteController.text,
+                                  variants: selectedVariants,
+                                ));
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("Masuk keranjang"), duration: Duration(seconds: 1)),
+                                );
+                              },
+                              child: const Text("Tambah ke Pesanan", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            ),
+                          )
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -387,7 +449,8 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
                           final item = state.items[index];
                           return ListTile(
                             leading: Container(
-                              width: 50, height: 50,
+                              width: 50,
+                              height: 50,
                               decoration: BoxDecoration(
                                   color: Colors.grey[200],
                                   borderRadius: BorderRadius.circular(8),
@@ -400,7 +463,13 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                if (item.note.isNotEmpty) Text("Catatan: ${item.note}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                if (item.selectedVariants.isNotEmpty) ...[
+                                  ...item.selectedVariants.entries.map((e) =>
+                                      Text("• ${e.key}: ${e.value}", style: const TextStyle(fontSize: 11, color: Colors.grey))
+                                  ),
+                                ],
+                                if (item.note.isNotEmpty)
+                                  Text("Catatan: ${item.note}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
                                 Text(currencyFormatter.format(item.price)),
                               ],
                             ),
@@ -494,7 +563,8 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
         'quantity': e.quantity,
         'sellingPrice': e.price,
         'total': e.total,
-        'note': e.note
+        'note': e.note,
+        'variants': e.selectedVariants
       }).toList();
 
       final result = await ApiService().submitSelfOrder(

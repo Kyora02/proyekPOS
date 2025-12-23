@@ -180,9 +180,11 @@ class ApiService {
     XFile? imageFile,
     bool showInMenu = true,
     int? stok,
+    List<Map<String, dynamic>>? variants,
   }) async {
     final token = await _getAuthToken();
     final url = Uri.parse('$_baseUrl/products');
+
 
     var request = http.MultipartRequest('POST', url);
     request.headers['Authorization'] = 'Bearer $token';
@@ -194,6 +196,7 @@ class ApiService {
     if (costPrice != null) request.fields['costPrice'] = costPrice.toString();
     request.fields['categoryId'] = categoryId;
     request.fields['outlets'] = jsonEncode(outlets);
+    request.fields['variants'] = jsonEncode(variants ?? []);
     request.fields['showInMenu'] = showInMenu.toString();
     if (stok != null) request.fields['stok'] = stok.toString();
 
@@ -227,6 +230,7 @@ class ApiService {
     XFile? imageFile,
     bool showInMenu = true,
     int? stok,
+    List<Map<String, dynamic>>? variants,
   }) async {
     final token = await _getAuthToken();
     final url = Uri.parse('$_baseUrl/products/$id');
@@ -241,6 +245,7 @@ class ApiService {
     if (costPrice != null) request.fields['costPrice'] = costPrice.toString();
     request.fields['categoryId'] = categoryId;
     if (outlets != null) request.fields['outlets'] = jsonEncode(outlets);
+    request.fields['variants'] = jsonEncode(variants ?? []);
     request.fields['showInMenu'] = showInMenu.toString();
     if (stok != null) request.fields['stok'] = stok.toString();
 

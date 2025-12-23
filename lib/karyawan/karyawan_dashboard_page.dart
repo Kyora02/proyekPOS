@@ -12,6 +12,7 @@ import '../../payment/payment_webview_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:html' as html;
 import 'package:flutter/services.dart';
+import 'dart:convert';
 
 class KaryawanDashboardPage extends StatefulWidget {
   final Map<String, dynamic> karyawanData;
@@ -41,6 +42,8 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
   List<Map<String, dynamic>> _availableCoupons = [];
   Map<String, dynamic>? _appliedCoupon;
   Map<String, dynamic>? _outletData;
+  double? _lastSubtotal;
+  double? _lastPajak;
 
   bool _isLoading = true;
   bool _isOnline = true;
@@ -62,7 +65,6 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
   double _discount = 0.0;
   double _total = 0.0;
   final double _pajakRate = 0.10;
-
   final Color _primaryColor = const Color(0xFF00A3A3);
   final NumberFormat _currencyFormat = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
@@ -180,6 +182,18 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
       border-top: 2px solid #000;
       padding-top: 5px;
     }
+    .variant-text {
+      font-size: 10px;
+      color: #555;
+      margin-left: 10px;
+      font-style: italic;
+    }
+    .note-text {
+      font-size: 10px;
+      color: #666;
+      margin-left: 10px;
+      margin-top: 2px;
+    }
   </style>
 </head>
 <body>
@@ -198,6 +212,8 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
       final qty = item['quantity'] ?? 1;
       final price = (item['harga'] ?? 0).toDouble();
       final subtotal = price * qty;
+      final variants = item['variants'] as Map<String, dynamic>?;
+      final note = item['note'] as String?;
 
       receiptHtml += '''
   <div class="item-row">
@@ -205,8 +221,20 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
     <span>${_currencyFormat.format(subtotal)}</span>
   </div>
 ''';
-    }
+      if (variants != null && variants.isNotEmpty) {
+        for (var entry in variants.entries) {
+          receiptHtml += '''
+  <div class="variant-text">+ ${entry.key}: ${entry.value}</div>
+''';
+        }
+      }
 
+      if (note != null && note.isNotEmpty) {
+        receiptHtml += '''
+  <div class="note-text">Catatan: $note</div>
+''';
+      }
+    }
     receiptHtml += '''
   <div class="line"></div>
   <div class="item-row">
@@ -215,11 +243,11 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
   </div>
   <div class="item-row">
     <span>Subtotal</span>
-    <span>${_currencyFormat.format(_subtotal)}</span>
+    <span>${_currencyFormat.format(_lastSubtotal ?? 0)}</span>
   </div>
   <div class="item-row">
     <span>Pajak (10%)</span>
-    <span>${_currencyFormat.format(_pajak)}</span>
+    <span>${_currencyFormat.format(_lastPajak ?? 0)}</span>
   </div>
   <div class="total-section">
     <div class="item-row bold" style="font-size: 14px;">
@@ -275,6 +303,315 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
     if (_isOnline && _pendingSyncCount > 0) {
       _syncManager.syncPendingTransactions();
     }
+  }
+
+  void _showNoteDialog(Map<String, dynamic> product) {
+    final noteController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          top: 20,
+          left: 20,
+          right: 20,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      product['name'] ?? 'Produk',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                "Catatan Tambahan",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: noteController,
+                decoration: InputDecoration(
+                  hintText: "Tambahan Deskripsi",
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey[50],
+                ),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed: () {
+                    _addToCartSimple(product, noteController.text.trim());
+                    Navigator.pop(context);
+                  },
+                  child: const Text(
+                    "Tambah ke Keranjang",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _addToCartSimple(Map<String, dynamic> product, String note) {
+    final String id = product['_id'] ?? product['id'];
+    final String name = product['name'] ?? 'Produk';
+    final double price = (product['sellingPrice'] ?? 0).toDouble();
+
+    setState(() {
+      int index = _cartItems.indexWhere((item) =>
+      item['id'] == id &&
+          (item['variants'] == null || (item['variants'] as Map).isEmpty) &&
+          item['note'] == note
+      );
+
+      if (index != -1) {
+        _cartItems[index]['quantity']++;
+      } else {
+        _cartItems.add({
+          'id': id,
+          'nama': name,
+          'harga': price,
+          'quantity': 1,
+          'variants': <String, String>{},
+          'note': note,
+        });
+      }
+      _calculateTotals();
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$name ditambahkan ke keranjang'),
+        duration: const Duration(seconds: 1),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  void _showVariantSelection(Map<String, dynamic> product) {
+    Map<String, String> selections = {};
+    final noteController = TextEditingController();
+
+    List<dynamic> variantsList = [];
+    var variantsRaw = product['variants'];
+
+    if (variantsRaw is List) {
+      variantsList = variantsRaw;
+    } else if (variantsRaw is String && variantsRaw.isNotEmpty) {
+      try {
+        variantsList = jsonDecode(variantsRaw);
+      } catch (e) {
+        print('Error parsing variants: $e');
+        variantsList = [];
+      }
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            top: 20,
+            left: 20,
+            right: 20,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        product['name'] ?? 'Produk',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                ...variantsList.map((group) {
+                  if (group == null || group['groupName'] == null) return const SizedBox.shrink();
+
+                  String groupName = group['groupName'].toString();
+                  String optionsStr = (group['options'] ?? '').toString();
+                  List<String> options = optionsStr
+                      .split(',')
+                      .map((e) => e.trim())
+                      .where((e) => e.isNotEmpty)
+                      .toList();
+
+                  if (options.isEmpty) return const SizedBox.shrink();
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        groupName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: options.map((opt) {
+                          bool isSelected = selections[groupName] == opt;
+                          return ChoiceChip(
+                            label: Text(opt),
+                            selected: isSelected,
+                            selectedColor: _primaryColor.withOpacity(0.2),
+                            onSelected: (val) {
+                              setModalState(() {
+                                selections[groupName] = opt;
+                              });
+                            },
+                            labelStyle: TextStyle(
+                              color: isSelected ? _primaryColor : Colors.black87,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  );
+                }).toList(),
+
+                const Text(
+                  "Catatan Tambahan",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: noteController,
+                  decoration: InputDecoration(
+                    hintText: "Tambahan Deskripsi",
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                  ),
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () {
+                      _addToCartDetailed(product, selections, noteController.text.trim());
+                      Navigator.pop(context);
+                    },
+                    child: const Text(
+                      "Tambah ke Keranjang",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _addToCartDetailed(Map<String, dynamic> product, Map<String, String> variants, String note) {
+    setState(() {
+      final String id = product['id'] ?? product['_id'];
+      int index = _cartItems.indexWhere((item) =>
+      item['id'] == id &&
+          item['variants'].toString() == variants.toString() &&
+          item['note'] == note
+      );
+
+      if (index != -1) {
+        _cartItems[index]['quantity']++;
+      } else {
+        _cartItems.add({
+          'id': id,
+          'nama': product['name'],
+          'harga': product['sellingPrice'],
+          'quantity': 1,
+          'variants': variants,
+          'note': note
+        });
+      }
+      _calculateTotals();
+    });
   }
 
   Future<void> _updatePendingCount() async {
@@ -554,20 +891,7 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
   }
 
   void _addToCart(Map<String, dynamic> product) {
-    setState(() {
-      final String id = product['_id'] ?? product['id'];
-      final String name = product['name'] ?? 'Produk';
-      final double price = (product['sellingPrice'] ?? 0).toDouble();
-
-      int index = _cartItems.indexWhere((item) => item['id'] == id);
-
-      if (index != -1) {
-        _cartItems[index]['quantity']++;
-      } else {
-        _cartItems.add({'id': id, 'nama': name, 'harga': price, 'quantity': 1});
-      }
-      _calculateTotals();
-    });
+    _showNoteDialog(product);
   }
 
   void _incrementQuantity(int index) {
@@ -822,6 +1146,8 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
         _lastPaymentMethod = apiPaymentMethod;
         _lastCartItems = List.from(_cartItems);
         _lastTotal = _total;
+        _lastSubtotal = _subtotal;
+        _lastPajak = _pajak;
       });
 
       if (_selectedPaymentMethod == 'EDC' || _selectedPaymentMethod == 'Tunai') {
@@ -965,6 +1291,8 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
         _lastPaymentMethod = _selectedPaymentMethod;
         _lastCartItems = List.from(_cartItems);
         _lastTotal = _total;
+        _lastSubtotal = _subtotal;
+        _lastPajak = _pajak;
       });
 
       await _updatePendingCount();
@@ -1406,31 +1734,146 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                       itemCount: _cartItems.length,
                       itemBuilder: (context, index) {
                         final item = _cartItems[index];
+                        final variants = item['variants'] as Map<String, String>?;
+                        final note = item['note'] as String?;
+
                         return Card(
                           color: Colors.white,
                           surfaceTintColor: Colors.white,
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: ListTile(
-                            title: Text(item['nama'], maxLines: 1, overflow: TextOverflow.ellipsis),
-                            subtitle: Text(_currencyFormat.format(item['harga'] * item['quantity'])),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
+                          margin: const EdgeInsets.only(bottom: 12),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                IconButton(
-                                  icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                                  onPressed: () {
-                                    _decrementQuantity(index);
-                                    setSheetState(() {});
-                                  },
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            item['nama'],
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            _currencyFormat.format(item['harga'] * item['quantity']),
+                                            style: TextStyle(
+                                              color: _primaryColor,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 24),
+                                          onPressed: () {
+                                            _decrementQuantity(index);
+                                            setSheetState(() {});
+                                          },
+                                        ),
+                                        Text(
+                                          '${item['quantity']}',
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        IconButton(
+                                          icon: Icon(Icons.add_circle_outline, color: _primaryColor, size: 24),
+                                          onPressed: () {
+                                            _incrementQuantity(index);
+                                            setSheetState(() {});
+                                          },
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 24),
+                                          onPressed: () {
+                                            setState(() {
+                                              _cartItems.removeAt(index);
+                                              _calculateTotals();
+                                            });
+                                            setSheetState(() {});
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
-                                Text('${item['quantity']}'),
-                                IconButton(
-                                  icon: Icon(Icons.add_circle_outline, color: _primaryColor),
-                                  onPressed: () {
-                                    _incrementQuantity(index);
-                                    setSheetState(() {});
-                                  },
-                                ),
+                                // Display variants if available
+                                if (variants != null && variants.isNotEmpty) ...[
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[100],
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Pilihan:',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black54,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        ...variants.entries.map((entry) => Padding(
+                                          padding: const EdgeInsets.only(bottom: 3),
+                                          child: Text(
+                                            '• ${entry.key}: ${entry.value}',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        )),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                if (note != null && note.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange[50],
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.orange[200]!),
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Icon(Icons.note, size: 16, color: Colors.orange[700]),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            note,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.orange[900],
+                                              fontStyle: FontStyle.italic,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -1463,7 +1906,7 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
             Text(outletDisplay, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold)),
             Row(
               children: [
-                Text('Karyawan : $namaKaryawan', style: const TextStyle(fontSize: 15)),
+                Text('Karyawan : $namaKaryawan', style: const TextStyle(fontSize: 20)),
                 if (!_isOnline) ...[
                   const SizedBox(width: 8),
                   Container(
@@ -1764,44 +2207,154 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                     itemCount: _cartItems.length,
                     itemBuilder: (context, index) {
                       final item = _cartItems[index];
+                      final variants = item['variants'] as Map<String, String>?;
+                      final note = item['note'] as String?;
+
                       return Card(
                         color: Colors.white,
                         surfaceTintColor: Colors.white,
                         margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          dense: true,
-                          title: Text(item['nama'], maxLines: 1, overflow: TextOverflow.ellipsis),
-                          subtitle: Text(_currencyFormat.format(item['harga'] * item['quantity'])),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              IconButton(
-                                icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                                onPressed: () => _decrementQuantity(index),
-                                constraints: const BoxConstraints(),
-                              ),
-                              SizedBox(
-                                width: 40,
-                                child: TextFormField(
-                                  key: ValueKey('qty_desktop_${item['id']}_${item['quantity']}'),
-                                  initialValue: item['quantity'].toString(),
-                                  textAlign: TextAlign.center,
-                                  keyboardType: TextInputType.number,
-                                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                                  decoration: const InputDecoration(
-                                    isDense: true,
-                                    contentPadding: EdgeInsets.symmetric(vertical: 8),
-                                    border: InputBorder.none,
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          item['nama'],
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          _currencyFormat.format(item['harga'] * item['quantity']),
+                                          style: TextStyle(
+                                            color: _primaryColor,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  onFieldSubmitted: (val) => _updateQuantityDirectly(index, val),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                                        onPressed: () => _decrementQuantity(index),
+                                        constraints: const BoxConstraints(),
+                                        padding: const EdgeInsets.all(4),
+                                      ),
+                                      SizedBox(
+                                        width: 40,
+                                        child: TextFormField(
+                                          key: ValueKey('qty_desktop_${item['id']}_${item['quantity']}'),
+                                          initialValue: item['quantity'].toString(),
+                                          textAlign: TextAlign.center,
+                                          keyboardType: TextInputType.number,
+                                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                          decoration: const InputDecoration(
+                                            isDense: true,
+                                            contentPadding: EdgeInsets.symmetric(vertical: 8),
+                                            border: InputBorder.none,
+                                          ),
+                                          onFieldSubmitted: (val) => _updateQuantityDirectly(index, val),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: Icon(Icons.add_circle_outline, color: _primaryColor),
+                                        onPressed: () => _incrementQuantity(index),
+                                        constraints: const BoxConstraints(),
+                                        padding: const EdgeInsets.all(4),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                        onPressed: () {
+                                          setState(() {
+                                            _cartItems.removeAt(index);
+                                            _calculateTotals();
+                                          });
+                                        },
+                                        constraints: const BoxConstraints(),
+                                        padding: const EdgeInsets.all(4),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              if (variants != null && variants.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[100],
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Pilihan:',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black54,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      ...variants.entries.map((entry) => Padding(
+                                        padding: const EdgeInsets.only(bottom: 2),
+                                        child: Text(
+                                          '• ${entry.key}: ${entry.value}',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                      )),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              IconButton(
-                                icon: Icon(Icons.add_circle_outline, color: _primaryColor),
-                                onPressed: () => _incrementQuantity(index),
-                                constraints: const BoxConstraints(),
-                              ),
+                              ],
+                              // Display note if available
+                              if (note != null && note.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange[50],
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: Colors.orange[200]!),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.note, size: 14, color: Colors.orange[700]),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          note,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.orange[900],
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -1860,6 +2413,22 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
     final int stock = product['stok'] ?? 0;
     final bool isOutOfStock = stock <= 0;
 
+    // Check if product has variants
+    bool hasVariants = false;
+    var variantsRaw = product['variants'];
+    if (variantsRaw is List && variantsRaw.isNotEmpty) {
+      hasVariants = true;
+    } else if (variantsRaw is String && variantsRaw.isNotEmpty) {
+      try {
+        var decoded = jsonDecode(variantsRaw);
+        if (decoded is List && decoded.isNotEmpty) {
+          hasVariants = true;
+        }
+      } catch (e) {
+        hasVariants = false;
+      }
+    }
+
     return Card(
       elevation: 2,
       color: Colors.white,
@@ -1869,30 +2438,62 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
       child: Stack(
         children: [
           InkWell(
-            onTap: isOutOfStock ? null : () => _addToCart(product),
+            onTap: isOutOfStock
+                ? null
+                : () {
+              if (hasVariants) {
+                _showVariantSelection(product);
+              } else {
+                _addToCart(product);
+              }
+            },
             child: Opacity(
               opacity: isOutOfStock ? 0.5 : 1.0,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: (imageUrl != null && imageUrl.isNotEmpty)
-                        ? Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
+                    child: Stack(
+                      children: [
+                        (imageUrl != null && imageUrl.isNotEmpty)
+                            ? Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: Colors.grey[100],
+                              width: double.infinity,
+                              child: const Icon(Icons.broken_image, color: Colors.grey),
+                            );
+                          },
+                        )
+                            : Container(
                           color: Colors.grey[100],
                           width: double.infinity,
-                          child: const Icon(Icons.broken_image, color: Colors.grey),
-                        );
-                      },
-                    )
-                        : Container(
-                      color: Colors.grey[100],
-                      width: double.infinity,
-                      child: const Icon(Icons.fastfood, size: 40, color: Colors.grey),
+                          child: const Icon(Icons.fastfood, size: 40, color: Colors.grey),
+                        ),
+                        if (hasVariants)
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: _primaryColor,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Text(
+                                'Varian',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   Padding(
@@ -1913,7 +2514,11 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                             Expanded(
                               child: Text(
                                 _currencyFormat.format(price),
-                                style: TextStyle(color: _primaryColor, fontWeight: FontWeight.bold, fontSize: 12),
+                                style: TextStyle(
+                                  color: _primaryColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -1941,7 +2546,11 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                 child: const Center(
                   child: Text(
                     'HABIS',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
               ),

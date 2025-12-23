@@ -7,6 +7,7 @@ class CartItem {
   final String? imageUrl;
   final int quantity;
   final String note;
+  final Map<String, String> selectedVariants;
 
   CartItem({
     required this.id,
@@ -15,6 +16,7 @@ class CartItem {
     this.imageUrl,
     this.quantity = 1,
     this.note = '',
+    this.selectedVariants = const {},
   });
 
   double get total => price * quantity;
@@ -36,8 +38,9 @@ abstract class CartEvent {}
 class AddCartItem extends CartEvent {
   final Map<String, dynamic> product;
   final String note;
+  final Map<String, String> variants;
 
-  AddCartItem({required this.product, this.note = ''});
+  AddCartItem({required this.product, this.note = '', this.variants = const {}});
 }
 
 class UpdateCartItemQuantity extends CartEvent {
@@ -68,14 +71,24 @@ class CartBloc extends Bloc<CartEvent, CartState> {
 
   void _onAddItem(AddCartItem event, Emitter<CartState> emit) {
     final existingIndex = state.items.indexWhere(
-            (item) => item.id == event.product['id'] && item.note == event.note
+            (item) => item.id == event.product['id'] &&
+            item.note == event.note &&
+            item.selectedVariants.toString() == event.variants.toString()
     );
 
     List<CartItem> updatedList = List.from(state.items);
 
     if (existingIndex >= 0) {
       final currentItem = updatedList[existingIndex];
-      updatedList[existingIndex] = currentItem.copyWith(quantity: currentItem.quantity + 1);
+      updatedList[existingIndex] = CartItem(
+        id: currentItem.id,
+        name: currentItem.name,
+        price: currentItem.price,
+        imageUrl: currentItem.imageUrl,
+        quantity: currentItem.quantity + 1,
+        note: currentItem.note,
+        selectedVariants: currentItem.selectedVariants,
+      );
     } else {
       updatedList.add(CartItem(
         id: event.product['id'],
@@ -83,6 +96,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
         price: (event.product['sellingPrice'] as num).toDouble(),
         imageUrl: event.product['imageUrl'],
         note: event.note,
+        selectedVariants: event.variants,
       ));
     }
 

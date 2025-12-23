@@ -23,7 +23,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
   final _apiService = ApiService();
   bool _isLoading = false;
   bool _isFetchingData = true;
-
+  List<Map<String, dynamic>> _variants = [];
   final _namaProdukController = TextEditingController();
   final _deskripsiController = TextEditingController();
   final _skuController = TextEditingController();
@@ -80,6 +80,12 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
     }
   }
 
+  void _addVariantGroup() {
+    setState(() {
+      _variants.add({'groupName': '', 'options': ''});
+    });
+  }
+
   void _populateFieldsForEdit() {
     final product = widget.product!;
     _namaProdukController.text = product['name'] ?? '';
@@ -89,8 +95,11 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
     _hargaBeliController.text = product['costPrice']?.toString() ?? '0';
     _stokController.text = product['stok']?.toString() ?? '0';
     _existingImageUrl = product['imageUrl'];
-
     _showInMenu = product['showInMenu'] ?? true;
+
+    if (product['variants'] != null) {
+      _variants = List<Map<String, dynamic>>.from(product['variants']);
+    }
 
     final savedCategoryId = product['categoryId'];
     if (_kategoriOptions.any((cat) => cat['id'] == savedCategoryId)) {
@@ -141,6 +150,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
           sellingPrice: sellingPrice,
           costPrice: costPrice,
           stok: stok,
+          variants: _variants,
           categoryId: _selectedKategoriId!,
           outlets: outletsToSave,
           imageFile: _imageFile,
@@ -156,6 +166,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
           stok: stok,
           categoryId: _selectedKategoriId!,
           outlets: outletsToSave,
+          variants: _variants,
           imageFile: _imageFile,
           showInMenu: _showInMenu,
         );
@@ -339,6 +350,8 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  _buildVariantSection(),
+                  const SizedBox(height: 24),
                   _buildSectionCard(
                     title: 'Harga dan SKU',
                     child: Column(
@@ -473,6 +486,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
     String? prefixText,
+    ValueChanged<String>? onChanged,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -570,6 +584,97 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildVariantSection() {
+    return _buildSectionCard(
+      title: 'Konfigurasi Varian (Add-ons)',
+      child: Column(
+        children: [
+          ..._variants.asMap().entries.map((entry) {
+            int index = entry.key;
+            Map<String, dynamic> variant = entry.value;
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Nama Grup', style: TextStyle(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          initialValue: variant['groupName'] ?? '',
+                          decoration: InputDecoration(
+                            hintText: 'Misal: Level Es',
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.grey[300]!),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.grey[300]!),
+                            ),
+                          ),
+                          onChanged: (value) {
+                            _variants[index]['groupName'] = value;
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Opsi', style: TextStyle(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          initialValue: variant['options'] ?? '',
+                          decoration: InputDecoration(
+                            hintText: 'Normal, Less, No',
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.grey[300]!),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.grey[300]!),
+                            ),
+                          ),
+                          onChanged: (value) {
+                            _variants[index]['options'] = value;
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () => setState(() => _variants.removeAt(index)),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: _addVariantGroup,
+            icon: const Icon(Icons.add),
+            label: const Text('Tambah Grup Varian'),
+          ),
+        ],
+      ),
     );
   }
 }
