@@ -79,8 +79,6 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
     _initializeSync();
   }
 
-
-
   Future<void> _fetchOutletData() async {
     try {
       final String outletId = widget.karyawanData['outletId'] ?? '';

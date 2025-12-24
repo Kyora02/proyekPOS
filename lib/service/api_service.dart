@@ -2037,29 +2037,36 @@ class ApiService {
     required String tableNumber,
     required String customerName,
     required List<Map<String, dynamic>> items,
-    required double totalAmount,
+    required num totalAmount,
     required String paymentType,
+    String? karyawanId,
+    String? karyawanName,
   }) async {
-    final url = Uri.parse("$publicBaseUrl/submit-self-order");
+    try {
+      final response = await http.post(
+        Uri.parse('$publicBaseUrl/submit-self-order'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'outletId': outletId,
+          'tableId': tableId,
+          'tableNumber': tableNumber,
+          'customerName': customerName,
+          'items': items,
+          'totalAmount': totalAmount,
+          'paymentType': paymentType,
+          'karyawanId': karyawanId,
+          'karyawanName': karyawanName,
+        }),
+      );
 
-    final response = await http.post(
-      url,
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "outletId": outletId,
-        "tableId": tableId,
-        "tableNumber": tableNumber,
-        "customerName": customerName,
-        "items": items,
-        "totalAmount": totalAmount,
-        'paymentType': paymentType,
-      }),
-    );
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception("Gagal membuat pesanan: ${response.body}");
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to submit order');
+      }
+    } catch (e) {
+      throw Exception('Error submitting order: $e');
     }
   }
 

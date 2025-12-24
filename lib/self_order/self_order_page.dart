@@ -4,10 +4,9 @@ import 'package:intl/intl.dart';
 import 'package:proyekpos2/bloc/cart/cart_bloc.dart';
 import 'package:proyekpos2/bloc/menu/menu_bloc.dart';
 import 'package:proyekpos2/service/api_service.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:proyekpos2/payment/payment_webview_page.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
@@ -30,12 +29,36 @@ class SelfOrderPage extends StatefulWidget {
 class _SelfOrderPageState extends State<SelfOrderPage> {
   final TextEditingController _nameController = TextEditingController();
   String _selectedPaymentType = 'Online';
+  String? _karyawanId;
+  String? _karyawanName;
 
   @override
   void initState() {
     super.initState();
     if (widget.outletId != null) {
       context.read<MenuBloc>().add(FetchMenu(widget.outletId!));
+      _fetchKaryawanData();
+    }
+  }
+
+  Future<void> _fetchKaryawanData() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final karyawanDoc = await FirebaseFirestore.instance
+            .collection('karyawan')
+            .doc(user.uid)
+            .get();
+
+        if (karyawanDoc.exists) {
+          setState(() {
+            _karyawanId = user.uid;
+            _karyawanName = karyawanDoc.data()?['nama'] ?? 'Staff';
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching karyawan data: $e');
     }
   }
 
@@ -404,7 +427,7 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
                           TextField(
                             controller: noteController,
                             decoration: InputDecoration(
-                              hintText: "",
+                              hintText: "Contoh: Tidak pakai es",
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                             ),
                             maxLines: 2,
@@ -568,7 +591,7 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
                                     ),
                                     onPressed: state.items.isEmpty
                                         ? null
-                                        : () => _submitOrder(parentContext, state), // Langsung panggil submit
+                                        : () => _submitOrder(parentContext, state),
                                     child: const Text("Pesan Sekarang", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                                   ),
                                 ),
@@ -607,13 +630,15 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
       }).toList();
 
       await ApiService().submitSelfOrder(
-          outletId: widget.outletId!,
-          tableId: widget.tableId!,
-          tableNumber: widget.tableNumber ?? '-',
-          customerName: _nameController.text,
-          items: itemsMap,
-          totalAmount: state.totalAmount,
-          paymentType: _selectedPaymentType,
+        outletId: widget.outletId!,
+        tableId: widget.tableId!,
+        tableNumber: widget.tableNumber ?? '-',
+        customerName: _nameController.text,
+        items: itemsMap,
+        totalAmount: state.totalAmount,
+        paymentType: _selectedPaymentType,
+        karyawanId: _karyawanId,
+        karyawanName: _karyawanName,
       );
 
       if (mounted) {
@@ -633,10 +658,15 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
         context: context,
         barrierDismissible: false,
         builder: (_) => AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Icon(Icons.check_circle_outline, color: Colors.teal, size: 60),
           content: const Text("Pesanan Berhasil Dikirim!\n\nSilakan konfirmasi pembayaran ke kasir setelah selesai makan.", textAlign: TextAlign.center),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK", style: TextStyle(fontSize: 16))
+            )
           ],
         )
     );
@@ -674,7 +704,7 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
                         print(e);
                       }
                     },
-                    child: const Text(" Saya Sudah Bayar"),
+                    child: const Text("Saya Sudah Bayar"),
                   )
                 ],
               ),
@@ -690,6 +720,7 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
         context: context,
         barrierDismissible: false,
         builder: (_) => AlertDialog(
+          backgroundColor: Colors.white,
           title: const Icon(Icons.check_circle, color: Colors.green, size: 60),
           content: const Text("Pembayaran Berhasil!\nPesanan Anda sedang di proses.", textAlign: TextAlign.center),
           actions: [
