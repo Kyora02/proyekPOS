@@ -14,6 +14,7 @@ import 'dart:html' as html;
 import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'package:proyekpos2/karyawan/denah_meja_page.dart';
+import 'package:proyekpos2/selfie_attendance_dialog.dart';
 
 class KaryawanDashboardPage extends StatefulWidget {
   final Map<String, dynamic> karyawanData;
@@ -27,7 +28,6 @@ class KaryawanDashboardPage extends StatefulWidget {
 
   @override
   State<KaryawanDashboardPage> createState() => _KaryawanDashboardPageState();
-
 }
 
 class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
@@ -573,7 +573,6 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                       ),
                     ),
                     onPressed: () {
-                      // Validation: Check if all variants are selected
                       for (var group in variantsList) {
                         if (group != null && group['groupName'] != null) {
                           String groupName = group['groupName'].toString();
@@ -584,7 +583,7 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                                 backgroundColor: Colors.orange,
                               ),
                             );
-                            return; // Stop execution if selection is missing
+                            return;
                           }
                         }
                       }
@@ -697,62 +696,51 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
     }
   }
 
-  Future<void> _performAttendance() async {
+  Future<void> _performAttendance(StateSetter setDialogState) async {
     final bool isCheckIn = _todayAttendance == null || _todayAttendance!['jamMasuk'] == null;
-    final String action = isCheckIn ? 'Check In' : 'Check Out';
-    final String message = isCheckIn
-        ? 'Apakah Anda yakin ingin melakukan absen masuk?'
-        : 'Apakah Anda yakin ingin melakukan absen keluar?';
 
-    final bool? confirmed = await showDialog<bool>(
+    final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        title: Text('Konfirmasi $action'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              minimumSize: const Size(100, 48),
-            ),
-            child: const Text('Batal', style: TextStyle(fontSize: 16)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _primaryColor,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              minimumSize: const Size(120, 48),
-            ),
-            child: const Text('Ya, Lanjutkan', style: TextStyle(fontSize: 16)),
-          ),
-        ],
+      barrierDismissible: false,
+      builder: (context) => SelfieAttendanceDialog(
+        karyawanId: widget.karyawanId,
+        karyawanName: widget.karyawanData['nama'] ?? 'Karyawan',
+        outletId: widget.karyawanData['outletId'] ?? '',
+        isCheckIn: isCheckIn,
+        onImageCaptured: (imageUrl) async {
+          await _submitAttendanceWithImage(imageUrl, isCheckIn);
+        },
       ),
     );
 
-    if (confirmed != true) return;
-    setState(() => _isLoadingAttendance = true);
+    if (result == true) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      await _checkTodayAttendance();
+      if (mounted) {
+        setDialogState(() {});
+        setState(() {});
+      }
+    }
+  }
 
+  Future<void> _submitAttendanceWithImage(String imageUrl, bool isCheckIn) async {
     try {
       final String karyawanName = widget.karyawanData['nama'] ?? 'Karyawan';
       final String outletId = widget.karyawanData['outletId'] ?? '';
-      final now = DateTime.now();
 
-      await _apiService.createAbsensi(
+      final String timestamp = DateTime.now().toUtc().toIso8601String();
+
+      final response = await _apiService.createAbsensi(
         karyawanId: widget.karyawanId,
         karyawanName: karyawanName,
         outletId: outletId,
         type: isCheckIn ? 'masuk' : 'keluar',
-        timestamp: now.toUtc().toIso8601String(),
+        timestamp: timestamp,
+        imageUrl: imageUrl,
       );
 
-      await _checkTodayAttendance();
-
       if (mounted) {
+        Navigator.of(context).pop(true);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(isCheckIn ? '✅ Absen masuk berhasil!' : '✅ Absen keluar berhasil!'),
@@ -761,10 +749,12 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
         );
       }
     } catch (e) {
-      setState(() => _isLoadingAttendance = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -775,56 +765,51 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
       context: context,
       builder: (context) => Dialog(
         backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.85,
-          constraints: const BoxConstraints(maxWidth: 500),
-          padding: const EdgeInsets.all(24),
-          child: StatefulBuilder(
-            builder: (context, setDialogState) {
-              final bool hasCheckedIn = _todayAttendance != null && _todayAttendance!['jamMasuk'] != null;
-              final bool hasCheckedOut = _todayAttendance != null && _todayAttendance!['jamKeluar'] != null;
+        child: StatefulBuilder(
+          builder: (context, setDialogState) {
+            final bool hasCheckedIn = _todayAttendance != null && _todayAttendance!['jamMasuk'] != null;
+            final bool hasCheckedOut = _todayAttendance != null && _todayAttendance!['jamKeluar'] != null;
 
-              String jamMasuk = '-';
-              String jamKeluar = '-';
+            String jamMasuk = '-';
+            String jamKeluar = '-';
 
-              if (hasCheckedIn) {
-                final DateTime masuk = DateTime.parse(_todayAttendance!['jamMasuk']).toLocal();
-                jamMasuk = DateFormat('HH:mm').format(masuk);
-              }
+            if (hasCheckedIn) {
+              final DateTime masuk = DateTime.parse(_todayAttendance!['jamMasuk']).toLocal();
+              jamMasuk = DateFormat('HH:mm').format(masuk);
+            }
 
-              if (hasCheckedOut) {
-                final DateTime keluar = DateTime.parse(_todayAttendance!['jamKeluar']).toLocal();
-                jamKeluar = DateFormat('HH:mm').format(keluar);
-              }
+            if (hasCheckedOut) {
+              final DateTime keluar = DateTime.parse(_todayAttendance!['jamKeluar']).toLocal();
+              jamKeluar = DateFormat('HH:mm').format(keluar);
+            }
 
-              return Column(
+            return Container(
+              constraints: const BoxConstraints(maxWidth: 400),
+              padding: const EdgeInsets.all(24),
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Icon(Icons.access_time, color: _primaryColor, size: 24),
-                          const SizedBox(width: 8),
-                          const Text('Absensi Hari Ini', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                        ],
+                      const Text(
+                        'Absensi Hari Ini',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
-                      IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [_primaryColor, _primaryColor.withOpacity(0.8)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: const Color(0xFF00A3A3),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
@@ -833,26 +818,21 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                           children: [
                             Expanded(
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Text('Jam Masuk', style: TextStyle(color: Colors.white70, fontSize: 12)),
                                   const SizedBox(height: 4),
-                                  Text(jamMasuk, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                                  Text(jamMasuk, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
                                 ],
                               ),
                             ),
-                            Container(width: 1, height: 50, color: Colors.white30),
+                            Container(width: 1, height: 30, color: Colors.white30),
                             Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.only(left: 16),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('Jam Keluar', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                                    const SizedBox(height: 4),
-                                    Text(jamKeluar, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
+                              child: Column(
+                                children: [
+                                  const Text('Jam Keluar', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                                  const SizedBox(height: 4),
+                                  Text(jamKeluar, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                                ],
                               ),
                             ),
                           ],
@@ -860,28 +840,24 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                         const SizedBox(height: 24),
                         SizedBox(
                           width: double.infinity,
+                          height: 45,
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
-                              foregroundColor: _primaryColor,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              foregroundColor: const Color(0xFF00A3A3),
+                              elevation: 0,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
                             onPressed: (hasCheckedOut || _isLoadingAttendance)
                                 ? null
-                                : () async {
-                              await _performAttendance();
-                              if (mounted) Navigator.pop(context);
-                            },
+                                : () => _performAttendance(setDialogState),
                             child: _isLoadingAttendance
-                                ? SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(_primaryColor)),
-                            )
+                                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF00A3A3)))
                                 : Text(
-                              hasCheckedOut ? 'Sudah Absen Hari Ini' : hasCheckedIn ? 'Absen Keluar' : 'Absen Masuk',
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              hasCheckedOut
+                                  ? 'Selesai'
+                                  : hasCheckedIn ? 'Absen Keluar' : 'Absen Masuk',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
                             ),
                           ),
                         ),
@@ -889,13 +865,14 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                     ),
                   ),
                 ],
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
   }
+
 
   void _filterProducts(String categoryId) {
     setState(() {
@@ -1829,7 +1806,6 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                                     ),
                                   ],
                                 ),
-                                // Display variants if available
                                 if (variants != null && variants.isNotEmpty) ...[
                                   const SizedBox(height: 12),
                                   Container(
@@ -2367,7 +2343,6 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
                                   ),
                                 ),
                               ],
-                              // Display note if available
                               if (note != null && note.isNotEmpty) ...[
                                 const SizedBox(height: 8),
                                 Container(
@@ -2565,8 +2540,6 @@ class _KaryawanDashboardPageState extends State<KaryawanDashboardPage> {
       ),
     );
   }
-
-
 
   Widget _buildCartSummary() {
     return Container(

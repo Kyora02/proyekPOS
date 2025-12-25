@@ -58,133 +58,91 @@ class _DenahMejaPageState extends State<DenahMejaPage> {
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                "Pilih Metode Pembayaran",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                  color: Colors.black87,
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  "Metode Pembayaran",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE0F7F7),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    const Text(
-                      "Total Pembayaran",
-                      style: TextStyle(fontSize: 14, color: Colors.black54),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      currencyFormatter.format(orderData['totalAmount']),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 24,
-                        color: Color(0xFF00A3A3),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              InkWell(
-                onTap: () {
-                  Navigator.pop(context);
-                  _closeBill(orderData['orderId'], tableId, "Tunai", orderData);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.green, width: 2),
-                    borderRadius: BorderRadius.circular(12),
-                    color: Colors.white,
+                    color: const Color(0xFFF0F9F9),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Row(
+                  child: Column(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.money, color: Colors.green, size: 28),
-                      ),
-                      const SizedBox(width: 16),
-                      const Text(
-                        "TUNAI / CASH",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
+                      const Text("Total Tagihan", style: TextStyle(fontSize: 12, color: Colors.black54)),
+                      const SizedBox(height: 4),
+                      Text(
+                        currencyFormatter.format(orderData['totalAmount']),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 24, color: Color(0xFF00A3A3)),
                       ),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              InkWell(
-                onTap: () {
-                  Navigator.pop(context);
-                  _closeBill(orderData['orderId'], tableId, "EDC", orderData);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.blue, width: 2),
-                    borderRadius: BorderRadius.circular(12),
-                    color: Colors.white,
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.credit_card, color: Colors.blue, size: 28),
-                      ),
-                      const SizedBox(width: 16),
-                      const Text(
-                        "EDC / KARTU",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
-                  ),
+                const SizedBox(height: 24),
+                _buildPaymentOption(
+                  icon: Icons.payments_outlined,
+                  label: "TUNAI",
+                  color: Colors.green,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _closeBill(orderData['orderId'], tableId, "Tunai", orderData);
+                  },
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text(
-                  "Batal",
-                  style: TextStyle(color: Colors.grey, fontSize: 16),
+                const SizedBox(height: 12),
+                _buildPaymentOption(
+                  icon: Icons.credit_card_outlined,
+                  label: "EDC / TRANSFER",
+                  color: Colors.blue,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _closeBill(orderData['orderId'], tableId, "EDC", orderData);
+                  },
                 ),
-              ),
-            ],
+                const SizedBox(height: 20),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Batal", style: TextStyle(color: Colors.grey, fontSize: 16)),
+                ),
+              ],
+            ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentOption({required IconData icon, required String label, required Color color, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: color.withOpacity(0.3)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 28),
+            const SizedBox(width: 16),
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+            const Spacer(),
+            const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+          ],
         ),
       ),
     );
@@ -199,18 +157,10 @@ class _DenahMejaPageState extends State<DenahMejaPage> {
 
     try {
       final token = await _getAuthToken();
-
       final response = await http.post(
         Uri.parse('$_baseUrl/payment/close-bill-pos'),
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $token",
-        },
-        body: jsonEncode({
-          'orderId': orderId,
-          'tableId': tableId,
-          'paymentMethod': method,
-        }),
+        headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"},
+        body: jsonEncode({'orderId': orderId, 'tableId': tableId, 'paymentMethod': method}),
       );
 
       if (mounted) Navigator.pop(context);
@@ -220,28 +170,18 @@ class _DenahMejaPageState extends State<DenahMejaPage> {
         if (result['success']) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("Pembayaran Berhasil & Meja Kosong"),
-                backgroundColor: Colors.green,
-              ),
+              const SnackBar(content: Text("Pembayaran Berhasil"), backgroundColor: Colors.green),
             );
             _showPrintReceiptDialog(orderId, orderData, method);
           }
         } else {
-          throw Exception(result['message'] ?? 'Payment failed');
+          throw Exception(result['message'] ?? 'Gagal');
         }
-      } else {
-        throw Exception('Server error: ${response.statusCode}');
       }
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error: $e"),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red));
       }
     }
   }
@@ -250,88 +190,38 @@ class _DenahMejaPageState extends State<DenahMejaPage> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text("Transaksi Berhasil", textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        content: const Text("Cetak struk belanja?", textAlign: TextAlign.center),
+        actionsAlignment: MainAxisAlignment.center,
+        actionsPadding: const EdgeInsets.only(bottom: 16),
+        actions: [
+          SizedBox(
+            width: 100,
+            child: TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("TUTUP", style: TextStyle(color: Colors.grey)),
+            ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check_circle,
-                  color: Colors.green,
-                  size: 48,
-                ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 100,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00A3A3),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              const SizedBox(height: 16),
-              const Text(
-                "Transaksi Berhasil",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                "Apakah Anda ingin mencetak struk belanja?",
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.black54),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: const BorderSide(color: Colors.grey),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text(
-                        "TUTUP",
-                        style: TextStyle(color: Colors.grey, fontSize: 16),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00A3A3),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _printReceipt(orderId, orderData, paymentMethod);
-                      },
-                      child: const Text(
-                        "CETAK STRUK",
-                        style: TextStyle(color: Colors.white, fontSize: 16),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              onPressed: () {
+                Navigator.pop(context);
+                _printReceipt(orderId, orderData, paymentMethod);
+              },
+              child: const Text("CETAK"),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -340,18 +230,10 @@ class _DenahMejaPageState extends State<DenahMejaPage> {
     try {
       final outletName = _outletData?['name'] ?? 'Outlet';
       final outletAddress = _outletData?['alamat'] ?? '';
-      final transactionId = orderId;
       final date = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
       final customerName = orderData['customerName'] ?? 'Guest';
       final tableNumber = orderData['tableNumber'] ?? '-';
-
       final List<dynamic> items = orderData['items'] ?? [];
-
-      int totalQty = 0;
-      for (var item in items) {
-        totalQty += (item['quantity'] as int);
-      }
-
       final subtotal = orderData['subTotal'] ?? orderData['totalAmount'] ?? 0;
       final tax = orderData['tax'] ?? 0;
       final total = orderData['totalAmount'] ?? 0;
@@ -360,133 +242,43 @@ class _DenahMejaPageState extends State<DenahMejaPage> {
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Struk Pembayaran</title>
   <style>
-    @page {
-      size: 80mm auto;
-      margin: 0;
-    }
-    body {
-      font-family: 'Courier New', monospace;
-      font-size: 12px;
-      width: 80mm;
-      margin: 0 auto;
-      padding: 10mm;
-    }
-    .center {
-      text-align: center;
-    }
-    .bold {
-      font-weight: bold;
-    }
-    .line {
-      border-top: 1px dashed #000;
-      margin: 5px 0;
-    }
-    .item-row {
-      display: flex;
-      justify-content: space-between;
-      margin: 3px 0;
-    }
-    .total-section {
-      margin-top: 10px;
-      border-top: 2px solid #000;
-      padding-top: 5px;
-    }
-    .variant-text {
-      font-size: 10px;
-      color: #555;
-      margin-left: 10px;
-      font-style: italic;
-    }
-    .note-text {
-      font-size: 10px;
-      color: #666;
-      margin-left: 10px;
-      margin-top: 2px;
-    }
+    @page { size: 80mm auto; margin: 0; }
+    body { font-family: 'Courier New', monospace; font-size: 12px; width: 80mm; padding: 5mm; margin: 0; }
+    .center { text-align: center; }
+    .line { border-top: 1px dashed #000; margin: 5px 0; }
+    .item-row { display: flex; justify-content: space-between; margin: 2px 0; }
   </style>
 </head>
 <body>
-  <div class="center bold" style="font-size: 14px;">$outletName</div>
-  <div class="center" style="font-size: 10px; margin-bottom: 5px;">$outletAddress</div>
+  <div class="center" style="font-weight:bold">$outletName</div>
+  <div class="center" style="font-size:10px">$outletAddress</div>
   <div class="line"></div>
-  <div>No. Transaksi: $transactionId</div>
-  <div>Tanggal: $date</div>
+  <div>Tgl: $date</div>
   <div>Meja: $tableNumber</div>
-  <div>Pelanggan: $customerName</div>
+  <div>Plg: $customerName</div>
   <div class="line"></div>
 ''';
 
       for (var item in items) {
-        final name = item['name'] ?? '';
-        final qty = item['quantity'] ?? 1;
-        final price = (item['sellingPrice'] ?? item['price'] ?? 0).toDouble();
-        final itemTotal = (item['total'] ?? (price * qty)).toDouble();
-        final variants = item['variants'] as Map<String, dynamic>?;
-        final note = item['note'] as String?;
-
         receiptHtml += '''
   <div class="item-row">
-    <span>${qty}x $name</span>
-    <span>${currencyFormatter.format(itemTotal)}</span>
-  </div>
-''';
-        if (variants != null && variants.isNotEmpty) {
-          for (var entry in variants.entries) {
-            receiptHtml += '''
-  <div class="variant-text">+ ${entry.key}: ${entry.value}</div>
-''';
-          }
-        }
-
-        if (note != null && note.isNotEmpty) {
-          receiptHtml += '''
-  <div class="note-text">Catatan: $note</div>
-''';
-        }
+    <span>${item['quantity']}x ${item['name']}</span>
+    <span>${currencyFormatter.format(item['total'] ?? 0)}</span>
+  </div>''';
       }
 
       receiptHtml += '''
   <div class="line"></div>
-  <div class="item-row">
-    <span>Total Item ($totalQty)</span>
-    <span></span>
-  </div>
-  <div class="item-row">
-    <span>Subtotal</span>
-    <span>${currencyFormatter.format(subtotal)}</span>
-  </div>
-''';
-
-      if (tax > 0) {
-        receiptHtml += '''
-  <div class="item-row">
-    <span>Pajak (10%)</span>
-    <span>${currencyFormatter.format(tax)}</span>
-  </div>
-''';
-      }
-
-      receiptHtml += '''
-  <div class="total-section">
-    <div class="item-row bold" style="font-size: 14px;">
-      <span>TOTAL</span>
-      <span>${currencyFormatter.format(total)}</span>
-    </div>
-  </div>
+  <div class="item-row"><span>Subtotal</span><span>${currencyFormatter.format(subtotal)}</span></div>
+  <div class="item-row"><span>Pajak</span><span>${currencyFormatter.format(tax)}</span></div>
+  <div class="item-row" style="font-weight:bold"><span>TOTAL</span><span>${currencyFormatter.format(total)}</span></div>
   <div class="line"></div>
-  <div class="center">Metode Pembayaran: $paymentMethod</div>
-  <div class="center" style="margin-top: 10px;">Terima Kasih!</div>
-  <script>
-    window.onload = function() {
-      window.print();
-    }
-  </script>
+  <div class="center">Bayar: $paymentMethod</div>
+  <div class="center" style="margin-top:10px">Terima Kasih</div>
+  <script>window.onload = function() { window.print(); }</script>
 </body>
-</html>
-''';
+</html>''';
 
       if (kIsWeb) {
         final blob = html.Blob([receiptHtml], 'text/html');
@@ -494,30 +286,13 @@ class _DenahMejaPageState extends State<DenahMejaPage> {
         html.window.open(url, '_blank');
         html.Url.revokeObjectUrl(url);
       }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Struk berhasil dicetak"),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error printing: $e"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      debugPrint("Print error: $e");
     }
   }
 
-  Color _getStatusColor(String status) {
-    return status.toLowerCase() == 'terisi' ? Colors.redAccent : Colors.green;
+  Color _getStatusColor(String status, String? activeOrderId) {
+    return (status.toLowerCase() == 'terisi' || activeOrderId != null) ? Colors.redAccent : Colors.green;
   }
 
   @override
@@ -537,14 +312,7 @@ class _DenahMejaPageState extends State<DenahMejaPage> {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           final docs = snapshot.data!.docs;
 
-          if (docs.isEmpty) {
-            return const Center(
-              child: Text(
-                'Belum ada meja. Tambahkan meja terlebih dahulu.',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-              ),
-            );
-          }
+          if (docs.isEmpty) return const Center(child: Text('Belum ada meja.'));
 
           return GridView.builder(
             padding: const EdgeInsets.all(24),
@@ -555,39 +323,26 @@ class _DenahMejaPageState extends State<DenahMejaPage> {
             ),
             itemCount: docs.length,
             itemBuilder: (context, index) {
-              final data = docs[index].data() as Map<String, dynamic>;
+              final doc = docs[index];
+              final data = doc.data() as Map<String, dynamic>;
+              final String firestoreId = doc.id;
               final String status = data['status'] ?? 'tersedia';
-              final tableNumber = data['number'] ?? (index + 1);
+              final String displayTableNumber = (data['tableNumber'] ?? data['number'] ?? (index + 1)).toString();
+              final String? activeOrderId = data['activeOrderId'];
+
               return InkWell(
-                onTap: () => _handleTableAction(
-                    docs[index].id,
-                    tableNumber.toString(),
-                    status,
-                    data['activeOrderId']
-                ),
+                onTap: () => _handleTableAction(firestoreId, displayTableNumber, status, activeOrderId),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: _getStatusColor(status),
+                    color: _getStatusColor(status, activeOrderId),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Icon(Icons.table_bar_rounded, color: Colors.white, size: 48),
-                      Text(
-                          "Meja $tableNumber",
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold
-                          )
-                      ),
-                      Text(
-                          status.toUpperCase(),
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10
-                          )
-                      ),
+                      Text("Meja $displayTableNumber", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      Text(status.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 10)),
                     ],
                   ),
                 ),
@@ -600,7 +355,7 @@ class _DenahMejaPageState extends State<DenahMejaPage> {
   }
 
   void _handleTableAction(String id, String nomor, String status, String? orderId) {
-    if (status.toLowerCase() == 'terisi') {
+    if (status.toLowerCase() == 'terisi' || orderId != null) {
       _showOccupiedMenu(id, nomor, orderId);
     } else {
       _showAvailableMenu(id, nomor);
@@ -609,223 +364,87 @@ class _DenahMejaPageState extends State<DenahMejaPage> {
 
   void _showOccupiedMenu(String id, String nomor, String? orderId) async {
     Map<String, dynamic>? orderData;
-
     if (orderId != null && orderId.isNotEmpty) {
       try {
-        final doc = await FirebaseFirestore.instance
-            .collection('transactions')
-            .doc(orderId)
-            .get();
-
+        final doc = await FirebaseFirestore.instance.collection('transactions').doc(orderId).get();
         if (doc.exists) {
           orderData = doc.data();
+          orderData?['orderId'] = orderId;
           if (orderData != null && !orderData.containsKey('totalAmount')) {
             orderData['totalAmount'] = orderData['grossAmount'] ?? 0;
           }
-          if (orderData != null) {
-            orderData['orderId'] = orderId;
-          }
-        } else {
-          print('Order document not found: $orderId');
         }
       } catch (e) {
-        print('Error fetching order: $e');
+        debugPrint('Error: $e');
       }
-    } else {
-      print('No activeOrderId found for table $nomor');
     }
 
     if (!mounted) return;
 
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))
-      ),
+      isScrollControlled: true,
       backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                  "Meja $nomor (Terisi)",
-                  style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold
-                  )
-              ),
-              const SizedBox(height: 8),
-
-              if (orderData != null) ...[
-                Text(
-                    "Pelanggan: ${orderData['customerName'] ?? '-'}",
-                    style: const TextStyle(fontSize: 14, color: Colors.grey)
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                    "Pesanan:",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
-                ),
-                const SizedBox(height: 8),
-
-                ...((orderData['items'] as List?)?.map((item) {
-                  final variants = item['variants'] as Map<String, dynamic>?;
-                  final note = item['note'] as String?;
-
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                  "${item['quantity']}x ${item['name']}",
-                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)
-                              ),
-                            ),
-                            Text(
-                                currencyFormatter.format(
-                                    (item['total'] ?? (item['price'] ?? item['sellingPrice'] ?? 0) * item['quantity'])
-                                ),
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)
-                            ),
-                          ],
-                        ),
-                        if (variants != null && variants.isNotEmpty) ...[
-                          ...variants.entries.map((entry) => Padding(
-                            padding: const EdgeInsets.only(left: 16, top: 2),
-                            child: Text(
-                                "• ${entry.key}: ${entry.value}",
-                                style: const TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic)
-                            ),
-                          )),
-                        ],
-                        if (note != null && note.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 16, top: 2),
-                            child: Text(
-                                "Catatan: $note",
-                                style: const TextStyle(fontSize: 12, color: Colors.grey)
-                            ),
-                          ),
-                      ],
-                    ),
-                  );
-                }) ?? []),
-
-                const Divider(height: 24),
-                Row(
+        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Meja $nomor", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            if (orderData != null) ...[
+              const SizedBox(height: 12),
+              Text("Pelanggan: ${orderData['customerName'] ?? '-'}", style: const TextStyle(color: Colors.black54)),
+              const Divider(height: 32),
+              ...(orderData['items'] as List).map((item) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                        "Total:",
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
-                    ),
-                    Text(
-                        currencyFormatter.format(orderData['totalAmount']),
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: Color(0xFF00A3A3)
-                        )
-                    ),
+                    Text("${item['quantity']}x ${item['name']}", style: const TextStyle(fontSize: 15)),
+                    Text(currencyFormatter.format(item['total'] ?? 0), style: const TextStyle(fontSize: 15)),
                   ],
                 ),
-                const SizedBox(height: 24),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.check_circle),
-                    label: const Text("PROSES CHECKOUT / BAYAR"),
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00A3A3),
-                        foregroundColor: Colors.white
-                    ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _showPaymentSelectionDialog(orderData!, id);
-                    },
-                  ),
+              )),
+              const Divider(height: 32),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text("TOTAL", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text(currencyFormatter.format(orderData['totalAmount']), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF00A3A3))),
+                ],
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00A3A3),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 54),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                const SizedBox(height: 10),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.clean_hands_outlined),
-                    label: const Text("Kosongkan Meja (Selesai)"),
-                    style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.grey
-                    ),
-                    onPressed: () async {
-                      try {
-                        await FirebaseFirestore.instance
-                            .collection('meja')
-                            .doc(id)
-                            .update({
-                          'status': 'tersedia',
-                          'activeOrderId': null,
-                          'updatedAt': FieldValue.serverTimestamp(),
-                        });
-
-                        if (mounted) {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text("Meja berhasil dikosongkan"),
-                                backgroundColor: Colors.green,
-                              )
-                          );
-                        }
-                      } catch (e) {
-                        print('Error clearing table: $e');
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text("Error: $e"),
-                                backgroundColor: Colors.red,
-                              )
-                          );
-                        }
-                      }
-                    },
-                  ),
-                ),
-              ] else ...[
-                const SizedBox(height: 10),
-                Text(
-                  orderId != null && orderId.isNotEmpty
-                      ? "Order ID: $orderId tidak ditemukan"
-                      : "Tidak ada pesanan aktif untuk meja ini",
-                  style: const TextStyle(color: Colors.orange),
-                ),
-                const SizedBox(height: 10),
-                TextButton(
-                  onPressed: () async {
-                    await FirebaseFirestore.instance
-                        .collection('meja')
-                        .doc(id)
-                        .update({
-                      'status': 'tersedia',
-                      'activeOrderId': null
-                    });
-                    Navigator.pop(context);
-                  },
-                  child: const Text("Kosongkan Meja"),
-                ),
-              ],
-              const SizedBox(height: 10),
-            ],
-          ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  _showPaymentSelectionDialog(orderData!, id);
+                },
+                child: const Text("PROSES BAYAR", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+            ] else
+              const Padding(padding: EdgeInsets.symmetric(vertical: 24), child: Text("Pesanan tidak ditemukan.", style: TextStyle(color: Colors.red))),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 54),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                side: const BorderSide(color: Colors.red),
+              ),
+              onPressed: () async {
+                await FirebaseFirestore.instance.collection('meja').doc(id).update({'status': 'tersedia', 'activeOrderId': null});
+                if (mounted) Navigator.pop(context);
+              },
+              child: const Text("KOSONGKAN MEJA", style: TextStyle(color: Colors.red, fontSize: 16)),
+            ),
+          ],
         ),
       ),
     );
@@ -836,23 +455,23 @@ class _DenahMejaPageState extends State<DenahMejaPage> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
-        title: Text("Buka Meja $nomor"),
-        content: const Text("Tandai meja ini sebagai terisi?"),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text("Meja $nomor"),
+        content: const Text("Buka meja ini?"),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("BATAL")
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("BATAL", style: TextStyle(color: Colors.grey))),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00A3A3),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
             onPressed: () async {
-              await FirebaseFirestore.instance
-                  .collection('meja')
-                  .doc(id)
-                  .update({'status': 'terisi'});
-              Navigator.pop(context);
+              await FirebaseFirestore.instance.collection('meja').doc(id).update({'status': 'terisi'});
+              if (mounted) Navigator.pop(context);
             },
             child: const Text("BUKA"),
-          )
+          ),
         ],
       ),
     );

@@ -1088,6 +1088,7 @@ class ApiService {
     required String timestamp,
     double? latitude,
     double? longitude,
+    String? imageUrl,
   }) async {
     try {
       final token = await _getAuthToken();
@@ -1107,6 +1108,7 @@ class ApiService {
           'timestamp': timestamp,
           if (latitude != null) 'latitude': latitude,
           if (longitude != null) 'longitude': longitude,
+          if (imageUrl != null) 'imageUrl': imageUrl,
         }),
       );
 
