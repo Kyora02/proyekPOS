@@ -10,8 +10,31 @@ class CartProvider with ChangeNotifier {
 
   double get totalAmount => _items.fold(0, (sum, item) => sum + item.total);
 
-  void addItem(String id, String name, double price, String? imageUrl, {String note = ''}) {
-    final existingIndex = _items.indexWhere((item) => item.id == id && item.note == note);
+  // void addItem(String id, String name, double price, String? imageUrl, {String note = ''}) {
+  //   final existingIndex = _items.indexWhere((item) => item.id == id && item.note == note);
+  //
+  //   if (existingIndex >= 0) {
+  //     _items[existingIndex].quantity += 1;
+  //   } else {
+  //     _items.add(CartItem(
+  //       id: id,
+  //       name: name,
+  //       price: price,
+  //       imageUrl: imageUrl,
+  //       note: note,
+  //     ));
+  //   }
+  //   notifyListeners();
+  // }
+
+  void addItem(String id, String name, double price, String? imageUrl,
+      {String note = '', Map<String, String> variants = const {}}) {
+
+    final existingIndex = _items.indexWhere((item) =>
+    item.id == id &&
+        item.note == note &&
+        item.selectedVariants.toString() == variants.toString()
+    );
 
     if (existingIndex >= 0) {
       _items[existingIndex].quantity += 1;
@@ -22,6 +45,7 @@ class CartProvider with ChangeNotifier {
         price: price,
         imageUrl: imageUrl,
         note: note,
+        selectedVariants: variants,
       ));
     }
     notifyListeners();

@@ -4,9 +4,9 @@ import 'package:intl/intl.dart';
 import 'package:proyekpos2/bloc/cart/cart_bloc.dart';
 import 'package:proyekpos2/bloc/menu/menu_bloc.dart';
 import 'package:proyekpos2/service/api_service.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:proyekpos2/payment/payment_webview_page.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
@@ -27,14 +27,38 @@ class SelfOrderPage extends StatefulWidget {
 }
 
 class _SelfOrderPageState extends State<SelfOrderPage> {
-
   final TextEditingController _nameController = TextEditingController();
+  String _selectedPaymentType = 'Online';
+  String? _karyawanId;
+  String? _karyawanName;
 
   @override
   void initState() {
     super.initState();
     if (widget.outletId != null) {
       context.read<MenuBloc>().add(FetchMenu(widget.outletId!));
+      _fetchKaryawanData();
+    }
+  }
+
+  Future<void> _fetchKaryawanData() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final karyawanDoc = await FirebaseFirestore.instance
+            .collection('karyawan')
+            .doc(user.uid)
+            .get();
+
+        if (karyawanDoc.exists) {
+          setState(() {
+            _karyawanId = user.uid;
+            _karyawanName = karyawanDoc.data()?['nama'] ?? 'Staff';
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching karyawan data: $e');
     }
   }
 
@@ -163,10 +187,20 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
   }
 
   Widget _buildProductCard(BuildContext context, dynamic product) {
+    List<dynamic> variantsList = [];
+    var variantsRaw = product['variants'];
+    if (variantsRaw is List) {
+      variantsList = variantsRaw;
+    } else if (variantsRaw is String && variantsRaw.isNotEmpty) {
+      try {
+        variantsList = json.decode(variantsRaw);
+      } catch (e) {
+        variantsList = [];
+      }
+    }
+
     return GestureDetector(
-      onTap: () {
-        _showProductDetail(context, product);
-      },
+      onTap: () => _showProductDetail(context, product),
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -217,10 +251,30 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
               alignment: Alignment.bottomRight,
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
-                child: CircleAvatar(
-                  backgroundColor: Colors.teal,
-                  radius: 14,
-                  child: const Icon(Icons.add, color: Colors.white, size: 16),
+                child: GestureDetector(
+                  onTap: () {
+                    if (variantsList.isNotEmpty) {
+                      _showProductDetail(context, product);
+                    } else {
+                      context.read<CartBloc>().add(AddCartItem(
+                        product: product,
+                        note: '',
+                        variants: {},
+                      ));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Masuk keranjang"), duration: Duration(seconds: 1)),
+                      );
+                    }
+                  },
+                  child: CircleAvatar(
+                    backgroundColor: Colors.teal,
+                    radius: 14,
+                    child: Icon(
+                      variantsList.isNotEmpty ? Icons.arrow_forward : Icons.add,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
                 ),
               ),
             )
@@ -276,6 +330,20 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
 
   void _showProductDetail(BuildContext context, dynamic product) {
     final noteController = TextEditingController();
+    Map<String, String> selectedVariants = {};
+
+    List<dynamic> variantsList = [];
+    var variantsRaw = product['variants'];
+
+    if (variantsRaw is List) {
+      variantsList = variantsRaw;
+    } else if (variantsRaw is String && variantsRaw.isNotEmpty) {
+      try {
+        variantsList = json.decode(variantsRaw);
+      } catch (e) {
+        variantsList = [];
+      }
+    }
 
     showModalBottomSheet(
       context: context,
@@ -283,72 +351,128 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                height: 200,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                  image: product['imageUrl'] != null && product['imageUrl'] != ''
-                      ? DecorationImage(
-                      image: NetworkImage(product['imageUrl']), fit: BoxFit.cover)
-                      : null,
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(20),
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+              child: SingleChildScrollView(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(product['name'], style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    Text(currencyFormatter.format(product['sellingPrice']),
-                        style: const TextStyle(fontSize: 18, color: Colors.teal, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 16),
-                    const Text("Catatan Pesanan (Opsional)", style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: noteController,
-                      decoration: InputDecoration(
-                        hintText: "",
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
+                    Container(
+                      height: 200,
                       width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.teal,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
-                        ),
-                        onPressed: () {
-                          context.read<CartBloc>().add(AddCartItem(
-                            product: product,
-                            note: noteController.text,
-                          ));
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Masuk keranjang"), duration: Duration(seconds: 1)),
-                          );
-                        },
-                        child: const Text("Tambah ke Pesanan", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                        image: product['imageUrl'] != null && product['imageUrl'] != ''
+                            ? DecorationImage(image: NetworkImage(product['imageUrl']), fit: BoxFit.cover)
+                            : null,
                       ),
-                    )
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(product['name'], style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          Text(currencyFormatter.format(product['sellingPrice']),
+                              style: const TextStyle(fontSize: 18, color: Colors.teal, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 16),
+
+                          ...variantsList.map((group) {
+                            if (group == null || group['groupName'] == null) return const SizedBox.shrink();
+
+                            String groupName = group['groupName'].toString();
+                            String optionsStr = (group['options'] ?? '').toString();
+                            List<String> options = optionsStr.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+
+                            if (options.isEmpty) return const SizedBox.shrink();
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(groupName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: options.map((opt) {
+                                    bool isSelected = selectedVariants[groupName] == opt;
+                                    return ChoiceChip(
+                                      label: Text(opt),
+                                      selected: isSelected,
+                                      selectedColor: Colors.teal.withOpacity(0.2),
+                                      onSelected: (val) {
+                                        setModalState(() {
+                                          selectedVariants[groupName] = opt;
+                                        });
+                                      },
+                                      labelStyle: TextStyle(
+                                        color: isSelected ? Colors.teal : Colors.black87,
+                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+                            );
+                          }).toList(),
+
+                          const Text("Catatan Pesanan", style: TextStyle(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: noteController,
+                            decoration: InputDecoration(
+                              hintText: "Contoh: Tidak pakai es",
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            maxLines: 2,
+                          ),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.teal,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+                              ),
+                              onPressed: () {
+                                for (var group in variantsList) {
+                                  if (group != null && group['groupName'] != null) {
+                                    String groupName = group['groupName'].toString();
+                                    if (!selectedVariants.containsKey(groupName)) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text("Silakan pilih $groupName terlebih dahulu")),
+                                      );
+                                      return;
+                                    }
+                                  }
+                                }
+
+                                context.read<CartBloc>().add(AddCartItem(
+                                  product: product,
+                                  note: noteController.text,
+                                  variants: selectedVariants,
+                                ));
+                                Navigator.pop(context);
+                              },
+                              child: const Text("Tambah ke Pesanan", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            ),
+                          )
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -363,116 +487,123 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
       builder: (context) {
         return BlocProvider.value(
           value: parentContext.read<CartBloc>(),
-          child: BlocBuilder<CartBloc, CartState>(
-            builder: (context, state) {
-              return FractionallySizedBox(
-                heightFactor: 0.9,
-                child: Column(
-                  children: [
-                    AppBar(
-                      title: const Text("Konfirmasi Pesanan"),
-                      centerTitle: true,
-                      automaticallyImplyLeading: false,
-                      actions: [
-                        IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close))
-                      ],
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
-                      elevation: 0,
-                    ),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: state.items.length,
-                        itemBuilder: (context, index) {
-                          final item = state.items[index];
-                          return ListTile(
-                            leading: Container(
-                              width: 50, height: 50,
-                              decoration: BoxDecoration(
-                                  color: Colors.grey[200],
-                                  borderRadius: BorderRadius.circular(8),
-                                  image: item.imageUrl != null
-                                      ? DecorationImage(image: NetworkImage(item.imageUrl!), fit: BoxFit.cover)
-                                      : null
-                              ),
-                            ),
-                            title: Text(item.name),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (item.note.isNotEmpty) Text("Catatan: ${item.note}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                Text(currencyFormatter.format(item.price)),
-                              ],
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.remove_circle_outline),
-                                  onPressed: () => context.read<CartBloc>().add(
-                                      UpdateCartItemQuantity(productId: item.id, note: item.note, change: -1)
-                                  ),
-                                ),
-                                Text("${item.quantity}"),
-                                IconButton(
-                                  icon: const Icon(Icons.add_circle_outline, color: Colors.teal),
-                                  onPressed: () => context.read<CartBloc>().add(
-                                      UpdateCartItemQuantity(productId: item.id, note: item.note, change: 1)
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                          color: Colors.white,
-                          boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -5))]
-                      ),
+          child: StatefulBuilder(
+              builder: (context, setModalState) {
+                return BlocBuilder<CartBloc, CartState>(
+                  builder: (context, state) {
+                    return FractionallySizedBox(
+                      heightFactor: 0.9,
                       child: Column(
                         children: [
-                          TextField(
-                            controller: _nameController,
-                            decoration: const InputDecoration(
-                                labelText: "Nama Pemesan",
-                                border: OutlineInputBorder(),
-                                hintText: "Masukkan nama Anda"
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text("Total Bayar", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                              Text(currencyFormatter.format(state.totalAmount), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal)),
+                          AppBar(
+                            title: const Text("Konfirmasi Pesanan"),
+                            centerTitle: true,
+                            automaticallyImplyLeading: false,
+                            actions: [
+                              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close))
                             ],
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.black,
+                            elevation: 0,
                           ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.teal,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
-                              ),
-                              onPressed: state.items.isEmpty
-                                  ? null
-                                  : () => _submitOrder(parentContext, state),
-                              child: const Text("Pesan Sekarang", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          Expanded(
+                            child: ListView.builder(
+                              itemCount: state.items.length,
+                              itemBuilder: (context, index) {
+                                final item = state.items[index];
+                                return ListTile(
+                                  leading: Container(
+                                    width: 50,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                        color: Colors.grey[200],
+                                        borderRadius: BorderRadius.circular(8),
+                                        image: item.imageUrl != null
+                                            ? DecorationImage(image: NetworkImage(item.imageUrl!), fit: BoxFit.cover)
+                                            : null
+                                    ),
+                                  ),
+                                  title: Text(item.name),
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      if (item.selectedVariants.isNotEmpty) ...[
+                                        ...item.selectedVariants.entries.map((e) =>
+                                            Text("• ${e.key}: ${e.value}", style: const TextStyle(fontSize: 11, color: Colors.grey))
+                                        ),
+                                      ],
+                                      if (item.note.isNotEmpty)
+                                        Text("Catatan: ${item.note}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                      Text(currencyFormatter.format(item.price)),
+                                    ],
+                                  ),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.remove_circle_outline),
+                                        onPressed: () => context.read<CartBloc>().add(
+                                            UpdateCartItemQuantity(productId: item.id, note: item.note, change: -1)
+                                        ),
+                                      ),
+                                      Text("${item.quantity}"),
+                                      IconButton(
+                                        icon: const Icon(Icons.add_circle_outline, color: Colors.teal),
+                                        onPressed: () => context.read<CartBloc>().add(
+                                            UpdateCartItemQuantity(productId: item.id, note: item.note, change: 1)
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
                             ),
                           ),
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              children: [
+                                TextField(
+                                  controller: _nameController,
+                                  decoration: const InputDecoration(
+                                      labelText: "Nama Pemesan",
+                                      border: OutlineInputBorder(),
+                                      hintText: "Masukkan nama Anda"
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text("Total Pesanan", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                    Text(currencyFormatter.format(state.totalAmount), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal)),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.teal,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+                                    ),
+                                    onPressed: state.items.isEmpty
+                                        ? null
+                                        : () => _submitOrder(parentContext, state),
+                                    child: const Text("Pesan Sekarang", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
                         ],
                       ),
-                    )
-                  ],
-                ),
-              );
-            },
+                    );
+                  },
+                );
+              }
           ),
         );
       },
@@ -481,7 +612,7 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
 
   Future<void> _submitOrder(BuildContext context, CartState state) async {
     if (_nameController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Mohon isi nama pemesan")));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Mohon isi nama Anda")));
       return;
     }
 
@@ -494,53 +625,51 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
         'quantity': e.quantity,
         'sellingPrice': e.price,
         'total': e.total,
-        'note': e.note
+        'note': e.note,
+        'variants': e.selectedVariants
       }).toList();
 
-      final result = await ApiService().submitSelfOrder(
-          outletId: widget.outletId!,
-          tableId: widget.tableId!,
-          tableNumber: widget.tableNumber ?? '-',
-          customerName: _nameController.text,
-          items: itemsMap,
-          totalAmount: state.totalAmount
+      await ApiService().submitSelfOrder(
+        outletId: widget.outletId!,
+        tableId: widget.tableId!,
+        tableNumber: widget.tableNumber ?? '-',
+        customerName: _nameController.text,
+        items: itemsMap,
+        totalAmount: state.totalAmount,
+        paymentType: _selectedPaymentType,
+        karyawanId: _karyawanId,
+        karyawanName: _karyawanName,
       );
 
       if (mounted) {
         Navigator.pop(context);
         Navigator.pop(context);
-
-        String redirectUrl = result['redirectUrl'];
-        String orderId = result['orderId'];
-
-        if (kIsWeb) {
-          final Uri uri = Uri.parse(redirectUrl);
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-            _showCheckStatusDialog(context, orderId);
-          }
-        } else {
-          final bool? paymentSuccess = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => PaymentWebviewPage(url: redirectUrl, orderId: orderId),
-            ),
-          );
-
-          if (paymentSuccess == true) {
-            context.read<CartBloc>().add(ClearCart());
-            _showSuccessDialog();
-          } else {
-            _showCheckStatusDialog(context, orderId);
-          }
-        }
+        context.read<CartBloc>().add(ClearCart());
+        _showOrderSentDialog();
       }
     } catch (e) {
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Gagal: $e"), backgroundColor: Colors.red));
-      }
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Gagal: $e"), backgroundColor: Colors.red));
     }
+  }
+
+  void _showOrderSentDialog() {
+    showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Icon(Icons.check_circle_outline, color: Colors.teal, size: 60),
+          content: const Text("Pesanan Berhasil Dikirim!\n\nSilakan konfirmasi pembayaran ke kasir setelah selesai makan.", textAlign: TextAlign.center),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK", style: TextStyle(fontSize: 16))
+            )
+          ],
+        )
+    );
   }
 
   void _showCheckStatusDialog(BuildContext context, String orderId) {
@@ -591,6 +720,7 @@ class _SelfOrderPageState extends State<SelfOrderPage> {
         context: context,
         barrierDismissible: false,
         builder: (_) => AlertDialog(
+          backgroundColor: Colors.white,
           title: const Icon(Icons.check_circle, color: Colors.green, size: 60),
           content: const Text("Pembayaran Berhasil!\nPesanan Anda sedang di proses.", textAlign: TextAlign.center),
           actions: [

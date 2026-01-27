@@ -178,9 +178,11 @@ class ApiService {
     XFile? imageFile,
     bool showInMenu = true,
     int? stok,
+    List<Map<String, dynamic>>? variants,
   }) async {
     final token = await _getAuthToken();
     final url = Uri.parse('$_baseUrl/products');
+
 
     var request = http.MultipartRequest('POST', url);
     request.headers['Authorization'] = 'Bearer $token';
@@ -192,6 +194,7 @@ class ApiService {
     if (costPrice != null) request.fields['costPrice'] = costPrice.toString();
     request.fields['categoryId'] = categoryId;
     request.fields['outlets'] = jsonEncode(outlets);
+    request.fields['variants'] = jsonEncode(variants ?? []);
     request.fields['showInMenu'] = showInMenu.toString();
     if (stok != null) request.fields['stok'] = stok.toString();
 
@@ -225,6 +228,7 @@ class ApiService {
     XFile? imageFile,
     bool showInMenu = true,
     int? stok,
+    List<Map<String, dynamic>>? variants,
   }) async {
     final token = await _getAuthToken();
     final url = Uri.parse('$_baseUrl/products/$id');
@@ -239,6 +243,7 @@ class ApiService {
     if (costPrice != null) request.fields['costPrice'] = costPrice.toString();
     request.fields['categoryId'] = categoryId;
     if (outlets != null) request.fields['outlets'] = jsonEncode(outlets);
+    request.fields['variants'] = jsonEncode(variants ?? []);
     request.fields['showInMenu'] = showInMenu.toString();
     if (stok != null) request.fields['stok'] = stok.toString();
 
@@ -1081,6 +1086,7 @@ class ApiService {
     required String timestamp,
     double? latitude,
     double? longitude,
+    String? imageUrl,
   }) async {
     try {
       final token = await _getAuthToken();
@@ -1100,6 +1106,7 @@ class ApiService {
           'timestamp': timestamp,
           if (latitude != null) 'latitude': latitude,
           if (longitude != null) 'longitude': longitude,
+          if (imageUrl != null) 'imageUrl': imageUrl,
         }),
       );
 
@@ -2030,29 +2037,39 @@ class ApiService {
     required String tableNumber,
     required String customerName,
     required List<Map<String, dynamic>> items,
-    required double totalAmount,
+    required num totalAmount,
+    required String paymentType,
+    String? karyawanId,
+    String? karyawanName,
   }) async {
-    final url = Uri.parse("$publicBaseUrl/order");
+    try {
+      final response = await http.post(
+        Uri.parse('$publicBaseUrl/submit-self-order'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'outletId': outletId,
+          'tableId': tableId,
+          'tableNumber': tableNumber,
+          'customerName': customerName,
+          'items': items,
+          'totalAmount': totalAmount,
+          'paymentType': paymentType,
+          'karyawanId': karyawanId,
+          'karyawanName': karyawanName,
+        }),
+      );
 
-    final response = await http.post(
-      url,
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "outletId": outletId,
-        "tableId": tableId,
-        "tableNumber": tableNumber,
-        "customerName": customerName,
-        "items": items,
-        "totalAmount": totalAmount,
-      }),
-    );
-
-    if (response.statusCode == 201) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception("Gagal membuat pesanan: ${response.body}");
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to submit order');
+      }
+    } catch (e) {
+      throw Exception('Error submitting order: $e');
     }
   }
+
   Future<void> confirmSelfOrderPayment(String orderId) async {
     final url = Uri.parse("$publicBaseUrl/confirm-payment");
 
@@ -2093,6 +2110,23 @@ class ApiService {
       return jsonDecode(response.body);
     } else {
       throw Exception("Gagal cek status: ${response.body}");
+    }
+  }
+
+  Future<void> completeOrderAndClearTable(String orderId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/complete-order-and-clear-table'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'orderId': orderId}),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to complete order and clear table');
+      }
+    } catch (e) {
+      print('Error in completeOrderAndClearTable: $e');
+      rethrow;
     }
   }
 }

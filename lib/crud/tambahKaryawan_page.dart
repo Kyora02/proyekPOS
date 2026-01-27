@@ -29,14 +29,25 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
 
   bool _statusAktif = true;
   bool _isPasswordVisible = false;
-
   bool _isEditMode = false;
   String? _karyawanId;
   bool _isLoading = false;
 
+  List<Map<String, dynamic>> _outletsList = [];
+  String? _selectedOutletId;
+  String? _selectedOutletName;
+
   @override
   void initState() {
     super.initState();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    setState(() => _isLoading = true);
+
+    _selectedOutletId = widget.outletId;
+    _selectedOutletName = widget.outletName;
 
     if (widget.karyawan != null) {
       _isEditMode = true;
@@ -46,6 +57,23 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
       _emailController.text = widget.karyawan!['email'] ?? '';
       _notelpController.text = widget.karyawan!['notelp'] ?? '';
       _statusAktif = widget.karyawan!['status'] == 'Aktif';
+      _selectedOutletId = widget.karyawan!['outletId'] ?? widget.outletId;
+      _selectedOutletName = widget.karyawan!['outlet'] ?? widget.outletName;
+    }
+
+    try {
+      final outlets = await _apiService.getOutlets();
+      setState(() {
+        _outletsList = outlets;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal memuat daftar outlet: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -61,63 +89,49 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
 
   Future<void> _saveForm() async {
     if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
-
-      final nama = _namaController.text;
-      final nip = _nipController.text;
-      final email = _emailController.text;
-      final password = _passwordController.text;
-      final notelp = _notelpController.text;
-
-      final outletId = widget.outletId;
-      final outletName = widget.outletName;
-      final status = _statusAktif ? 'Aktif' : 'Tidak Aktif';
+      setState(() => _isLoading = true);
 
       try {
         if (_isEditMode) {
           await _apiService.updateKaryawan(
             id: _karyawanId!,
-            nama: nama,
-            nip: nip,
-            notelp: notelp,
-            outlet: outletName,
-            outletId: outletId,
-            status: status,
+            nama: _namaController.text,
+            nip: _nipController.text,
+            notelp: _notelpController.text,
+            outlet: _selectedOutletName!,
+            outletId: _selectedOutletId!,
+            status: _statusAktif ? 'Aktif' : 'Tidak Aktif',
           );
         } else {
           await _apiService.addKaryawan(
-            nama: nama,
-            nip: nip,
-            email: email,
-            password: password,
-            notelp: notelp,
-            outlet: outletName,
-            outletId: outletId,
-            status: status,
+            nama: _namaController.text,
+            nip: _nipController.text,
+            email: _emailController.text,
+            password: _passwordController.text,
+            notelp: _notelpController.text,
+            outlet: _selectedOutletName!,
+            outletId: _selectedOutletId!,
+            status: _statusAktif ? 'Aktif' : 'Tidak Aktif',
           );
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Karyawan berhasil ${_isEditMode ? 'diupdate' : 'disimpan'}!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.of(context).pop(true);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Karyawan berhasil ${_isEditMode ? 'diupdate' : 'disimpan'}!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.of(context).pop(true);
+        }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal menyimpan: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Gagal menyimpan: $e'), backgroundColor: Colors.red),
+          );
+        }
       } finally {
-        setState(() {
-          _isLoading = false;
-        });
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }
@@ -143,8 +157,7 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
         children: [
           Center(
             child: SingleChildScrollView(
-              padding:
-              const EdgeInsets.symmetric(vertical: 32.0, horizontal: 16.0),
+              padding: const EdgeInsets.symmetric(vertical: 32.0, horizontal: 16.0),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 700),
                 child: Container(
@@ -167,83 +180,35 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text(
-                          'Informasi Karyawan',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        const Text('Informasi Karyawan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                         const Divider(height: 32),
                         _buildLabel('Nama *'),
-                        _buildTextField(
-                          controller: _namaController,
-                          hintText: 'Masukkan nama karyawan',
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Nama tidak boleh kosong';
-                            }
-                            return null;
-                          },
-                        ),
+                        _buildTextField(_namaController, 'Masukkan nama karyawan'),
                         _buildLabel('Nomor Induk Pegawai (NIP) *'),
-                        _buildTextField(
-                          controller: _nipController,
-                          hintText: 'Masukkan NIP',
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'NIP tidak boleh kosong';
-                            }
-                            return null;
-                          },
-                        ),
+                        _buildTextField(_nipController, 'Masukkan NIP'),
+                        _buildLabel('Pilih Outlet *'),
+                        _buildOutletDropdown(),
                         _buildLabel(_isEditMode ? 'Email' : 'Email *'),
                         _buildTextField(
-                          controller: _emailController,
-                          hintText: 'contoh: email@domain.com',
-                          keyboardType: TextInputType.emailAddress,
-                          readOnly: _isEditMode,
-                          validator: (value) {
-                            if (!_isEditMode &&
-                                (value == null || value.isEmpty)) {
-                              return 'Email tidak boleh kosong';
-                            }
-                            return null;
-                          },
+                            _emailController,
+                            'email@domain.com',
+                            readOnly: _isEditMode,
+                            keyboardType: TextInputType.emailAddress
                         ),
                         if (!_isEditMode) ...[
                           _buildLabel('Password *'),
                           _buildTextField(
-                            controller: _passwordController,
-                            hintText: 'Masukkan password',
+                            _passwordController,
+                            'Masukkan password',
                             obscureText: !_isPasswordVisible,
                             suffixIcon: IconButton(
-                              icon: Icon(
-                                _isPasswordVisible
-                                    ? Icons.visibility_off
-                                    : Icons.visibility,
-                                color: Colors.grey,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _isPasswordVisible = !_isPasswordVisible;
-                                });
-                              },
+                              icon: Icon(_isPasswordVisible ? Icons.visibility_off : Icons.visibility),
+                              onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
                             ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Password tidak boleh kosong';
-                              }
-                              return null;
-                            },
                           ),
                         ],
                         _buildLabel('No. Telp'),
-                        _buildTextField(
-                          controller: _notelpController,
-                          hintText: 'Contoh: 08123456789',
-                          keyboardType: TextInputType.phone,
-                        ),
+                        _buildTextField(_notelpController, '08123456789', keyboardType: TextInputType.phone),
                         _buildLabel('Status'),
                         _buildStatusToggle(),
                         const SizedBox(height: 32),
@@ -257,12 +222,8 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
           ),
           if (_isLoading)
             Container(
-              color: Colors.black.withOpacity(0.5),
-              child: const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              ),
+              color: Colors.black.withOpacity(0.3),
+              child: const Center(child: CircularProgressIndicator(color: Color(0xFF279E9E))),
             ),
         ],
       ),
@@ -270,93 +231,73 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
   }
 
   Widget _buildLabel(String text) {
-    bool isRequired = text.endsWith('*');
-    String labelText = isRequired ? text.substring(0, text.length - 1) : text;
-
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0, top: 16.0),
-      child: RichText(
-        text: TextSpan(
-          text: labelText,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Colors.black87,
-            fontWeight: FontWeight.w600,
-          ),
-          children: isRequired
-              ? [
-            const TextSpan(
-              text: ' *',
-              style: TextStyle(
-                color: Colors.red,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ]
-              : [],
-        ),
-      ),
+      child: Text(text, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String hintText,
-    TextInputType? keyboardType,
-    String? Function(String?)? validator,
-    bool obscureText = false,
-    Widget? suffixIcon,
-    int maxLines = 1,
-    bool readOnly = false,
-  }) {
+  Widget _buildTextField(TextEditingController controller, String hint, {bool readOnly = false, bool obscureText = false, Widget? suffixIcon, TextInputType? keyboardType}) {
     return TextFormField(
       controller: controller,
-      keyboardType: keyboardType,
-      obscureText: obscureText,
-      maxLines: maxLines,
       readOnly: readOnly,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
       decoration: InputDecoration(
-        hintText: hintText,
-        hintStyle: TextStyle(color: Colors.grey[400]),
+        hintText: hint,
+        suffixIcon: suffixIcon,
         filled: true,
         fillColor: readOnly ? Colors.grey[100] : Colors.white,
-        suffixIcon: suffixIcon,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: Colors.grey.shade300),
         ),
-        contentPadding:
-        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
-      validator: validator,
+      validator: (v) => (v == null || v.isEmpty) && !readOnly ? 'Field wajib diisi' : null,
+    );
+  }
+
+  Widget _buildOutletDropdown() {
+    return DropdownButtonFormField<String>(
+      dropdownColor: Colors.white,
+      value: _outletsList.any((o) => o['id'] == _selectedOutletId) ? _selectedOutletId : null,
+      items: _outletsList.map((outlet) {
+        return DropdownMenuItem<String>(
+          value: outlet['id'],
+          child: Text(outlet['name'] ?? 'Outlet Tanpa Nama'),
+        );
+      }).toList(),
+      onChanged: (value) {
+        final selected = _outletsList.firstWhere((o) => o['id'] == value);
+        setState(() {
+          _selectedOutletId = value;
+          _selectedOutletName = selected['name'];
+        });
+      },
+      validator: (value) => value == null ? 'Silakan pilih outlet' : null,
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
     );
   }
 
   Widget _buildStatusToggle() {
     return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(8),
-      ),
+      decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8)),
       child: SwitchListTile(
-        title: Text(
-          _statusAktif ? 'Aktif' : 'Tidak Aktif',
-          style: const TextStyle(fontWeight: FontWeight.normal, fontSize: 16),
-        ),
+        title: Text(_statusAktif ? 'Aktif' : 'Tidak Aktif'),
         value: _statusAktif,
-        onChanged: (bool value) {
-          setState(() {
-            _statusAktif = value;
-          });
-        },
+        onChanged: (v) => setState(() => _statusAktif = v),
         activeColor: const Color(0xFF279E9E),
-        dense: true,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
@@ -371,12 +312,9 @@ class _TambahKaryawanPageState extends State<TambahKaryawanPage> {
             backgroundColor: const Color(0xFF279E9E),
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
-          child: Text(_isEditMode ? 'Update' : 'Simpan',
-              style: const TextStyle(fontSize: 16)),
+          child: Text(_isEditMode ? 'Update' : 'Simpan'),
         ),
       ],
     );
