@@ -25,6 +25,8 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
   final _deskripsiC = TextEditingController();
   final _nilaiKuponC = TextEditingController();
 
+  final _formatter = NumberFormat.decimalPattern('id');
+
   String _tipeNilaiKupon = 'percent';
   DateTime? _tanggalMulai;
   DateTime? _tanggalSelesai;
@@ -42,9 +44,17 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
       _namaKuponC.text = kupon['nama'] ?? '';
       _kodeKuponC.text = kupon['kodeKupon'] ?? '';
       _deskripsiC.text = kupon['deskripsi'] ?? '';
-      _nilaiKuponC.text = (kupon['nilai'] ?? 0).toString();
 
       _tipeNilaiKupon = kupon['tipeNilai'] ?? 'percent';
+
+      if (kupon['nilai'] != null) {
+        if (_tipeNilaiKupon == 'rupiah') {
+          _nilaiKuponC.text = _formatter.format(double.parse(kupon['nilai'].toString()));
+        } else {
+          _nilaiKuponC.text = kupon['nilai'].toString();
+        }
+      }
+
       _kuponStatus = kupon['status'] ?? true;
 
       if (kupon['tanggalMulai'] != null) {
@@ -161,7 +171,7 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
       setState(() => _isSaving = true);
 
       try {
-        final nilai = double.tryParse(_nilaiKuponC.text) ?? 0.0;
+        final nilai = double.tryParse(_nilaiKuponC.text.replaceAll('.', '')) ?? 0.0;
 
         if (_isEditMode) {
           await _apiService.updateKupon(
@@ -393,6 +403,20 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
             TextFormField(
               controller: _nilaiKuponC,
               keyboardType: TextInputType.number,
+              onChanged: (value) {
+                if (_tipeNilaiKupon == 'rupiah' && value.isNotEmpty) {
+                  String cleanValue = value.replaceAll('.', '');
+                  if (cleanValue.isEmpty) return;
+                  double? parsed = double.tryParse(cleanValue);
+                  if (parsed != null) {
+                    String formatted = _formatter.format(parsed);
+                    _nilaiKuponC.value = TextEditingValue(
+                      text: formatted,
+                      selection: TextSelection.collapsed(offset: formatted.length),
+                    );
+                  }
+                }
+              },
               decoration: _inputDecoration(
                 hint: _tipeNilaiKupon == 'percent'
                     ? 'Contoh: 25'
@@ -404,11 +428,13 @@ class _TambahKuponPageState extends State<TambahKuponPage> {
                 if (value == null || value.isEmpty) {
                   return 'Nilai kupon wajib diisi';
                 }
-                if (double.tryParse(value) == null) {
+                String cleanValue = value.replaceAll('.', '');
+                double? parsedValue = double.tryParse(cleanValue);
+                if (parsedValue == null) {
                   return 'Masukkan angka yang valid';
                 }
                 if (_tipeNilaiKupon == 'percent' &&
-                    (double.parse(value) < 0 || double.parse(value) > 100)) {
+                    (parsedValue < 0 || parsedValue > 100)) {
                   return 'Persen harus antara 0-100';
                 }
                 return null;

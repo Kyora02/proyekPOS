@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:proyekpos2/service/api_service.dart';
+import 'package:intl/intl.dart';
 
 class TambahProdukPage extends StatefulWidget {
   final Map<String, dynamic>? product;
@@ -30,6 +31,8 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
   final _hargaJualController = TextEditingController();
   final _hargaBeliController = TextEditingController();
   final _stokController = TextEditingController();
+
+  final _formatter = NumberFormat.decimalPattern('id');
 
   XFile? _imageFile;
   final ImagePicker _picker = ImagePicker();
@@ -91,8 +94,16 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
     _namaProdukController.text = product['name'] ?? '';
     _deskripsiController.text = product['description'] ?? '';
     _skuController.text = product['sku'] ?? '';
-    _hargaJualController.text = product['sellingPrice']?.toString() ?? '';
-    _hargaBeliController.text = product['costPrice']?.toString() ?? '0';
+
+    if (product['sellingPrice'] != null) {
+      _hargaJualController.text =
+          _formatter.format(double.parse(product['sellingPrice'].toString()));
+    }
+    if (product['costPrice'] != null) {
+      _hargaBeliController.text =
+          _formatter.format(double.parse(product['costPrice'].toString()));
+    }
+
     _stokController.text = product['stok']?.toString() ?? '0';
     _existingImageUrl = product['imageUrl'];
     _showInMenu = product['showInMenu'] ?? true;
@@ -137,8 +148,10 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
       _outletOptions.firstWhere((opt) => opt['id'] == widget.outletId);
       final List<Map<String, dynamic>> outletsToSave = [activeOutlet];
 
-      final sellingPrice = double.tryParse(_hargaJualController.text) ?? 0.0;
-      final costPrice = double.tryParse(_hargaBeliController.text);
+      final sellingPrice =
+          double.tryParse(_hargaJualController.text.replaceAll('.', '')) ?? 0.0;
+      final costPrice =
+      double.tryParse(_hargaBeliController.text.replaceAll('.', ''));
       final stok = int.tryParse(_stokController.text) ?? 0;
 
       if (_isEditMode) {
@@ -231,8 +244,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
       return Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.cloud_upload_outlined,
-              size: 40, color: Colors.grey[600]),
+          Icon(Icons.cloud_upload_outlined, size: 40, color: Colors.grey[600]),
           const SizedBox(height: 8),
           Text('Pilih Foto', style: TextStyle(color: Colors.grey[700])),
         ],
@@ -282,7 +294,8 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                         _buildActiveOutletDisplay(),
                         const SizedBox(height: 16),
                         Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          padding:
+                          const EdgeInsets.symmetric(vertical: 8),
                           decoration: BoxDecoration(
                             border: Border.all(color: Colors.grey[300]!),
                             borderRadius: BorderRadius.circular(8),
@@ -308,7 +321,6 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                           ),
                         ),
                         const SizedBox(height: 16),
-
                         _buildTextField(
                           controller: _namaProdukController,
                           label: 'Nama Produk',
@@ -319,8 +331,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                         _buildTextField(
                           controller: _deskripsiController,
                           label: 'Deskripsi Produk',
-                          hint:
-                          'Contoh: Perpaduan kopi...',
+                          hint: 'Contoh: Perpaduan kopi...',
                           maxLines: 3,
                         ),
                         const SizedBox(height: 16),
@@ -371,6 +382,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                                 hint: '0',
                                 keyboardType: TextInputType.number,
                                 prefixText: 'Rp ',
+                                isCurrency: true,
                               ),
                             ),
                             const SizedBox(width: 16),
@@ -382,6 +394,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                                 isRequired: true,
                                 keyboardType: TextInputType.number,
                                 prefixText: 'Rp ',
+                                isCurrency: true,
                               ),
                             ),
                           ],
@@ -486,6 +499,7 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
     String? prefixText,
+    bool isCurrency = false,
     ValueChanged<String>? onChanged,
   }) {
     return Column(
@@ -503,6 +517,21 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
           controller: controller,
           maxLines: maxLines,
           keyboardType: keyboardType,
+          onChanged: (value) {
+            if (isCurrency && value.isNotEmpty) {
+              String cleanValue = value.replaceAll('.', '');
+              if (cleanValue.isEmpty) return;
+              double? parsed = double.tryParse(cleanValue);
+              if (parsed != null) {
+                String formatted = _formatter.format(parsed);
+                controller.value = TextEditingValue(
+                  text: formatted,
+                  selection: TextSelection.collapsed(offset: formatted.length),
+                );
+              }
+            }
+            if (onChanged != null) onChanged(value);
+          },
           decoration: InputDecoration(
             hintText: hint,
             prefixText: prefixText,
@@ -523,9 +552,11 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
             }
             if (keyboardType == TextInputType.number &&
                 value != null &&
-                value.isNotEmpty &&
-                double.tryParse(value) == null) {
-              return 'Masukkan angka yang valid';
+                value.isNotEmpty) {
+              String cleanValue = value.replaceAll('.', '');
+              if (double.tryParse(cleanValue) == null) {
+                return 'Masukkan angka yang valid';
+              }
             }
             return null;
           },
@@ -604,7 +635,8 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Nama Grup', style: TextStyle(fontWeight: FontWeight.w600)),
+                        const Text('Nama Grup',
+                            style: TextStyle(fontWeight: FontWeight.w600)),
                         const SizedBox(height: 8),
                         TextFormField(
                           initialValue: variant['groupName'] ?? '',
@@ -612,7 +644,8 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                             hintText: 'Misal: Level Es',
                             filled: true,
                             fillColor: Colors.white,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
                               borderSide: BorderSide(color: Colors.grey[300]!),
@@ -634,7 +667,8 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Opsi', style: TextStyle(fontWeight: FontWeight.w600)),
+                        const Text('Opsi',
+                            style: TextStyle(fontWeight: FontWeight.w600)),
                         const SizedBox(height: 8),
                         TextFormField(
                           initialValue: variant['options'] ?? '',
@@ -642,7 +676,8 @@ class _TambahProdukPageState extends State<TambahProdukPage> {
                             hintText: 'Normal, Less, No',
                             filled: true,
                             fillColor: Colors.white,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
                               borderSide: BorderSide(color: Colors.grey[300]!),
