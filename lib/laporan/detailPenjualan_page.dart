@@ -174,6 +174,142 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
     return _filteredData.fold(0.0, (sum, item) => sum + ((item['totalPenjualan'] ?? 0) as num).toDouble());
   }
 
+  Future<void> _showEditDateDialog(Map<String, dynamic> transaction) async {
+    final DateTime currentDate = transaction['timestamp'] ?? DateTime.now();
+    DateTime? selectedDate = currentDate;
+
+    final result = await showDialog<DateTime>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: const Text(
+            'Ubah Tanggal Transaksi',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'No. Transaksi: ${transaction['noTransaksi']}',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Tanggal Saat Ini: ${_dateFormatter.format(currentDate)}',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 24),
+                Center(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final DateTime? picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate ?? currentDate,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2030),
+                        builder: (context, child) {
+                          return Theme(
+                            data: ThemeData.light().copyWith(
+                              colorScheme: const ColorScheme.light(
+                                primary: Color(0xFF279E9E),
+                                onPrimary: Colors.white,
+                              ),
+                              textButtonTheme: TextButtonThemeData(
+                                style: TextButton.styleFrom(
+                                  foregroundColor: const Color(0xFF279E9E),
+                                ),
+                              ),
+                            ),
+                            child: child!,
+                          );
+                        },
+                      );
+                      if (picked != null) {
+                        final TimeOfDay? pickedTime = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.fromDateTime(selectedDate ?? currentDate),
+                          builder: (context, child) {
+                            return Theme(
+                              data: ThemeData.light().copyWith(
+                                colorScheme: const ColorScheme.light(
+                                  primary: Color(0xFF279E9E),
+                                  onPrimary: Colors.white,
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (pickedTime != null) {
+                          selectedDate = DateTime(
+                            picked.year,
+                            picked.month,
+                            picked.day,
+                            pickedTime.hour,
+                            pickedTime.minute,
+                          );
+                          Navigator.of(context).pop(selectedDate);
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.calendar_today, size: 18),
+                    label: const Text('Pilih Tanggal & Waktu'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF279E9E),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(null),
+              child: const Text(
+                'Batal',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result != null && result != currentDate) {
+      await _updateTransactionDate(transaction['id'], result);
+    }
+  }
+
+  Future<void> _updateTransactionDate(String transactionId, DateTime newDate) async {
+    try {
+      await _apiService.updateTransactionDate(
+        transactionId: transactionId,
+        newDate: newDate,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tanggal transaksi berhasil diubah')),
+        );
+      }
+
+      await _fetchData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengubah tanggal: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _exportToPdf() async {
     try {
       final doc = pw.Document();
@@ -505,7 +641,7 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
         controller: _scrollController,
         scrollDirection: Axis.horizontal,
         child: Container(
-          constraints: const BoxConstraints(minWidth: 1000),
+          constraints: const BoxConstraints(minWidth: 1100),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
@@ -581,6 +717,9 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
           numeric: true,
           onSort: (columnIndex, ascending) => _onSort(columnIndex, ascending),
         ),
+        DataColumn(
+          label: SizedBox(width: 80, child: Center(child: Text('AKSI', style: headerStyle))),
+        ),
       ],
       rows: data.map((item) {
         final DateTime dateVal = item['timestamp'] is DateTime
@@ -625,6 +764,36 @@ class _DetailPenjualanPageState extends State<DetailPenjualanPage> {
               _currencyFormatter.format(item['totalPenjualan'] ?? 0),
               style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF444444)),
             ))),
+            DataCell(
+              SizedBox(
+                width: 80,
+                child: Center(
+                  child: PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert, color: Color(0xFF279E9E)),
+                    offset: const Offset(0, 40),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    onSelected: (value) {
+                      if (value == 'edit') {
+                        _showEditDateDialog(item);
+                      }
+                    },
+                    itemBuilder: (BuildContext context) => [
+                      const PopupMenuItem<String>(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            SizedBox(width: 12),
+                            Text('Ubah'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ],
         );
       }).toList(),

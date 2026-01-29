@@ -2131,4 +2131,31 @@ class ApiService {
       rethrow;
     }
   }
+
+  Future<void> updateTransactionDate({
+    required String transactionId,
+    required DateTime newDate,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      final url = Uri.parse('$_baseUrl/reports/transactions/$transactionId/update-date');
+
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'newDate': newDate.toIso8601String(),
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Gagal mengubah tanggal transaksi: ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
 }
