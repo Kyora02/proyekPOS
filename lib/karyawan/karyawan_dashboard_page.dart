@@ -10,11 +10,12 @@ import 'package:proyekpos2/sync-transaction/sync_manager_service.dart';
 import '../../registration/login_page.dart';
 import '../../payment/payment_webview_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:html' as html;
 import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'package:proyekpos2/karyawan/denah_meja_page.dart';
 import 'package:proyekpos2/selfie_attendance_dialog.dart';
+import 'package:proyekpos2/util/web_stub.dart'
+if (dart.library.html) 'dart:html' as html;
 
 class KaryawanDashboardPage extends StatefulWidget {
   final Map<String, dynamic> karyawanData;
